@@ -7,7 +7,8 @@ VALUES
   (1, 'Alok Kumar (UPCL)', '+91 87872 20423', 'active', 'ADMIN', 'ग्रामोदय यूथ मंच', '/images/alok_profile_1786317857578.jpg'),
   (2, 'Vikash Kumar', '+91 94507 06183', 'active', 'ADMIN', 'ग्रामोदय यूथ मंच', '/images/vikash_profile_1786317831617.jpg'),
   (3, 'Rajnish Kumar', '+91 94507 06182', 'active', 'ADMIN', 'ग्रामोदय यूथ मंच', '/images/rajnish_profile_1786317842982.jpg'),
-  (4, 'Abhishek Kumar (Railway)', '+91 84004 88759', 'active', 'ADMIN', 'ग्रामोदय यूथ मंच', '/images/abhishek_profile_1786317869389.jpg')
+  (4, 'Abhishek Kumar (Railway)', '+91 84004 88759', 'active', 'ADMIN', 'ग्रामोदय यूथ मंच', '/images/abhishek_profile_1786317869389.jpg'),
+  (5, 'Super Admin (Global)', '+91 88877 54321', 'active', 'SUPER_ADMIN', 'ग्रामोदय यूथ मंच', '')
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name,
   mobile = EXCLUDED.mobile,

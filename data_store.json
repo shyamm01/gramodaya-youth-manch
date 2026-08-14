@@ -36,6 +36,17 @@
   "userVillageRoles": [],
   "admins": [
     {
+      "id": "admin_super",
+      "name": "Super Admin (Global)",
+      "mobile": "+91 88877 54321",
+      "email": "superadmin@gramodaya.org",
+      "role": "SUPER_ADMIN",
+      "village": "Rasoolpur",
+      "gramPanchayat": "Bahera",
+      "isHead": true,
+      "photoUrl": ""
+    },
+    {
       "id": "admin_1",
       "name": "Alok Kumar (UPCL)",
       "mobile": "+91 87872 20423",
@@ -81,6 +92,14 @@
     }
   ],
   "members": [
+    {
+      "id": "mem_super",
+      "name": "Super Admin (Global)",
+      "mobile": "+91 88877 54321",
+      "role": "SUPER_ADMIN",
+      "status": "active",
+      "createdAt": "2026-08-01"
+    },
     {
       "id": "mem_1",
       "name": "Adesh",
@@ -613,8 +632,19 @@
     }
   ],
   "adminPasswords": {
+    "admin_super": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "8887754321": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
     "admin_1": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
-    "": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9"
+    "8787220423": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "admin_2": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "9450706183": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "admin_3": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "9450706182": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "admin_4": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "8400488759": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9"
   },
-  "memberPasswords": {}
+  "memberPasswords": {
+    "mem_super": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "8887754321": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9"
+  }
 }
