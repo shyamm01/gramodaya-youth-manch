@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { verifyJwtToken } from './src/lib/jwtAuth';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
 
   // 1. Extract token from Authorization header or gym_auth_token cookie
@@ -30,7 +30,7 @@ export async function middleware(request: NextRequest) {
         requestHeaders.set('x-is-admin', user.isAdmin ? 'true' : 'false');
       }
     } catch {
-      // invalid token ignored in middleware, handled by individual endpoints
+      // invalid token ignored in proxy, handled by individual endpoints
     }
   }
 
@@ -40,17 +40,16 @@ export async function middleware(request: NextRequest) {
     },
   });
 
+  // Set Permissions-Policy header to allow extension handlers without unload violations
+  response.headers.set('Permissions-Policy', 'unload=*');
+
   return response;
 }
 
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
+     * Match all request paths except for static files & images
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],

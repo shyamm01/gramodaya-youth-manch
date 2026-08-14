@@ -42,6 +42,7 @@ export const viewport: Viewport = {
 };
 
 import { ThemeProvider } from '@/src/components/common';
+import { ReduxProvider } from '@/src/store/ReduxProvider';
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 
@@ -64,9 +65,11 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-[#F8F9FA] dark:bg-[#0B0F17] text-[#1E293B] dark:text-[#F8FAFC] flex flex-col antialiased selection:bg-amber-100 selection:text-amber-900 transition-colors duration-200">
-        <ThemeProvider>
-          <AppShell>{children}</AppShell>
-        </ThemeProvider>
+        <ReduxProvider>
+          <ThemeProvider>
+            <AppShell>{children}</AppShell>
+          </ThemeProvider>
+        </ReduxProvider>
       </body>
     </html>
   );
