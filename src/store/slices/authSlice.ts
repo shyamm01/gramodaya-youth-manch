@@ -1,6 +1,6 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import type { Member, SystemRole, PermissionCode } from '@/src/types';
-import { gymApi } from '../services/gymApi';
+import { apiClient } from '@/src/lib/apiClient';
 
 export interface AuthState {
   user: Member | null;
@@ -14,6 +14,67 @@ export interface AuthState {
   status: 'idle' | 'loading' | 'succeeded' | 'failed';
   error: string | null;
 }
+
+// ── 1. ASYNC THUNKS (createAsyncThunk with Axios) ──
+
+export const loginUser = createAsyncThunk(
+  'auth/loginUser',
+  async (credentials: { identifier: string; password: string }, { rejectWithValue }) => {
+    try {
+      const data = await apiClient.post('/api/auth/login', credentials);
+      if (!data?.success) {
+        return rejectWithValue(data?.error || 'लॉगिन करने में त्रुटि हुई।');
+      }
+      return data;
+    } catch (err: any) {
+      return rejectWithValue(err.message || 'नेटवर्क त्रुटि हुई।');
+    }
+  }
+);
+
+export const registerUser = createAsyncThunk(
+  'auth/registerUser',
+  async (memberData: Record<string, any>, { rejectWithValue }) => {
+    try {
+      const data = await apiClient.post('/api/members', memberData);
+      if (!data?.success) {
+        return rejectWithValue(data?.error || 'पंजीकरण करने में त्रुटि हुई।');
+      }
+      return data;
+    } catch (err: any) {
+      return rejectWithValue(err.message || 'नेटवर्क त्रुटि हुई।');
+    }
+  }
+);
+
+export const fetchCurrentUser = createAsyncThunk(
+  'auth/fetchCurrentUser',
+  async (_, { rejectWithValue }) => {
+    try {
+      const data = await apiClient.get('/api/auth/me');
+      if (!data?.authenticated) {
+        return rejectWithValue('Unauthenticated');
+      }
+      return data;
+    } catch (err: any) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+export const logoutUser = createAsyncThunk(
+  'auth/logoutUser',
+  async (_, { rejectWithValue }) => {
+    try {
+      const data = await apiClient.post('/api/auth/logout');
+      return data;
+    } catch (err: any) {
+      return rejectWithValue(err.message);
+    }
+  }
+);
+
+// ── 2. INITIAL STATE ──
 
 const loadInitialAuth = (): Partial<AuthState> => {
   if (typeof window === 'undefined') return {};
@@ -65,6 +126,8 @@ const initialState: AuthState = {
   error: null,
 };
 
+// ── 3. SLICE DEFINITION ──
+
 export const authSlice = createSlice({
   name: 'auth',
   initialState,
@@ -96,14 +159,14 @@ export const authSlice = createSlice({
           'gym_auth',
           JSON.stringify({
             isAdminLoggedIn: isAdm,
-            isMemberLoggedIn: !isAdm,
+            isMemberLoggedIn: true,
             role: effectiveRole,
             systemRole: effectiveRole,
             adminId: isAdm ? user.id : undefined,
             adminName: isAdm ? user.name : undefined,
             adminMobile: isAdm ? user.mobile : undefined,
-            currentMember: !isAdm ? user : undefined,
-            currentMemberMobile: !isAdm ? user.mobile : undefined,
+            currentMember: user,
+            currentMemberMobile: user.mobile,
             token,
           })
         );
@@ -139,51 +202,108 @@ export const authSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // 1. Login Mutation handling
-    builder.addMatcher(gymApi.endpoints.login.matchPending, (state) => {
-      state.status = 'loading';
-      state.error = null;
-    });
-    builder.addMatcher(gymApi.endpoints.login.matchFulfilled, (state, action) => {
-      state.status = 'succeeded';
+    // 1. loginUser Thunk
+    builder
+      .addCase(loginUser.pending, (state) => {
+        state.status = 'loading';
+        state.error = null;
+      })
+      .addCase(loginUser.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        const payload = action.payload;
+        const effectiveRole = payload.role || payload.user?.systemRole || (payload.isAdmin ? 'ADMIN' : 'MEMBER');
+        const isAdm = Boolean(payload.isAdmin || effectiveRole === 'SUPER_ADMIN' || effectiveRole === 'ADMIN');
+        const user = payload.user || payload.member;
+
+        state.user = user;
+        state.token = payload.token;
+        state.role = effectiveRole;
+        state.systemRole = effectiveRole;
+        state.isAuthenticated = true;
+        state.isAdmin = isAdm;
+        state.isSuperAdmin = effectiveRole === 'SUPER_ADMIN';
+
+        if (typeof window !== 'undefined' && payload.token) {
+          localStorage.setItem('gym_token', payload.token);
+          localStorage.setItem(
+            'gym_auth',
+            JSON.stringify({
+              isAdminLoggedIn: isAdm,
+              isMemberLoggedIn: true,
+              role: effectiveRole,
+              systemRole: effectiveRole,
+              adminId: isAdm ? user?.id : undefined,
+              adminName: isAdm ? user?.name : undefined,
+              adminMobile: isAdm ? user?.mobile : undefined,
+              currentMember: user,
+              currentMemberMobile: user?.mobile,
+              token: payload.token,
+            })
+          );
+        }
+      })
+      .addCase(loginUser.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = (action.payload as string) || action.error.message || 'Login failed';
+      });
+
+    // 2. registerUser Thunk
+    builder
+      .addCase(registerUser.pending, (state) => {
+        state.status = 'loading';
+        state.error = null;
+      })
+      .addCase(registerUser.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        const payload = action.payload;
+        if (payload.token && payload.member) {
+          state.user = payload.member;
+          state.token = payload.token;
+          state.role = 'MEMBER';
+          state.systemRole = 'MEMBER';
+          state.isAuthenticated = true;
+          state.isAdmin = false;
+          state.isSuperAdmin = false;
+
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('gym_token', payload.token);
+            localStorage.setItem(
+              'gym_auth',
+              JSON.stringify({
+                isAdminLoggedIn: false,
+                isMemberLoggedIn: true,
+                role: 'MEMBER',
+                systemRole: 'MEMBER',
+                currentMember: payload.member,
+                currentMemberMobile: payload.member.mobile,
+                token: payload.token,
+              })
+            );
+          }
+        }
+      })
+      .addCase(registerUser.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = (action.payload as string) || action.error.message || 'Registration failed';
+      });
+
+    // 3. fetchCurrentUser Thunk
+    builder.addCase(fetchCurrentUser.fulfilled, (state, action) => {
       const payload = action.payload;
-      const effectiveRole = payload.role || payload.user?.systemRole || (payload.isAdmin ? 'ADMIN' : 'MEMBER');
-      const isAdm = payload.isAdmin || effectiveRole === 'SUPER_ADMIN' || effectiveRole === 'ADMIN';
-
-      state.user = payload.user || payload.member;
-      state.token = payload.token;
-      state.role = effectiveRole;
-      state.systemRole = effectiveRole;
-      state.isAuthenticated = true;
-      state.isAdmin = isAdm;
-      state.isSuperAdmin = effectiveRole === 'SUPER_ADMIN';
-
-      if (typeof window !== 'undefined' && payload.token) {
-        localStorage.setItem('gym_token', payload.token);
-        localStorage.setItem(
-          'gym_auth',
-          JSON.stringify({
-            isAdminLoggedIn: isAdm,
-            isMemberLoggedIn: !isAdm,
-            role: effectiveRole,
-            systemRole: effectiveRole,
-            adminId: isAdm ? payload.user?.id : undefined,
-            adminName: isAdm ? payload.user?.name : undefined,
-            adminMobile: isAdm ? payload.user?.mobile : undefined,
-            currentMember: !isAdm ? (payload.user || payload.member) : undefined,
-            currentMemberMobile: !isAdm ? (payload.user?.mobile || payload.member?.mobile) : undefined,
-            token: payload.token,
-          })
-        );
+      if (payload.authenticated && payload.user) {
+        const isAdm = Boolean(payload.isAdmin || payload.role === 'SUPER_ADMIN' || payload.role === 'ADMIN');
+        state.user = payload.user;
+        state.token = payload.token || state.token;
+        state.role = payload.role;
+        state.systemRole = payload.role;
+        state.isAuthenticated = true;
+        state.isAdmin = isAdm;
+        state.isSuperAdmin = payload.role === 'SUPER_ADMIN';
       }
     });
-    builder.addMatcher(gymApi.endpoints.login.matchRejected, (state, action) => {
-      state.status = 'failed';
-      state.error = (action.payload as any)?.data?.error || action.error.message || 'Login failed';
-    });
 
-    // 2. Logout Mutation handling
-    builder.addMatcher(gymApi.endpoints.logout.matchFulfilled, (state) => {
+    // 4. logoutUser Thunk
+    builder.addCase(logoutUser.fulfilled, (state) => {
       state.user = null;
       state.token = null;
       state.role = null;
@@ -196,37 +316,6 @@ export const authSlice = createSlice({
         localStorage.removeItem('gym_token');
         localStorage.removeItem('gym_auth');
         localStorage.removeItem('gym_member_mobile');
-      }
-    });
-
-    // 3. Register Member Mutation handling
-    builder.addMatcher(gymApi.endpoints.registerMember.matchFulfilled, (state, action) => {
-      state.status = 'succeeded';
-      const payload = action.payload;
-      if (payload.token) {
-        state.user = payload.member;
-        state.token = payload.token;
-        state.role = 'MEMBER';
-        state.systemRole = 'MEMBER';
-        state.isAuthenticated = true;
-        state.isAdmin = false;
-        state.isSuperAdmin = false;
-
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('gym_token', payload.token);
-          localStorage.setItem(
-            'gym_auth',
-            JSON.stringify({
-              isAdminLoggedIn: false,
-              isMemberLoggedIn: true,
-              role: 'MEMBER',
-              systemRole: 'MEMBER',
-              currentMember: payload.member,
-              currentMemberMobile: payload.member?.mobile,
-              token: payload.token,
-            })
-          );
-        }
       }
     });
   },
