@@ -43,7 +43,7 @@ export async function POST(req: Request) {
         `
       : await sql`
           SELECT * FROM public.members 
-          WHERE mobile LIKE ${`%${cleanDigits}%`}
+          WHERE REGEXP_REPLACE(mobile, '\\D', '', 'g') LIKE ${'%' + cleanDigits}
           LIMIT 1;
         `;
 
