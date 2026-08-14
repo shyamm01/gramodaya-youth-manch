@@ -51,6 +51,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
   const [name, setName] = useState('');
   const [fatherName, setFatherName] = useState('');
   const [dob, setDob] = useState('');
+  const [gender, setGender] = useState('');
   const [selectedVillageId, setSelectedVillageId] = useState<string>(
     activeVillageId || 'vil_rasoolpur'
   );
@@ -234,6 +235,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
       photoUrl,
       fatherName: fatherName.trim(),
       dob: dob.trim(),
+      gender: gender.trim(),
       address:
         address.trim() ||
         `${lang === 'en' ? 'Village ' + (selectedVillageObj.name || 'Rasoolpur') : 'ग्राम ' + (selectedVillageObj.nameHindi || 'रसूलपुर')}`,
@@ -282,6 +284,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
     setName('');
     setFatherName('');
     setDob('');
+    setGender('');
     setAddress('');
     setPhotoUrl('');
     setOccupation('');
@@ -376,6 +379,8 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
               setFatherName={setFatherName}
               dob={dob}
               setDob={setDob}
+              gender={gender}
+              setGender={setGender}
               selectedVillageId={selectedVillageId}
               setSelectedVillageId={setSelectedVillageId}
               address={address}

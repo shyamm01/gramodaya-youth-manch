@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore, logAuditAction, normalizeMobile, isAuthorizedAdminMobile, hashPassword } from '@/src/lib/serverStore';
+import { signJwtToken } from '@/src/lib/jwtAuth';
 
 export async function POST(req: Request) {
   try {
@@ -57,12 +58,25 @@ export async function POST(req: Request) {
       }
     }
 
+    const adminRole = admin.role || 'ADMIN';
+    const jwtToken = await signJwtToken({
+      id: admin.id,
+      name: admin.name,
+      mobile: admin.mobile,
+      email: admin.email,
+      role: adminRole,
+      systemRole: adminRole,
+      villageId: admin.villageId,
+      permissions: admin.permissions || [],
+      isAdmin: true,
+    });
+
     logAuditAction('Admin Login Success', admin.name, admin.mobile, 'Admin Dashboard');
 
     return NextResponse.json({
       success: true,
       admin,
-      token: `session_${admin.id}_${Date.now()}`,
+      token: jwtToken,
     });
   } catch (err: any) {
     console.error('Admin login error:', err);

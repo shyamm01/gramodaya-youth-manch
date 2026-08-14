@@ -103,6 +103,7 @@ interface AppContextType {
           photoUrl?: string;
           fatherName?: string;
           dob?: string;
+          gender?: string;
           address?: string;
           villageId?: string;
           occupation?: string;
@@ -980,6 +981,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           photoUrl?: string;
           fatherName?: string;
           dob?: string;
+          gender?: string;
           address?: string;
           villageId?: string;
           occupation?: string;

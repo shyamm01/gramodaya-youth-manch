@@ -20,6 +20,8 @@ interface JoinStepPersonalProps {
   setFatherName: (f: string) => void;
   dob: string;
   setDob: (d: string) => void;
+  gender: string;
+  setGender: (g: string) => void;
   selectedVillageId: string;
   setSelectedVillageId: (v: string) => void;
   address: string;
@@ -40,6 +42,8 @@ export const JoinStepPersonal: React.FC<JoinStepPersonalProps> = ({
   setFatherName,
   dob,
   setDob,
+  gender,
+  setGender,
   selectedVillageId,
   setSelectedVillageId,
   address,
@@ -166,8 +170,24 @@ export const JoinStepPersonal: React.FC<JoinStepPersonalProps> = ({
         </div>
       </div>
 
-      {/* ── ROW 3: DOB & ADDRESS ── */}
+      {/* ── ROW 3: GENDER & DOB ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+            {lang === 'en' ? 'Gender' : 'लिंग (Gender)'}
+          </label>
+          <select
+            value={gender}
+            onChange={(e) => setGender(e.target.value)}
+            className="w-full h-9.5 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+          >
+            <option value="">{lang === 'en' ? 'Select Gender' : 'लिंग चुनें'}</option>
+            <option value="male">{lang === 'en' ? 'Male (पुरुष)' : 'पुरुष (Male)'}</option>
+            <option value="female">{lang === 'en' ? 'Female (महिला)' : 'महिला (Female)'}</option>
+            <option value="other">{lang === 'en' ? 'Other (अन्य)' : 'अन्य (Other)'}</option>
+          </select>
+        </div>
+
         <div className="space-y-1.5 relative z-30">
           <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
             {t('join.dob')}
@@ -183,19 +203,20 @@ export const JoinStepPersonal: React.FC<JoinStepPersonalProps> = ({
             className="h-9.5 text-xs rounded-lg"
           />
         </div>
+      </div>
 
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-            {t('join.localAddress')}
-          </label>
-          <Input
-            type="text"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder={lang === 'en' ? 'e.g. Ward No. 04' : 'उदा. वार्ड संख्या ०४'}
-            className="h-9.5 text-xs rounded-lg"
-          />
-        </div>
+      {/* ── ROW 4: ADDRESS ── */}
+      <div className="space-y-1.5">
+        <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
+          {t('join.localAddress')}
+        </label>
+        <Input
+          type="text"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          placeholder={lang === 'en' ? 'e.g. Ward No. 04' : 'उदा. वार्ड संख्या ०४'}
+          className="h-9.5 text-xs rounded-lg"
+        />
       </div>
 
       {/* ── ACTION BUTTONS ── */}

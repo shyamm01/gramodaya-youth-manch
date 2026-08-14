@@ -133,6 +133,7 @@ export interface Admin {
   photoUrl?: string;
   isHead: boolean;
   hasPasswordSet?: boolean;
+  permissions?: PermissionCode[];
 }
 
 export interface Member {
@@ -146,6 +147,7 @@ export interface Member {
   organizationName?: string;
   fatherName?: string;
   dob?: string;
+  gender?: string;
   address?: string;
   occupation?: string;
   designation?: string;

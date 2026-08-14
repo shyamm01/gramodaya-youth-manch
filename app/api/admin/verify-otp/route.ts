@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore, normalizeMobile, getOtpStore, logAuditAction } from '@/src/lib/serverStore';
+import { signJwtToken } from '@/src/lib/jwtAuth';
 
 export async function POST(req: Request) {
   try {
@@ -33,12 +34,25 @@ export async function POST(req: Request) {
     );
 
     if (admin) {
+      const adminRole = admin.role || 'ADMIN';
+      const jwtToken = await signJwtToken({
+        id: admin.id,
+        name: admin.name,
+        mobile: admin.mobile,
+        email: admin.email,
+        role: adminRole,
+        systemRole: adminRole,
+        villageId: admin.villageId,
+        permissions: admin.permissions || [],
+        isAdmin: true,
+      });
+
       logAuditAction('Admin OTP Login Success', admin.name, admin.mobile, 'Unified Portal');
       return NextResponse.json({
         success: true,
         isAdmin: true,
         admin,
-        token: `session_${admin.id}_${Date.now()}`,
+        token: jwtToken,
         message: 'ओटीपी सत्यापन सफल! एडमिन पोर्टल में प्रवेश स्वीकृत।',
       });
     }
@@ -57,6 +71,12 @@ export async function POST(req: Request) {
         fatherName: '',
         dob: '',
         address: 'ग्राम रसूलपुर, ग्राम पंचायत बहेरा',
+        occupation: '',
+        designation: '',
+        politicalBackground: '',
+        bloodGroup: '',
+        role: 'MEMBER' as const,
+        systemRole: 'MEMBER' as const,
       };
       store.members.push(newMember);
       saveStore(store);
@@ -69,12 +89,21 @@ export async function POST(req: Request) {
     }
 
     const member = store.members[memberIndex];
+    const memberJwt = await signJwtToken({
+      id: member.id,
+      name: member.name,
+      mobile: member.mobile,
+      role: member.systemRole || member.role || 'MEMBER',
+      systemRole: member.systemRole || member.role || 'MEMBER',
+      villageId: member.villageId,
+      isAdmin: false,
+    });
 
     return NextResponse.json({
       success: true,
       isAdmin: false,
       member,
-      token: `mem_session_${member.id}_${Date.now()}`,
+      token: memberJwt,
       message: 'ओटीपी सत्यापन सफल! पोर्टल में प्रवेश स्वीकृत।',
     });
   } catch (error: any) {

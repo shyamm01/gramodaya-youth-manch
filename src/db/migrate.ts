@@ -194,7 +194,12 @@ async function runDatabaseMigrationsAndRoles() {
         organization_name text DEFAULT 'ग्रामोदय यूथ मंच',
         father_name text,
         dob text,
+        gender text,
         address text DEFAULT 'ग्राम रसूलपुर, ग्राम पंचायत बहेरा',
+        occupation text,
+        designation text,
+        political_background text,
+        blood_group text,
         created_at timestamptz DEFAULT now() NOT NULL,
         updated_at timestamptz DEFAULT now() NOT NULL
       );
