@@ -508,8 +508,30 @@ export const auditLogs = pgTable(
 );
 
 // ==============================================================================
-// 5. RELATIONS (संबंध)
+// 5. RELATIONS (पूर्ण संबंध मॉडलिंग)
 // ==============================================================================
+
+export const statesRelations = relations(states, ({ many }) => ({
+  districts: many(districts),
+  villages: many(villages),
+}));
+
+export const districtsRelations = relations(districts, ({ one, many }) => ({
+  state: one(states, {
+    fields: [districts.stateId],
+    references: [states.id],
+  }),
+  gramPanchayats: many(gramPanchayats),
+  villages: many(villages),
+}));
+
+export const gramPanchayatsRelations = relations(gramPanchayats, ({ one, many }) => ({
+  district: one(districts, {
+    fields: [gramPanchayats.districtId],
+    references: [districts.id],
+  }),
+  villages: many(villages),
+}));
 
 export const villagesRelations = relations(villages, ({ one, many }) => ({
   state: one(states, {
@@ -529,8 +551,31 @@ export const villagesRelations = relations(villages, ({ one, many }) => ({
   socialWorks: many(socialWorks),
   events: many(events),
   gallery: many(gallery),
+  elders: many(elders),
   announcements: many(announcements),
+  publicInfos: many(publicInfos),
+  groupMessages: many(groupMessages),
+  messages: many(messages),
   userVillageRoles: many(userVillageRoles),
+  auditLogs: many(auditLogs),
+}));
+
+export const permissionsRelations = relations(permissions, ({ many }) => ({
+  userPermissions: many(userPermissions),
+}));
+
+export const userPermissionsRelations = relations(userPermissions, ({ one }) => ({
+  permission: one(permissions, {
+    fields: [userPermissions.permissionCode],
+    references: [permissions.code],
+  }),
+}));
+
+export const userVillageRolesRelations = relations(userVillageRoles, ({ one }) => ({
+  village: one(villages, {
+    fields: [userVillageRoles.villageId],
+    references: [villages.id],
+  }),
 }));
 
 export const membersRelations = relations(members, ({ one, many }) => ({
@@ -547,3 +592,124 @@ export const complaintsRelations = relations(complaints, ({ one }) => ({
     references: [villages.id],
   }),
 }));
+
+export const socialWorksRelations = relations(socialWorks, ({ one }) => ({
+  village: one(villages, {
+    fields: [socialWorks.villageId],
+    references: [villages.id],
+  }),
+}));
+
+export const eventsRelations = relations(events, ({ one }) => ({
+  village: one(villages, {
+    fields: [events.villageId],
+    references: [villages.id],
+  }),
+}));
+
+export const galleryRelations = relations(gallery, ({ one }) => ({
+  village: one(villages, {
+    fields: [gallery.villageId],
+    references: [villages.id],
+  }),
+}));
+
+export const eldersRelations = relations(elders, ({ one }) => ({
+  village: one(villages, {
+    fields: [elders.villageId],
+    references: [villages.id],
+  }),
+}));
+
+export const announcementsRelations = relations(announcements, ({ one }) => ({
+  village: one(villages, {
+    fields: [announcements.villageId],
+    references: [villages.id],
+  }),
+}));
+
+export const publicInfosRelations = relations(publicInfos, ({ one }) => ({
+  village: one(villages, {
+    fields: [publicInfos.villageId],
+    references: [villages.id],
+  }),
+}));
+
+export const groupMessagesRelations = relations(groupMessages, ({ one }) => ({
+  village: one(villages, {
+    fields: [groupMessages.villageId],
+    references: [villages.id],
+  }),
+}));
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  village: one(villages, {
+    fields: [messages.villageId],
+    references: [villages.id],
+  }),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  village: one(villages, {
+    fields: [auditLogs.villageId],
+    references: [villages.id],
+  }),
+}));
+
+// ==============================================================================
+// 6. INFERRED TYPES (Drizzle ORM Inferred Types)
+// ==============================================================================
+
+export type State = typeof states.$inferSelect;
+export type NewState = typeof states.$inferInsert;
+
+export type District = typeof districts.$inferSelect;
+export type NewDistrict = typeof districts.$inferInsert;
+
+export type GramPanchayat = typeof gramPanchayats.$inferSelect;
+export type NewGramPanchayat = typeof gramPanchayats.$inferInsert;
+
+export type VillageModel = typeof villages.$inferSelect;
+export type NewVillageModel = typeof villages.$inferInsert;
+
+export type PermissionModel = typeof permissions.$inferSelect;
+export type NewPermissionModel = typeof permissions.$inferInsert;
+
+export type UserPermissionModel = typeof userPermissions.$inferSelect;
+export type NewUserPermissionModel = typeof userPermissions.$inferInsert;
+
+export type UserVillageRoleModel = typeof userVillageRoles.$inferSelect;
+export type NewUserVillageRoleModel = typeof userVillageRoles.$inferInsert;
+
+export type MemberModel = typeof members.$inferSelect;
+export type NewMemberModel = typeof members.$inferInsert;
+
+export type ComplaintModel = typeof complaints.$inferSelect;
+export type NewComplaintModel = typeof complaints.$inferInsert;
+
+export type SocialWorkModel = typeof socialWorks.$inferSelect;
+export type NewSocialWorkModel = typeof socialWorks.$inferInsert;
+
+export type EventModel = typeof events.$inferSelect;
+export type NewEventModel = typeof events.$inferInsert;
+
+export type GalleryModel = typeof gallery.$inferSelect;
+export type NewGalleryModel = typeof gallery.$inferInsert;
+
+export type ElderModel = typeof elders.$inferSelect;
+export type NewElderModel = typeof elders.$inferInsert;
+
+export type AnnouncementModel = typeof announcements.$inferSelect;
+export type NewAnnouncementModel = typeof announcements.$inferInsert;
+
+export type PublicInfoModel = typeof publicInfos.$inferSelect;
+export type NewPublicInfoModel = typeof publicInfos.$inferInsert;
+
+export type GroupMessageModel = typeof groupMessages.$inferSelect;
+export type NewGroupMessageModel = typeof groupMessages.$inferInsert;
+
+export type MessageModel = typeof messages.$inferSelect;
+export type NewMessageModel = typeof messages.$inferInsert;
+
+export type AuditLogModel = typeof auditLogs.$inferSelect;
+export type NewAuditLogModel = typeof auditLogs.$inferInsert;
