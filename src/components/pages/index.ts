@@ -1,0 +1,14 @@
+'use client';
+export { HomeSection } from './HomeSection';
+export { MembersSection } from './MembersSection';
+export { ProblemsSection } from './ProblemsSection';
+export { SocialWorkSection } from './SocialWorkSection';
+export { EventsSection } from './EventsSection';
+export { GallerySection } from './GallerySection';
+export { AnnouncementsSection } from './AnnouncementsSection';
+export { LeadershipSection } from './LeadershipSection';
+export { HelplineSection } from './HelplineSection';
+export { AboutSection } from './AboutSection';
+export { EldersSection } from './EldersSection';
+export { LiveChatSection } from './LiveChatSection';
+export { AdminPanel } from './AdminPanel';
