@@ -9,6 +9,7 @@ import {
   Input,
   Textarea,
   Dialog,
+  DatePicker,
 } from '../ui';
 import { WhatsAppIcon } from '../common';
 
@@ -308,12 +309,12 @@ export const SocialWorkSection: React.FC = () => {
               <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
                 {lang === 'en' ? 'Date *' : 'दिनांक *'}
               </label>
-              <Input
-                type="date"
-                required
+              <DatePicker
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="rounded-xl"
+                required
+                onChange={setDate}
+                placeholder={lang === 'en' ? 'Select Date' : 'तारीख चुनें'}
+                lang={lang}
               />
             </div>
             <div>

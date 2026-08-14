@@ -11,6 +11,7 @@ import {
   Input,
   Textarea,
   Dialog,
+  DatePicker,
 } from '../ui';
 import { WhatsAppIcon } from '../common';
 
@@ -295,11 +296,11 @@ export const EventsSection: React.FC = () => {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">दिनांक *</label>
-              <Input
-                type="date"
-                required
+              <DatePicker
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                required
+                onChange={setDate}
+                placeholder="कार्यक्रम दिनांक चुनें"
               />
             </div>
             <div>

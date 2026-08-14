@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { UserCheck, Shield, Camera, Edit3, Save, X, CheckCircle2, CreditCard, Lock, Phone, MapPin, Calendar, User } from 'lucide-react';
 import { DigitalIdCard } from '../features/DigitalIdCard';
+import { DatePicker } from '../ui';
 
 export const MyProfileModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const {
@@ -225,11 +226,12 @@ export const MyProfileModal: React.FC<{ isOpen: boolean; onClose: () => void }> 
                 <label className="block text-xs font-bold text-[#2C3327] mb-1">
                   📅 जन्म तिथि (DOB):
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={dob}
-                  onChange={(e) => setDob(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-white border border-[#E0DCCF] rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#4B634D]"
+                  onChange={setDob}
+                  placeholder="जन्म तिथि चुनें"
+                  minYear={1930}
+                  maxYear={new Date().getFullYear()}
                 />
               </div>
 

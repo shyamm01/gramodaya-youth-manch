@@ -147,6 +147,10 @@ export interface Member {
   fatherName?: string;
   dob?: string;
   address?: string;
+  occupation?: string;
+  designation?: string;
+  politicalBackground?: string;
+  bloodGroup?: string;
   role?: SystemRole | 'MEMBER' | 'ADMIN';
   systemRole?: SystemRole;
   supabaseUserId?: string;

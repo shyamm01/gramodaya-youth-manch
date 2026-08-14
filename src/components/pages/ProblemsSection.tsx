@@ -352,7 +352,7 @@ export const ProblemsSection: React.FC = () => {
               required
               value={reporterName}
               onChange={(e) => setReporterName(e.target.value)}
-              placeholder="उदा. रमेश कुमार"
+              placeholder={lang === 'en' ? 'e.g. Ramesh Kumar' : 'उदा. रमेश कुमार'}
               className="rounded-xl"
             />
           </div>
@@ -365,7 +365,7 @@ export const ProblemsSection: React.FC = () => {
               type="text"
               value={reporterMobile}
               onChange={(e) => setReporterMobile(e.target.value)}
-              placeholder="उदा. 9876543210"
+              placeholder={lang === 'en' ? 'e.g. 9876543210' : 'उदा. 9876543210'}
               className="rounded-xl"
             />
           </div>
@@ -400,7 +400,7 @@ export const ProblemsSection: React.FC = () => {
                 required
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="उदा. मुख्य चौराहा, रसूलपुर"
+                placeholder={lang === 'en' ? 'e.g. Main Square, Rasoolpur' : 'उदा. मुख्य चौराहा, रसूलपुर'}
                 className="rounded-xl"
               />
             </div>
@@ -415,7 +415,7 @@ export const ProblemsSection: React.FC = () => {
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="उदा. सड़क पर जलभराव या ट्रांसफार्मर खराब"
+              placeholder={lang === 'en' ? 'e.g. Waterlogging on road or transformer issue' : 'उदा. सड़क पर जलभराव या ट्रांसफार्मर खराब'}
               className="rounded-xl"
             />
           </div>
@@ -429,7 +429,7 @@ export const ProblemsSection: React.FC = () => {
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="समस्या का पूरा विवरण लिखें..."
+              placeholder={lang === 'en' ? 'Write detailed description of problem...' : 'समस्या का पूरा विवरण लिखें...'}
               className="rounded-xl"
             />
           </div>

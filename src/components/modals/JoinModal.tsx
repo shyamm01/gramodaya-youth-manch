@@ -1,16 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
-import { User, Phone, Calendar, CheckCircle, HeartHandshake, Building2, Camera } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { AlertCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { Member } from '../../types';
 import {
-  Button,
-  Input,
-  Dialog,
-  Avatar,
-  AvatarImage,
-  AvatarFallback,
-} from '../ui';
+  JoinModalHeader,
+  JoinStepOtp,
+  JoinStepPersonal,
+  JoinStepBackground,
+  JoinStepSuccess,
+} from './join';
 
 interface JoinModalProps {
   isOpen: boolean;
@@ -18,19 +18,140 @@ interface JoinModalProps {
 }
 
 export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
-  const { addMember, villageSettings, t } = useApp();
-  const [name, setName] = useState('');
-  const [mobile, setMobile] = useState('');
-  const [organizationName, setOrganizationName] = useState(villageSettings.orgNameHindi || 'ग्रामोदय यूथ मंच');
-  const [joiningDate, setJoiningDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [photoUrl, setPhotoUrl] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState('');
+  const {
+    addMember,
+    sendMemberOtp,
+    verifyMemberOtp,
+    villageSettings,
+    villages,
+    activeVillageId,
+    setSelectedIdCardMember,
+    t,
+    lang,
+  } = useApp();
 
+  // Wizard Step: 1 = Mobile OTP, 2 = Personal Details, 3 = Background & Pledge, 4 = Success
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+
+  // Step 1: Mobile & OTP State
+  const [mobile, setMobile] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [isOtpSent, setIsOtpSent] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [isMobileVerified, setIsMobileVerified] = useState(false);
+
+  // Step 2: Personal Details State
+  const [name, setName] = useState('');
+  const [fatherName, setFatherName] = useState('');
+  const [dob, setDob] = useState('');
+  const [selectedVillageId, setSelectedVillageId] = useState<string>(
+    activeVillageId || 'vil_rasoolpur'
+  );
+  const [address, setAddress] = useState('');
+  const [photoUrl, setPhotoUrl] = useState('');
+
+  // Step 3: Optional Background State
+  const [occupation, setOccupation] = useState('');
+  const [designation, setDesignation] = useState('');
+  const [politicalBackground, setPoliticalBackground] = useState('');
+  const [bloodGroup, setBloodGroup] = useState('');
+  const [pledgeAccepted, setPledgeAccepted] = useState(true);
+
+  // Submission & Confirmation State
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [registeredMember, setRegisteredMember] = useState<Member | null>(null);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
+
+  // Clean Mobile Digits
+  const cleanMobileDigits = mobile.replace(/\D/g, '').slice(-10);
+  const isMobileValid = cleanMobileDigits.length === 10;
+
+  // Countdown timer for OTP resend
+  useEffect(() => {
+    let timer: any;
+    if (resendTimer > 0) {
+      timer = setInterval(() => setResendTimer((prev) => prev - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [resendTimer]);
+
+  // Selected Village Information
+  const selectedVillageObj = useMemo(() => {
+    return (
+      (villages || []).find((v) => v.id === selectedVillageId) ||
+      villages[0] || {
+        nameHindi: villageSettings.nameHindi || 'रसूलपुर',
+        name: villageSettings.name || 'Rasoolpur',
+        gramPanchayatName: villageSettings.gramPanchayat || 'Bahera',
+        gramPanchayatNameHindi: villageSettings.gramPanchayatHindi || 'बहेरा',
+        districtName: villageSettings.district || 'Jaunpur',
+        districtNameHindi: villageSettings.districtHindi || 'जौनपुर',
+      }
+    );
+  }, [villages, selectedVillageId, villageSettings]);
+
+  // Handle Send OTP
+  const handleSendOtp = async () => {
+    if (!isMobileValid) {
+      setError(
+        lang === 'en'
+          ? 'Please enter a valid 10-digit mobile number.'
+          : 'कृपया वैध 10-अंकीय मोबाइल नंबर दर्ज करें।'
+      );
+      return;
+    }
+
+    setIsSendingOtp(true);
+    setError('');
+
+    const res = await sendMemberOtp(cleanMobileDigits);
+    setIsSendingOtp(false);
+
+    if (res.success) {
+      setIsOtpSent(true);
+      setResendTimer(60);
+    } else {
+      setError(res.error || (lang === 'en' ? 'Failed to send OTP.' : 'ओटीपी भेजने में त्रुटि हुई।'));
+    }
+  };
+
+  // Handle Verify OTP
+  const handleVerifyOtp = async () => {
+    if (!otpCode.trim() || otpCode.trim().length < 6) {
+      setError(lang === 'en' ? 'Please enter 6-digit OTP.' : 'कृपया 6-अंकीय ओटीपी कोड दर्ज करें।');
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    setError('');
+
+    const res = await verifyMemberOtp(cleanMobileDigits, otpCode.trim());
+    setIsVerifyingOtp(false);
+
+    if (res.success) {
+      setIsMobileVerified(true);
+      setCurrentStep(2);
+    } else {
+      setError(res.error || (lang === 'en' ? 'Invalid OTP code.' : 'अमान्य ओटीपी कोड दर्ज किया गया।'));
+    }
+  };
+
+  // Handle Photo Picker
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        setError(
+          lang === 'en'
+            ? 'Photo size must be under 5MB.'
+            : 'फ़ोटो का आकार 5MB से कम होना चाहिए।'
+        );
+        return;
+      }
+      setError('');
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === 'string') {
@@ -41,145 +162,220 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Step 2 Next
+  const handleNextFromStep2 = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !mobile.trim()) {
-      setError('कृपया अपना नाम एवं मोबाइल नंबर दर्ज करें।');
+    if (!name.trim()) {
+      setError(lang === 'en' ? 'Please enter member full name.' : 'कृपया सदस्य का पूरा नाम दर्ज करें।');
+      return;
+    }
+    setError('');
+    setCurrentStep(3);
+  };
+
+  // Step 3 Submit
+  const handleSubmitFinal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !isMobileValid) {
+      setError(lang === 'en' ? 'Please complete required personal details.' : 'कृपया आवश्यक व्यक्तिगत विवरण भरें।');
+      setCurrentStep(2);
+      return;
+    }
+    if (!pledgeAccepted) {
+      setError(lang === 'en' ? 'Please accept the membership pledge.' : 'कृपया सदस्यता संकल्प पत्र स्वीकार करें।');
       return;
     }
 
     setIsSubmitting(true);
     setError('');
+    setAlreadyRegistered(false);
 
-    const res = await addMember(name, mobile, photoUrl, joiningDate, organizationName);
+    const formattedMobile = `+91 ${cleanMobileDigits.slice(0, 5)} ${cleanMobileDigits.slice(5)}`;
+
+    const res = await addMember({
+      name: name.trim(),
+      mobile: formattedMobile,
+      photoUrl,
+      fatherName: fatherName.trim(),
+      dob: dob.trim(),
+      address:
+        address.trim() ||
+        `${lang === 'en' ? 'Village ' + (selectedVillageObj.name || 'Rasoolpur') : 'ग्राम ' + (selectedVillageObj.nameHindi || 'रसूलपुर')}`,
+      villageId: selectedVillageId,
+      occupation: occupation.trim(),
+      designation: designation.trim(),
+      politicalBackground: politicalBackground.trim(),
+      bloodGroup: bloodGroup.trim(),
+      organizationName: villageSettings.orgNameHindi || 'ग्रामोदय यूथ मंच',
+      joiningDate: new Date().toISOString().split('T')[0],
+    });
+
     setIsSubmitting(false);
 
-    if (res.success) {
-      setSuccess(true);
-      setTimeout(() => {
-        setSuccess(false);
-        setName('');
-        setMobile('');
-        setPhotoUrl('');
-        setOrganizationName(villageSettings.orgNameHindi || 'ग्रामोदय यूथ मंच');
-        setJoiningDate(new Date().toISOString().split('T')[0]);
-        onClose();
-      }, 2500);
+    if (res.success && res.member) {
+      setRegisteredMember(res.member);
+      setCurrentStep(4);
+    } else if (res.alreadyRegistered && res.member) {
+      setRegisteredMember(res.member);
+      setAlreadyRegistered(true);
+      setError(
+        res.error ||
+          (lang === 'en'
+            ? 'This mobile number is already registered.'
+            : 'यह मोबाइल नंबर पहले से पंजीकृत है।')
+      );
+      setCurrentStep(4);
     } else {
-      setError(res.error || 'पंजीकरण करने में त्रुटि हुई।');
+      setError(
+        res.error ||
+          (lang === 'en'
+            ? 'Error during registration. Please try again.'
+            : 'पंजीकरण करने में त्रुटि हुई। कृपया पुनः प्रयास करें।')
+      );
     }
   };
 
+  const handleResetForm = () => {
+    setCurrentStep(1);
+    setMobile('');
+    setOtpCode('');
+    setIsOtpSent(false);
+    setIsMobileVerified(false);
+    setName('');
+    setFatherName('');
+    setDob('');
+    setAddress('');
+    setPhotoUrl('');
+    setOccupation('');
+    setDesignation('');
+    setPoliticalBackground('');
+    setBloodGroup('');
+    setError('');
+    setRegisteredMember(null);
+    setAlreadyRegistered(false);
+    onClose();
+  };
+
+  const handleOpenMyDigitalCard = () => {
+    if (registeredMember) {
+      setSelectedIdCardMember(registeredMember);
+      onClose();
+    }
+  };
+
+  const handleShareWhatsApp = () => {
+    if (!registeredMember) return;
+    const text = encodeURIComponent(
+      `🌱 *${villageSettings.orgNameHindi || 'ग्रामोदय यूथ मंच'} — ${t('join.tag')}*\n\n` +
+        `👤 *${t('join.applicantName')}* ${registeredMember.name}\n` +
+        `📍 *${t('join.villageUnit')}* ${lang === 'en' ? selectedVillageObj.name : selectedVillageObj.nameHindi}\n` +
+        `📞 *${t('join.registeredMobile')}* ${registeredMember.mobile}\n` +
+        (occupation ? `💼 *पेशा/व्यवसाय:* ${occupation}\n` : '') +
+        `✅ ${lang === 'en' ? 'I have joined Gramodaya Youth Manch! Connect for village development.' : 'मैंने ग्रामोदय यूथ मंच की सदस्यता ले ली है। आप भी जुड़ें!'}\n\n` +
+        `🌐 ${typeof window !== 'undefined' ? window.location.origin : 'https://gramodaya.org'}`
+    );
+    window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+  };
+
+  if (!isOpen) return null;
+
   return (
-    <Dialog
-      isOpen={isOpen}
-      onClose={onClose}
-      title="ग्रामोदय यूथ मंच — सदस्यता फॉर्म"
-      description="डिजिटल सदस्य कार्ड हेतु विवरण भरें"
-      maxWidth="md"
-    >
-      <div className="space-y-4">
-        {error && (
-          <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs font-semibold rounded-xl text-center">
-            {error}
-          </div>
-        )}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+      {/* ── BACKDROP ── */}
+      <div
+        className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity animate-in fade-in"
+        onClick={handleResetForm}
+      />
 
-        {success ? (
-          <div className="p-6 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 rounded-2xl text-center space-y-2">
-            <CheckCircle className="w-10 h-10 text-emerald-600 dark:text-emerald-400 mx-auto" />
-            <h4 className="font-extrabold text-base">आवेदन सफलतापूर्वक जमा हुआ!</h4>
-            <p className="text-xs font-medium leading-relaxed">
-              आपका अनुरोध एडमिन स्वीकृति के बाद सक्रिय होगा और आपका डिजिटल ID कार्ड जनरेट हो जाएगा।
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Photo Preview & Picker */}
-            <div className="flex flex-col items-center justify-center">
-              <Avatar size="xl" className="border-2 border-emerald-600 dark:border-emerald-500 mb-2">
-                {photoUrl ? (
-                  <AvatarImage src={photoUrl} alt="Preview" />
-                ) : (
-                  <AvatarFallback>
-                    <User className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
-                  </AvatarFallback>
-                )}
-              </Avatar>
-              <label className="cursor-pointer inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 px-3 py-1.5 rounded-full hover:bg-emerald-100 transition">
-                <Camera className="w-3.5 h-3.5" />
-                <span>{photoUrl ? 'फ़ोटो बदलें' : 'अपनी फोटो अपलोड करें'}</span>
-                <input type="file" accept="image/*" onChange={handlePhotoSelect} className="hidden" />
-              </label>
+      {/* ── MODERN SHADCN CONTAINER ── */}
+      <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 shadow-2xl z-10 my-8 overflow-hidden transition-all text-slate-900 dark:text-slate-50 animate-in zoom-in-95 duration-200">
+        {/* Header & Step Indicator */}
+        <JoinModalHeader currentStep={currentStep} onClose={handleResetForm} />
+
+        {/* Dialog Content */}
+        <div className="p-6 max-h-[75vh] overflow-y-auto space-y-4">
+          {/* Error Banner */}
+          {error && currentStep !== 4 && (
+            <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-300 text-xs font-medium rounded-xl flex items-center gap-2.5">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-500" />
+              <span>{error}</span>
             </div>
+          )}
 
-            {/* Field 1: Name */}
-            <div>
-              <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
-                सदस्य का नाम *
-              </label>
-              <Input
-                type="text"
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="उदा. राहुल कुमार"
-              />
-            </div>
+          {/* Step 1: Mobile & OTP Verification */}
+          {currentStep === 1 && (
+            <JoinStepOtp
+              mobile={mobile}
+              setMobile={setMobile}
+              otpCode={otpCode}
+              setOtpCode={setOtpCode}
+              isOtpSent={isOtpSent}
+              setIsOtpSent={setIsOtpSent}
+              isSendingOtp={isSendingOtp}
+              isVerifyingOtp={isVerifyingOtp}
+              resendTimer={resendTimer}
+              isMobileValid={isMobileValid}
+              onSendOtp={handleSendOtp}
+              onVerifyOtp={handleVerifyOtp}
+            />
+          )}
 
-            {/* Field 2: Mobile */}
-            <div>
-              <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
-                मोबाइल नंबर *
-              </label>
-              <Input
-                type="tel"
-                required
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
-                placeholder="उदा. +91 98765 43210"
-              />
-            </div>
+          {/* Step 2: Personal Details */}
+          {currentStep === 2 && (
+            <JoinStepPersonal
+              name={name}
+              setName={setName}
+              cleanMobileDigits={cleanMobileDigits}
+              fatherName={fatherName}
+              setFatherName={setFatherName}
+              dob={dob}
+              setDob={setDob}
+              selectedVillageId={selectedVillageId}
+              setSelectedVillageId={setSelectedVillageId}
+              address={address}
+              setAddress={setAddress}
+              photoUrl={photoUrl}
+              setPhotoUrl={setPhotoUrl}
+              selectedVillageObj={selectedVillageObj}
+              onPhotoSelect={handlePhotoSelect}
+              onBack={() => setCurrentStep(1)}
+              onNext={handleNextFromStep2}
+            />
+          )}
 
-            {/* Field 3: Date */}
-            <div>
-              <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
-                जुड़ने की तिथि *
-              </label>
-              <Input
-                type="date"
-                required
-                value={joiningDate}
-                onChange={(e) => setJoiningDate(e.target.value)}
-              />
-            </div>
+          {/* Step 3: Optional Background & Pledge */}
+          {currentStep === 3 && (
+            <JoinStepBackground
+              occupation={occupation}
+              setOccupation={setOccupation}
+              designation={designation}
+              setDesignation={setDesignation}
+              politicalBackground={politicalBackground}
+              setPoliticalBackground={setPoliticalBackground}
+              bloodGroup={bloodGroup}
+              setBloodGroup={setBloodGroup}
+              pledgeAccepted={pledgeAccepted}
+              setPledgeAccepted={setPledgeAccepted}
+              isSubmitting={isSubmitting}
+              onBack={() => setCurrentStep(2)}
+              onSubmit={handleSubmitFinal}
+            />
+          )}
 
-            {/* Field 4: Sanghthan Name */}
-            <div>
-              <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
-                संगठन का नाम *
-              </label>
-              <Input
-                type="text"
-                required
-                value={organizationName}
-                onChange={(e) => setOrganizationName(e.target.value)}
-                placeholder="उदा. ग्रामोदय यूथ मंच"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              disabled={isSubmitting}
-              variant="amber"
-              size="lg"
-              className="w-full"
-            >
-              {isSubmitting ? 'जमा हो रहा है...' : 'सदस्यता हेतु आवेदन करें'}
-            </Button>
-          </form>
-        )}
+          {/* Step 4: Success & Confirmation */}
+          {currentStep === 4 && (
+            <JoinStepSuccess
+              registeredMember={registeredMember}
+              alreadyRegistered={alreadyRegistered}
+              selectedVillageObj={selectedVillageObj}
+              occupation={occupation}
+              onOpenDigitalCard={handleOpenMyDigitalCard}
+              onShareWhatsApp={handleShareWhatsApp}
+              onClose={handleResetForm}
+            />
+          )}
+        </div>
       </div>
-    </Dialog>
+    </div>
   );
 };

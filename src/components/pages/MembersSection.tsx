@@ -5,13 +5,13 @@ import { useApp } from '../../context/AppContext';
 import { Member } from '../../types';
 import { DigitalIdCard } from '../features/DigitalIdCard';
 import { MemberChatModal } from '../modals/MemberChatModal';
+import { JoinModal } from '../modals/JoinModal';
 import {
   MemberHeaderBanner,
   MemberSearchFilter,
   MemberPendingBanner,
   MemberCard,
   MemberPhotoModal,
-  MemberAddModal,
 } from '../features/members';
 import { Card, Button } from '../ui';
 import { Users } from 'lucide-react';
@@ -149,12 +149,10 @@ export const MembersSection: React.FC = () => {
         </div>
       )}
 
-      {/* 5. Add Member Modal */}
-      <MemberAddModal
+      {/* 5. Add Member / Join Modal */}
+      <JoinModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
-        onAddMember={addMember}
-        isAdminLoggedIn={authSession.isAdminLoggedIn}
       />
 
       {/* 6. Photo Upload Modal */}

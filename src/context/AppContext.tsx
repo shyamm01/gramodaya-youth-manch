@@ -95,12 +95,28 @@ interface AppContextType {
   ) => Promise<{ success: boolean; admin?: Admin; needsOtp?: boolean; error?: string }>;
   adminLogout: () => void;
   addMember: (
-    name: string,
-    mobile: string,
+    nameOrData:
+      | string
+      | {
+          name: string;
+          mobile: string;
+          photoUrl?: string;
+          fatherName?: string;
+          dob?: string;
+          address?: string;
+          villageId?: string;
+          occupation?: string;
+          designation?: string;
+          politicalBackground?: string;
+          bloodGroup?: string;
+          organizationName?: string;
+          joiningDate?: string;
+        },
+    mobile?: string,
     photoUrl?: string,
     joiningDate?: string,
     organizationName?: string
-  ) => Promise<{ success: boolean; error?: string }>;
+  ) => Promise<{ success: boolean; member?: Member; alreadyRegistered?: boolean; error?: string }>;
   approveMember: (id: string) => Promise<void>;
   deleteMember: (id: string) => Promise<void>;
   uploadPhoto: (targetType: 'admin' | 'member', targetId: string, photoUrl: string) => Promise<void>;
@@ -956,31 +972,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Member Handlers
   const addMember = async (
-    name: string,
-    mobile: string,
-    photoUrl?: string,
-    joiningDate?: string,
-    organizationName?: string
+    nameOrData:
+      | string
+      | {
+          name: string;
+          mobile: string;
+          photoUrl?: string;
+          fatherName?: string;
+          dob?: string;
+          address?: string;
+          villageId?: string;
+          occupation?: string;
+          designation?: string;
+          politicalBackground?: string;
+          bloodGroup?: string;
+          organizationName?: string;
+          joiningDate?: string;
+        },
+    posMobile?: string,
+    posPhotoUrl?: string,
+    posJoiningDate?: string,
+    posOrganizationName?: string
   ) => {
     try {
+      const payload =
+        typeof nameOrData === 'object'
+          ? {
+              ...nameOrData,
+              status: authSession.isAdminLoggedIn ? 'active' : 'pending',
+              createdAt: nameOrData.joiningDate
+                ? new Date(nameOrData.joiningDate).toISOString()
+                : new Date().toISOString(),
+            }
+          : {
+              name: nameOrData,
+              mobile: posMobile,
+              photoUrl: posPhotoUrl,
+              organizationName: posOrganizationName || villageSettings.orgNameHindi || 'ग्रामोदय यूथ मंच',
+              status: authSession.isAdminLoggedIn ? 'active' : 'pending',
+              createdAt: posJoiningDate ? new Date(posJoiningDate).toISOString() : new Date().toISOString(),
+            };
+
       const res = await fetch('/api/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name,
-          mobile,
-          photoUrl,
-          organizationName: organizationName || 'ग्रामोदय यूथ मंच',
-          status: authSession.isAdminLoggedIn ? 'active' : 'pending',
-          createdAt: joiningDate ? new Date(joiningDate).toISOString() : new Date().toISOString(),
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (!res.ok) return { success: false, error: data.error };
+      if (!res.ok) {
+        return {
+          success: false,
+          error: data.error,
+          alreadyRegistered: Boolean(data.alreadyRegistered),
+          member: data.member,
+        };
+      }
       await refreshData();
-      return { success: true };
+      return { success: true, member: data.member };
     } catch (e) {
-      return { success: false, error: 'Failed to connect to server.' };
+      return { success: false, error: 'सर्वर से कनेक्ट करने में त्रुटि हुई।' };
     }
   };
 
