@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSqlClient, normalizeMobile, hashPassword, logAuditAction } from '@/src/lib/authUtils';
-import { signJwtToken } from '@/src/lib/jwtAuth';
+import { signJwtToken, setAuthCookie } from '@/src/lib/jwtAuth';
 
 export async function POST(req: Request) {
   try {
@@ -99,7 +99,7 @@ export async function POST(req: Request) {
       isAdmin ? 'Admin Dashboard' : 'Unified Portal'
     );
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       isAdmin,
       role: systemRole,
@@ -146,6 +146,9 @@ export async function POST(req: Request) {
       token,
       message: isAdmin ? 'प्रशासक लॉगिन सफल! (Admin login successful)' : 'सदस्य लॉगिन सफल! (Member login successful)',
     });
+
+    setAuthCookie(response, token);
+    return response;
   } catch (error: any) {
     console.error('Login error:', error);
     return NextResponse.json(

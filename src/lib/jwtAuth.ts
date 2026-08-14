@@ -101,6 +101,28 @@ export async function verifyJwtToken(token: string): Promise<JwtUserPayload | nu
   return null;
 }
 
+export const AUTH_COOKIE_NAME = 'gym_auth_token';
+
+/**
+ * Attach secure HTTP-Only JWT Cookie to Response
+ */
+export function setAuthCookie(response: Response, token: string) {
+  const isProd = process.env.NODE_ENV === 'production';
+  const cookieValue = `${AUTH_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; Max-Age=${7 * 24 * 60 * 60}; SameSite=Lax; HttpOnly${isProd ? '; Secure' : ''}`;
+  response.headers.append('Set-Cookie', cookieValue);
+  return response;
+}
+
+/**
+ * Clear Authentication Cookie from Response
+ */
+export function clearAuthCookie(response: Response) {
+  const isProd = process.env.NODE_ENV === 'production';
+  const cookieValue = `${AUTH_COOKIE_NAME}=; Path=/; Max-Age=0; SameSite=Lax; HttpOnly${isProd ? '; Secure' : ''}`;
+  response.headers.append('Set-Cookie', cookieValue);
+  return response;
+}
+
 /**
  * Extract token from Request (Authorization header or cookies)
  */
@@ -114,7 +136,7 @@ export function extractTokenFromRequest(req: Request): string | null {
   // 2. Cookie header
   const cookieHeader = req.headers.get('cookie') || req.headers.get('Cookie');
   if (cookieHeader) {
-    const match = cookieHeader.match(/(?:auth-token|sb-access-token)=([^;]+)/);
+    const match = cookieHeader.match(/(?:gym_auth_token|auth-token|sb-access-token)=([^;]+)/);
     if (match && match[1]) {
       return decodeURIComponent(match[1]);
     }

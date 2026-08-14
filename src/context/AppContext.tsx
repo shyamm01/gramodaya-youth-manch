@@ -413,9 +413,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const memberLogout = async () => {
     try {
+      await fetch('/api/auth/logout', { method: 'POST' });
       await supabase.auth.signOut();
     } catch (e) {
-      console.warn('Supabase signout notice:', e);
+      console.warn('Signout notice:', e);
     }
     setCurrentMemberMobile(null);
     const newAuth: AuthSession = {
@@ -425,9 +426,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       currentMemberMobile: undefined,
       currentMemberName: undefined,
       role: undefined,
+      systemRole: undefined,
+      token: undefined,
     };
     setAuthSession(newAuth);
     localStorage.removeItem('gym_auth');
+    localStorage.removeItem('gym_token');
     localStorage.removeItem('gym_member_mobile');
     setActiveSectionState('home');
   };
@@ -514,8 +518,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (authSession.isAdminLoggedIn) {
         headers['x-admin-token'] = 'admin_active';
       }
+      const token = (typeof window !== 'undefined' ? localStorage.getItem('gym_token') : null) || authSession.token;
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-      const res = await fetch('/api/data', { headers });
+      const res = await fetch('/api/data', { headers, credentials: 'include' });
       if (res.ok) {
         const text = await res.text();
         let data: any = null;
@@ -966,6 +974,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const adminLogout = async () => {
     try {
+      await fetch('/api/auth/logout', { method: 'POST' });
       await supabase.auth.signOut();
     } catch (e) {
       /* ignore */

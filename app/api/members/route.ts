@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSqlClient, normalizeMobile, hashPassword, logAuditAction } from '@/src/lib/authUtils';
-import { signJwtToken } from '@/src/lib/jwtAuth';
+import { signJwtToken, setAuthCookie } from '@/src/lib/jwtAuth';
 
 export async function GET() {
   try {
@@ -236,7 +236,7 @@ export async function POST(req: Request) {
       newMember.name
     );
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: true,
         member: newMember,
@@ -245,6 +245,9 @@ export async function POST(req: Request) {
       },
       { status: 201 }
     );
+
+    setAuthCookie(response, token);
+    return response;
   } catch (error: any) {
     console.error('Error adding member to Postgres:', error);
     return NextResponse.json(
