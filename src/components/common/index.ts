@@ -7,3 +7,4 @@ export { ThemeProvider } from './ThemeProvider';
 export { BackButtonHeader } from './BackButtonHeader';
 export { ProtectedRoute } from './ProtectedRoute';
 export { WhatsAppIcon } from './WhatsAppIcon';
+export { GoogleIcon, FacebookIcon } from './SocialIcons';

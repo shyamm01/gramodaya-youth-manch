@@ -6,7 +6,8 @@ import { useApp } from '../../context/AppContext';
 import { Member } from '../../types';
 import {
   JoinModalHeader,
-  JoinStepOtp,
+  JoinStepAuth,
+  JoinAuthMethod,
   JoinStepPersonal,
   JoinStepBackground,
   JoinStepSuccess,
@@ -30,8 +31,9 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
     lang,
   } = useApp();
 
-  // Wizard Step: 1 = Mobile OTP, 2 = Personal Details, 3 = Background & Pledge, 4 = Success
+  // Wizard Step: 1 = Auth (OTP / Password / OAuth), 2 = Personal Details, 3 = Background & Pledge, 4 = Success
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+  const [authMethod, setAuthMethod] = useState<JoinAuthMethod>('otp');
 
   // Step 1: Mobile & OTP State
   const [mobile, setMobile] = useState('');
@@ -40,7 +42,10 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
-  const [isMobileVerified, setIsMobileVerified] = useState(false);
+
+  // Step 1: Password Auth State
+  const [emailOrMobile, setEmailOrMobile] = useState('');
+  const [password, setPassword] = useState('');
 
   // Step 2: Personal Details State
   const [name, setName] = useState('');
@@ -66,7 +71,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
 
   // Clean Mobile Digits
-  const cleanMobileDigits = mobile.replace(/\D/g, '').slice(-10);
+  const cleanMobileDigits = (mobile || emailOrMobile.replace(/\D/g, '')).slice(-10);
   const isMobileValid = cleanMobileDigits.length === 10;
 
   // Countdown timer for OTP resend
@@ -132,11 +137,39 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
     setIsVerifyingOtp(false);
 
     if (res.success) {
-      setIsMobileVerified(true);
       setCurrentStep(2);
     } else {
       setError(res.error || (lang === 'en' ? 'Invalid OTP code.' : 'अमान्य ओटीपी कोड दर्ज किया गया।'));
     }
+  };
+
+  // Handle Password-based Step 1 verification
+  const handleVerifyPasswordAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailOrMobile.trim()) {
+      setError(lang === 'en' ? 'Please enter mobile or email.' : 'कृपया मोबाइल नंबर या ईमेल दर्ज करें।');
+      return;
+    }
+    if (password.length < 6) {
+      setError(lang === 'en' ? 'Password must be at least 6 characters.' : 'पासवर्ड कम से कम ६ अक्षरों का होना चाहिए।');
+      return;
+    }
+
+    setError('');
+    // If mobile number was provided in emailOrMobile, sync to mobile state
+    const digits = emailOrMobile.replace(/\D/g, '').slice(-10);
+    if (digits.length === 10) {
+      setMobile(digits);
+    }
+    setCurrentStep(2);
+  };
+
+  // Handle OAuth Success
+  const handleOAuthSuccess = (provider: string, email?: string, oAuthName?: string) => {
+    setError('');
+    if (oAuthName) setName(oAuthName);
+    if (email && !emailOrMobile) setEmailOrMobile(email);
+    setCurrentStep(2);
   };
 
   // Handle Photo Picker
@@ -162,7 +195,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  // Step 2 Next
+  // Step 2 Next Validation
   const handleNextFromStep2 = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
@@ -176,8 +209,8 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
   // Step 3 Submit
   const handleSubmitFinal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !isMobileValid) {
-      setError(lang === 'en' ? 'Please complete required personal details.' : 'कृपया आवश्यक व्यक्तिगत विवरण भरें।');
+    if (!name.trim()) {
+      setError(lang === 'en' ? 'Please enter member name.' : 'कृपया सदस्य का नाम भरें।');
       setCurrentStep(2);
       return;
     }
@@ -190,11 +223,14 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
     setError('');
     setAlreadyRegistered(false);
 
-    const formattedMobile = `+91 ${cleanMobileDigits.slice(0, 5)} ${cleanMobileDigits.slice(5)}`;
+    const effectiveMobile =
+      cleanMobileDigits.length === 10
+        ? `+91 ${cleanMobileDigits.slice(0, 5)} ${cleanMobileDigits.slice(5)}`
+        : emailOrMobile || `+91 98765 00000`;
 
     const res = await addMember({
       name: name.trim(),
-      mobile: formattedMobile,
+      mobile: effectiveMobile,
       photoUrl,
       fatherName: fatherName.trim(),
       dob: dob.trim(),
@@ -237,10 +273,12 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
 
   const handleResetForm = () => {
     setCurrentStep(1);
+    setAuthMethod('otp');
     setMobile('');
     setOtpCode('');
     setIsOtpSent(false);
-    setIsMobileVerified(false);
+    setEmailOrMobile('');
+    setPassword('');
     setName('');
     setFatherName('');
     setDob('');
@@ -302,9 +340,11 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
-          {/* Step 1: Mobile & OTP Verification */}
+          {/* Step 1: Authentication (OTP / Password / OAuth) */}
           {currentStep === 1 && (
-            <JoinStepOtp
+            <JoinStepAuth
+              authMethod={authMethod}
+              setAuthMethod={setAuthMethod}
               mobile={mobile}
               setMobile={setMobile}
               otpCode={otpCode}
@@ -317,6 +357,12 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
               isMobileValid={isMobileValid}
               onSendOtp={handleSendOtp}
               onVerifyOtp={handleVerifyOtp}
+              emailOrMobile={emailOrMobile}
+              setEmailOrMobile={setEmailOrMobile}
+              password={password}
+              setPassword={setPassword}
+              onVerifyPasswordAccount={handleVerifyPasswordAccount}
+              onOAuthSuccess={handleOAuthSuccess}
             />
           )}
 

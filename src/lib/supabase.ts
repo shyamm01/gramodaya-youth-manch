@@ -283,6 +283,62 @@ export const verifyEmailOtp = async (email: string, token: string) => {
   }
 };
 
+/**
+ * Invoke Supabase Edge Function: send-otp
+ */
+export const invokeSendOtpEdgeFunction = async (mobile: string, role = 'MEMBER') => {
+  try {
+    const { data, error } = await supabase.functions.invoke('send-otp', {
+      body: { mobile, role },
+    });
+    if (error) throw error;
+    return { success: true, data };
+  } catch (err: any) {
+    console.warn('Supabase Edge Function send-otp fallback:', err.message);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Invoke Supabase Edge Function: verify-otp
+ */
+export const invokeVerifyOtpEdgeFunction = async (mobile: string, otp: string, name?: string) => {
+  try {
+    const { data, error } = await supabase.functions.invoke('verify-otp', {
+      body: { mobile, otp, name },
+    });
+    if (error) throw error;
+    return { success: true, data };
+  } catch (err: any) {
+    console.warn('Supabase Edge Function verify-otp fallback:', err.message);
+    return { success: false, error: err.message };
+  }
+};
+
+/**
+ * Sign in / Sign up via OAuth Provider (Google, Facebook, GitHub)
+ */
+export const signInWithOAuthProvider = async (provider: 'google' | 'facebook' | 'github') => {
+  try {
+    const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : undefined;
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
+    if (error) throw error;
+    return { success: true, data };
+  } catch (err: any) {
+    console.error(`OAuth login error (${provider}):`, err.message);
+    return { success: false, error: err.message };
+  }
+};
+
 
 
 
