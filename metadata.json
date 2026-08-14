@@ -1,0 +1,6 @@
+{
+  "name": "Gramodaya Youth Manch - Rasoolpur",
+  "description": "Gramodaya Youth Manch, Rasoolpur, Gram Panchayat Bahera. Village development platform connecting youth, families, and elders.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
