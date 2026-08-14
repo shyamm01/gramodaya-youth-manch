@@ -187,6 +187,8 @@ async function runDatabaseMigrationsAndRoles() {
         village_id BIGINT REFERENCES villages(id) ON DELETE SET NULL,
         name text NOT NULL,
         mobile text NOT NULL UNIQUE,
+        email text,
+        password_hash text,
         status member_status NOT NULL DEFAULT 'active',
         role member_role NOT NULL DEFAULT 'MEMBER',
         system_role system_role NOT NULL DEFAULT 'MEMBER',

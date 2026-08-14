@@ -8,33 +8,18 @@ export async function GET() {
       return NextResponse.json({ error: 'Database connection unavailable' }, { status: 500 });
     }
 
-    const [
-      villagesData,
-      membersData,
-      complaintsData,
-      socialWorksData,
-      eventsData,
-      galleryData,
-      eldersData,
-      announcementsData,
-      publicInfosData,
-      groupMessagesData,
-      auditLogsData,
-      permissionsData,
-    ] = await Promise.all([
-      sql`SELECT * FROM public.villages ORDER BY id ASC`,
-      sql`SELECT id, village_id, name, mobile, email, status, photo_url, organization_name, father_name, dob, gender, address, occupation, designation, political_background, blood_group, role, system_role, created_at FROM public.members ORDER BY id DESC`,
-      sql`SELECT * FROM public.complaints ORDER BY id DESC`,
-      sql`SELECT * FROM public.social_works ORDER BY id DESC`,
-      sql`SELECT * FROM public.events ORDER BY id DESC`,
-      sql`SELECT * FROM public.gallery ORDER BY id DESC`,
-      sql`SELECT * FROM public.elders ORDER BY id DESC`,
-      sql`SELECT * FROM public.announcements ORDER BY id DESC`,
-      sql`SELECT * FROM public.public_infos ORDER BY id DESC`,
-      sql`SELECT * FROM public.group_messages ORDER BY id ASC`,
-      sql`SELECT * FROM public.audit_logs ORDER BY id DESC LIMIT 50`,
-      sql`SELECT * FROM public.permissions ORDER BY id ASC`,
-    ]);
+    const villagesData = await sql`SELECT * FROM public.villages ORDER BY id ASC`;
+    const membersData = await sql`SELECT id, village_id, name, mobile, email, status, photo_url, organization_name, father_name, dob, gender, address, occupation, designation, political_background, blood_group, role, system_role, created_at FROM public.members ORDER BY id DESC`;
+    const complaintsData = await sql`SELECT * FROM public.complaints ORDER BY id DESC`;
+    const socialWorksData = await sql`SELECT * FROM public.social_works ORDER BY id DESC`;
+    const eventsData = await sql`SELECT * FROM public.events ORDER BY id DESC`;
+    const galleryData = await sql`SELECT * FROM public.gallery ORDER BY id DESC`;
+    const eldersData = await sql`SELECT * FROM public.elders ORDER BY id DESC`;
+    const announcementsData = await sql`SELECT * FROM public.announcements ORDER BY id DESC`;
+    const publicInfosData = await sql`SELECT * FROM public.public_infos ORDER BY id DESC`;
+    const groupMessagesData = await sql`SELECT * FROM public.group_messages ORDER BY id ASC`;
+    const auditLogsData = await sql`SELECT * FROM public.audit_logs ORDER BY id DESC LIMIT 50`;
+    const permissionsData = await sql`SELECT * FROM public.permissions ORDER BY id ASC`;
 
     // Format fields to camelCase for UI consumption
     const formattedVillages = villagesData.map((v: any) => ({

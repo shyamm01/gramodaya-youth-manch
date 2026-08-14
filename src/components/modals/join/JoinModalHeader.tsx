@@ -20,34 +20,38 @@ export const JoinModalHeader: React.FC<JoinModalHeaderProps> = ({
   const getStepBadge = () => {
     switch (currentStep) {
       case 1:
-        return lang === 'en' ? 'Step 1: Account Setup' : 'चरण १: खाता सेटअप';
+        return lang === "en" ? "Step 1: Account Setup" : "चरण १: खाता सेटअप";
       case 2:
-        return lang === 'en' ? 'Step 2: Personal Info' : 'चरण २: व्यक्तिगत विवरण';
+        return lang === "en"
+          ? "Step 2: Personal Info"
+          : "चरण २: व्यक्तिगत विवरण";
       case 3:
-        return lang === 'en' ? 'Step 3: Background' : 'चरण ३: पृष्ठभूमि व संकल्प';
+        return lang === "en"
+          ? "Step 3: Background"
+          : "चरण ३: पृष्ठभूमि व संकल्प";
       case 4:
-        return lang === 'en' ? 'Verified' : 'सफल';
+        return lang === "en" ? "Verified" : "सफल";
     }
   };
 
   const getStepSubtitle = () => {
     switch (currentStep) {
       case 1:
-        return lang === 'en'
-          ? 'Set mobile number & password for your membership account'
-          : 'सदस्य खाता बनाने हेतु मोबाइल नंबर एवं पासवर्ड दर्ज करें';
+        return lang === "en"
+          ? "Set mobile number & password for your membership account"
+          : "सदस्य खाता बनाने हेतु मोबाइल नंबर एवं पासवर्ड दर्ज करें";
       case 2:
-        return lang === 'en'
-          ? 'Enter personal details for your Digital ID Card'
-          : 'डिजिटल सदस्य कार्ड हेतु अपना व्यक्तिगत विवरण भरें';
+        return lang === "en"
+          ? "Enter personal details for your Digital ID Card"
+          : "डिजिटल सदस्य कार्ड हेतु अपना व्यक्तिगत विवरण भरें";
       case 3:
-        return lang === 'en'
-          ? 'Optional profession, designation & pledge'
-          : 'व्यवसाय, पद, पृष्ठभूमि एवं सदस्यता संकल्प';
+        return lang === "en"
+          ? "Optional profession, designation & pledge"
+          : "व्यवसाय, पद, पृष्ठभूमि एवं सदस्यता संकल्प";
       case 4:
-        return lang === 'en'
-          ? 'Membership registered successfully'
-          : 'सदस्यता सफलतापूर्वक दर्ज हो गई है';
+        return lang === "en"
+          ? "Membership registered successfully"
+          : "सदस्यता सफलतापूर्वक दर्ज हो गई है";
     }
   };
 
@@ -64,9 +68,6 @@ export const JoinModalHeader: React.FC<JoinModalHeaderProps> = ({
               <h2 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white leading-none">
                 {t("join.title")}
               </h2>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
-                {getStepBadge()}
-              </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-normal">
               {getStepSubtitle()}
