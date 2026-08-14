@@ -18,8 +18,9 @@ export function getDb() {
   }
 
   try {
-    // Enable connection pooling with postgres-js
+    // Enable connection pooling with postgres-js and disable prefetch for transaction pooler mode
     client = postgres(connectionString, {
+      prepare: false,
       max: 10,
       idle_timeout: 20,
       connect_timeout: 10,

@@ -42,6 +42,11 @@ export const viewport: Viewport = {
 };
 
 import { ThemeProvider } from '@/src/components/common';
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+
 
 export default function RootLayout({
   children,
@@ -49,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="hi" className="scroll-smooth" suppressHydrationWarning>
+    <html lang="hi" className={cn("scroll-smooth", "font-sans", geist.variable)} suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

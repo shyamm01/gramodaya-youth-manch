@@ -1,8 +1,8 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Retrieve credentials directly from Vite environment variables (VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY)
-const DEFAULT_SUPABASE_URL = 'https://cpfxqusbzmnqfnnzmvgj.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_aEMlGQAprHz9WsGS7__uCw_fPm9yLO8';
+const DEFAULT_SUPABASE_URL = 'https://yynnbfuinskyhdwjpnja.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_BHODlbLcF6uGs893x_r5dA_8c8bmxRr';
 
 export const normalizeUrl = (rawUrl?: string | null): string | null => {
   if (!rawUrl || typeof rawUrl !== 'string') return null;
