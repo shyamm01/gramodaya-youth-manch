@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   X,
   Lock,
@@ -14,10 +14,10 @@ import {
   ShieldCheck,
   AlertCircle,
   CheckCircle2,
-} from 'lucide-react';
-import { useApp } from '../../context/AppContext';
-import { GymLogo } from '../common/GymLogo';
-import { Button, Input } from '../ui';
+} from "lucide-react";
+import { useApp } from "../../context/AppContext";
+import { GymLogo } from "../common/GymLogo";
+import { Button, Input } from "../ui";
 
 export const UnifiedLoginModal: React.FC = () => {
   const {
@@ -33,21 +33,21 @@ export const UnifiedLoginModal: React.FC = () => {
 
   const isOpen = isAdminLoginModalOpen || isMemberLoginModalOpen;
 
-  const [mobileOrEmail, setMobileOrEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [mobileOrEmail, setMobileOrEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const handleClose = () => {
     setIsAdminLoginModalOpen(false);
     setIsMemberLoginModalOpen(false);
-    setMobileOrEmail('');
-    setPassword('');
+    setMobileOrEmail("");
+    setPassword("");
     setShowPassword(false);
-    setErrorMsg('');
-    setSuccessMsg('');
+    setErrorMsg("");
+    setSuccessMsg("");
     setLoading(false);
   };
 
@@ -60,23 +60,23 @@ export const UnifiedLoginModal: React.FC = () => {
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg('');
-    setSuccessMsg('');
+    setErrorMsg("");
+    setSuccessMsg("");
 
     const cleanInput = mobileOrEmail.trim();
     if (!cleanInput) {
       setErrorMsg(
-        lang === 'en'
-          ? 'Please enter mobile number or email.'
-          : 'कृपया मोबाइल नंबर अथवा ईमेल दर्ज करें।'
+        lang === "en"
+          ? "Please enter mobile number or email."
+          : "कृपया मोबाइल नंबर अथवा ईमेल दर्ज करें।",
       );
       return;
     }
     if (!password) {
       setErrorMsg(
-        lang === 'en'
-          ? 'Please enter your account password.'
-          : 'कृपया अपने खाते का पासवर्ड दर्ज करें।'
+        lang === "en"
+          ? "Please enter your account password."
+          : "कृपया अपने खाते का पासवर्ड दर्ज करें।",
       );
       return;
     }
@@ -84,9 +84,9 @@ export const UnifiedLoginModal: React.FC = () => {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier: cleanInput, password }),
       });
 
@@ -96,7 +96,9 @@ export const UnifiedLoginModal: React.FC = () => {
       if (res.ok && data.success) {
         setSuccessMsg(
           data.message ||
-            (lang === 'en' ? 'Login successful!' : 'लॉगिन सफल! पोर्टल में प्रवेश स्वीकृत।')
+            (lang === "en"
+              ? "Login successful!"
+              : "लॉगिन सफल! पोर्टल में प्रवेश स्वीकृत।"),
         );
 
         // Update application auth state via userLogin if available
@@ -106,25 +108,25 @@ export const UnifiedLoginModal: React.FC = () => {
 
         setTimeout(() => {
           handleClose();
-          if (typeof window !== 'undefined') {
+          if (typeof window !== "undefined") {
             window.location.reload();
           }
         }, 600);
       } else {
         setErrorMsg(
           data.error ||
-            (lang === 'en'
-              ? 'Invalid mobile/email or password.'
-              : 'अमान्य मोबाइल नंबर, ईमेल या पासवर्ड दर्ज किया गया है।')
+            (lang === "en"
+              ? "Invalid mobile/email or password."
+              : "अमान्य मोबाइल नंबर, ईमेल या पासवर्ड दर्ज किया गया है।"),
         );
       }
     } catch (err: any) {
       setLoading(false);
       setErrorMsg(
         err.message ||
-          (lang === 'en'
-            ? 'Network error during login. Please try again.'
-            : 'लॉगिन करते समय नेटवर्क त्रुटि हुई। कृपया पुनः प्रयास करें।')
+          (lang === "en"
+            ? "Network error during login. Please try again."
+            : "लॉगिन करते समय नेटवर्क त्रुटि हुई। कृपया पुनः प्रयास करें।"),
       );
     }
   };
@@ -141,9 +143,6 @@ export const UnifiedLoginModal: React.FC = () => {
 
       {/* ── MODAL CONTAINER ── */}
       <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-2xl z-10 my-8 overflow-hidden transition-all text-slate-900 dark:text-slate-50 animate-in zoom-in-95 duration-200">
-        {/* Top Accent Gradient */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-amber-500" />
-
         {/* Modal Header */}
         <div className="flex items-start justify-between px-6 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800/60">
           <div className="flex items-center gap-3">
@@ -153,16 +152,13 @@ export const UnifiedLoginModal: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold tracking-tight text-slate-900 dark:text-white leading-none">
-                  {lang === 'en' ? 'Portal Login' : 'पोर्टल लॉगिन'}
+                  {lang === "en" ? "Portal Login" : "पोर्टल लॉगिन"}
                 </h2>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
-                  {lang === 'en' ? 'Members & Admins' : 'सदस्य व प्रशासक'}
-                </span>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                {lang === 'en'
-                  ? 'Enter your mobile/email and password to continue'
-                  : 'पोर्टल में प्रवेश हेतु मोबाइल/ईमेल एवं पासवर्ड दर्ज करें'}
+                {lang === "en"
+                  ? "Enter your mobile/email and password to continue"
+                  : "पोर्टल में प्रवेश हेतु मोबाइल/ईमेल एवं पासवर्ड दर्ज करें"}
               </p>
             </div>
           </div>
@@ -198,7 +194,9 @@ export const UnifiedLoginModal: React.FC = () => {
             {/* Mobile / Email Input */}
             <div className="space-y-1.5">
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-                {lang === 'en' ? 'Mobile Number or Email' : 'मोबाइल नंबर या ईमेल पता'}{' '}
+                {lang === "en"
+                  ? "Mobile Number or Email"
+                  : "मोबाइल नंबर या ईमेल पता"}{" "}
                 <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
@@ -209,7 +207,9 @@ export const UnifiedLoginModal: React.FC = () => {
                   value={mobileOrEmail}
                   onChange={(e) => setMobileOrEmail(e.target.value)}
                   placeholder={
-                    lang === 'en' ? '9876543210 or user@example.com' : 'उदा. 9876543210 या नाम@ईमेल.com'
+                    lang === "en"
+                      ? "9876543210 or user@example.com"
+                      : "उदा. 9876543210 या नाम@ईमेल.com"
                   }
                   className="pl-10 h-10.5 text-xs rounded-xl"
                   autoFocus
@@ -221,13 +221,14 @@ export const UnifiedLoginModal: React.FC = () => {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-                  {lang === 'en' ? 'Password' : 'पासवर्ड'} <span className="text-rose-500">*</span>
+                  {lang === "en" ? "Password" : "पासवर्ड"}{" "}
+                  <span className="text-rose-500">*</span>
                 </label>
               </div>
               <div className="relative">
                 <Lock className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <Input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPassword ? "text" : "password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -239,7 +240,11 @@ export const UnifiedLoginModal: React.FC = () => {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
                 </button>
               </div>
             </div>
@@ -253,12 +258,14 @@ export const UnifiedLoginModal: React.FC = () => {
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  {lang === 'en' ? 'Authenticating...' : 'सत्यापित किया जा रहा है...'}
+                  {lang === "en"
+                    ? "Authenticating..."
+                    : "सत्यापित किया जा रहा है..."}
                 </span>
               ) : (
                 <span className="flex items-center justify-center gap-1.5">
                   <ShieldCheck className="w-4 h-4" />
-                  {lang === 'en' ? 'Login to Portal' : 'पोर्टल में प्रवेश करें'}
+                  {lang === "en" ? "Login to Portal" : "पोर्टल में प्रवेश करें"}
                 </span>
               )}
             </Button>
@@ -267,13 +274,15 @@ export const UnifiedLoginModal: React.FC = () => {
           {/* Switch to Signup */}
           <div className="pt-3 border-t border-slate-100 dark:border-slate-800 text-center">
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {lang === 'en' ? "Don't have an account yet?" : 'क्या आपका खाता अभी तक नहीं बना है?'}{' '}
+              {lang === "en"
+                ? "Don't have an account yet?"
+                : "क्या आपका खाता अभी तक नहीं बना है?"}{" "}
               <button
                 type="button"
                 onClick={handleSwitchToSignup}
                 className="font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer inline-flex items-center gap-1 ml-1"
               >
-                <span>{lang === 'en' ? 'Register Now' : 'नया खाता बनाएं'}</span>
+                <span>{lang === "en" ? "Register Now" : "नया खाता बनाएं"}</span>
                 <ArrowRight className="w-3 h-3" />
               </button>
             </p>
