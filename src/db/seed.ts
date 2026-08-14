@@ -13,6 +13,7 @@ import { loadStore } from '../lib/serverStore';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
+dotenv.config({ path: '.env.local' });
 
 async function seed() {
   console.log('🌱 Starting Drizzle multi-tenant database seeding...');
@@ -28,52 +29,57 @@ async function seed() {
 
     // 1. Seed State
     console.log('Inserting default state (Uttar Pradesh)...');
-    await db
+    const [stateRow] = await db
       .insert(states)
       .values({
-        id: 'state_up',
         name: 'Uttar Pradesh',
         nameHindi: 'उत्तर प्रदेश',
         code: 'UP',
       })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ id: states.id });
+
+    const stateId = stateRow?.id || 1;
 
     // 2. Seed District
     console.log('Inserting default district (Jaunpur)...');
-    await db
+    const [distRow] = await db
       .insert(districts)
       .values({
-        id: 'dist_jaunpur',
-        stateId: 'state_up',
+        stateId,
         name: 'Jaunpur',
         nameHindi: 'जौनपुर',
       })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ id: districts.id });
+
+    const districtId = distRow?.id || 1;
 
     // 3. Seed Gram Panchayat
     console.log('Inserting default gram panchayat (Bahera)...');
-    await db
+    const [gpRow] = await db
       .insert(gramPanchayats)
       .values({
-        id: 'gp_bahera',
-        districtId: 'dist_jaunpur',
+        districtId,
         name: 'Bahera',
         nameHindi: 'बहेरा',
       })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ id: gramPanchayats.id });
+
+    const gramPanchayatId = gpRow?.id || 1;
 
     // 4. Seed Primary Village
     console.log('Inserting primary village (Rasoolpur)...');
-    await db
+    const [vilRow] = await db
       .insert(villages)
       .values({
-        id: 'vil_rasoolpur',
         slug: 'rasoolpur',
         name: store.villageSettings?.name || 'Rasoolpur',
         nameHindi: store.villageSettings?.nameHindi || 'रसूलपुर',
-        gramPanchayatId: 'gp_bahera',
-        districtId: 'dist_jaunpur',
-        stateId: 'state_up',
+        gramPanchayatId,
+        districtId,
+        stateId,
         orgName: store.villageSettings?.orgName || 'Gramodaya Youth Manch',
         orgNameHindi: store.villageSettings?.orgNameHindi || 'ग्रामोदय यूथ मंच',
         sloganHindi: store.villageSettings?.sloganHindi || 'युवा शक्ति • ग्राम विकास • उज्ज्वल भविष्य',
@@ -82,14 +88,17 @@ async function seed() {
         isActive: true,
       })
       .onConflictDoUpdate({
-        target: villages.id,
+        target: villages.slug,
         set: {
           name: store.villageSettings?.name || 'Rasoolpur',
           nameHindi: store.villageSettings?.nameHindi || 'रसूलपुर',
           orgName: store.villageSettings?.orgName || 'Gramodaya Youth Manch',
           orgNameHindi: store.villageSettings?.orgNameHindi || 'ग्रामोदय यूथ मंच',
         },
-      });
+      })
+      .returning({ id: villages.id });
+
+    const villageId = vilRow?.id || 1;
 
     // 5. Seed System Permissions Catalog
     console.log(`Inserting ${ALL_SYSTEM_PERMISSIONS.length} system permissions...`);
@@ -118,8 +127,7 @@ async function seed() {
       await db
         .insert(members)
         .values({
-          id: admin.id,
-          villageId: 'vil_rasoolpur',
+          villageId,
           name: admin.name,
           mobile: admin.mobile,
           role: 'ADMIN',
@@ -130,10 +138,9 @@ async function seed() {
           address: `${admin.village || 'Rasoolpur'}, ग्राम पंचायत ${admin.gramPanchayat || 'Bahera'}`,
         })
         .onConflictDoUpdate({
-          target: members.id,
+          target: members.mobile,
           set: {
             name: admin.name,
-            mobile: admin.mobile,
             photoUrl: admin.photoUrl || null,
             systemRole: admin.isHead ? 'SUPER_ADMIN' : 'ADMIN',
           },
@@ -146,8 +153,7 @@ async function seed() {
       await db
         .insert(members)
         .values({
-          id: member.id,
-          villageId: 'vil_rasoolpur',
+          villageId,
           name: member.name,
           mobile: member.mobile,
           role: 'MEMBER',
@@ -165,11 +171,11 @@ async function seed() {
       await db
         .insert(announcements)
         .values({
-          id: ann.id,
-          villageId: 'vil_rasoolpur',
+          villageId,
           title: ann.title,
           content: ann.content,
           publishedBy: ann.publishedBy || 'ग्रामोदय यूथ मंच',
+          isUrgent: (ann as any).isUrgent || false,
         })
         .onConflictDoNothing();
     }

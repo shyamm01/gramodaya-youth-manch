@@ -232,15 +232,9 @@ interface RoleBadgeProps {
 }
 
 const ROLE_MAP: Record<string, { label: string; classes: string; icon: LucideIcon }> = {
-  SUPER_ADMIN:       { label: 'Super Admin',     classes: 'bg-purple-50 dark:bg-purple-950/40 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-800', icon: Zap },
-  DISTRICT_ADMIN:    { label: 'District Admin',  classes: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800', icon: Shield },
-  PANCHAYAT_ADMIN:   { label: 'Panchayat Admin', classes: 'bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800', icon: Shield },
-  VILLAGE_ADMIN:     { label: 'Village Admin',   classes: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800', icon: ShieldCheck },
-  VILLAGE_MODERATOR: { label: 'Moderator',       classes: 'bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-200 border-teal-200 dark:border-teal-800', icon: ShieldCheck },
-  ADMIN:             { label: 'Admin',            classes: 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800', icon: Shield },
-  MEMBER:            { label: 'Member',           classes: 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700', icon: User },
-  GUEST:             { label: 'Guest',            classes: 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700', icon: Users },
-  PUBLIC:            { label: 'Public',           classes: 'bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700', icon: Globe },
+  SUPER_ADMIN: { label: 'Super Admin', classes: 'bg-purple-50 dark:bg-purple-950/40 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-800', icon: Zap },
+  ADMIN:       { label: 'Admin',       classes: 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800', icon: Shield },
+  MEMBER:      { label: 'Member',      classes: 'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700', icon: User },
 };
 
 export const RoleBadge: React.FC<RoleBadgeProps> = ({ role, size = 'sm' }) => {

@@ -1,5 +1,7 @@
 import {
   pgTable,
+  bigserial,
+  bigint,
   text,
   timestamp,
   boolean,
@@ -12,7 +14,7 @@ import {
 import { relations, sql } from 'drizzle-orm';
 
 // ==============================================================================
-// 1. ENUMS (प्रकार / विकल्प)
+// 1. ENUMS (प्रकार / विकल्प - 3 Canonical Roles)
 // ==============================================================================
 export const roleScopeEnum = pgEnum('role_scope', [
   'GLOBAL',
@@ -75,7 +77,7 @@ export const publicInfoStatusEnum = pgEnum('public_info_status', [
 ]);
 
 // ==============================================================================
-// 2. GEOGRAPHY & MULTI-TENANCY TABLES
+// 2. GEOGRAPHY & MULTI-TENANCY TABLES (Auto-Increment IDs)
 // ==============================================================================
 
 /**
@@ -84,7 +86,7 @@ export const publicInfoStatusEnum = pgEnum('public_info_status', [
 export const states = pgTable(
   'states',
   {
-    id: text('id').primaryKey(), // e.g. 'state_up'
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
     name: text('name').notNull(),
     nameHindi: text('name_hindi').notNull(),
     code: text('code').notNull().unique(), // e.g. 'UP'
@@ -99,10 +101,10 @@ export const states = pgTable(
 export const districts = pgTable(
   'districts',
   {
-    id: text('id').primaryKey(), // e.g. 'dist_jaunpur'
-    stateId: text('state_id')
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    stateId: bigint('state_id', { mode: 'number' })
       .notNull()
-      .references(() => states.id, { onDelete: 'cascade' }),
+      .references(() => states.id, { onDelete: 'restrict' }),
     name: text('name').notNull(),
     nameHindi: text('name_hindi').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -119,10 +121,10 @@ export const districts = pgTable(
 export const gramPanchayats = pgTable(
   'gram_panchayats',
   {
-    id: text('id').primaryKey(), // e.g. 'gp_bahera'
-    districtId: text('district_id')
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    districtId: bigint('district_id', { mode: 'number' })
       .notNull()
-      .references(() => districts.id, { onDelete: 'cascade' }),
+      .references(() => districts.id, { onDelete: 'restrict' }),
     name: text('name').notNull(),
     nameHindi: text('name_hindi').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -139,17 +141,17 @@ export const gramPanchayats = pgTable(
 export const villages = pgTable(
   'villages',
   {
-    id: text('id').primaryKey(), // e.g. 'vil_rasoolpur'
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
     slug: text('slug').notNull().unique(), // e.g. 'rasoolpur'
     name: text('name').notNull(),
     nameHindi: text('name_hindi').notNull(),
-    gramPanchayatId: text('gram_panchayat_id').references(() => gramPanchayats.id, {
+    gramPanchayatId: bigint('gram_panchayat_id', { mode: 'number' }).references(() => gramPanchayats.id, {
       onDelete: 'set null',
     }),
-    districtId: text('district_id').references(() => districts.id, {
+    districtId: bigint('district_id', { mode: 'number' }).references(() => districts.id, {
       onDelete: 'set null',
     }),
-    stateId: text('state_id').references(() => states.id, {
+    stateId: bigint('state_id', { mode: 'number' }).references(() => states.id, {
       onDelete: 'set null',
     }),
     orgName: text('org_name').notNull().default('Gramodaya Youth Manch'),
@@ -173,14 +175,15 @@ export const villages = pgTable(
 );
 
 // ==============================================================================
-// 3. PBAC PERMISSIONS & USER LEVEL ROLES
+// 3. PBAC PERMISSIONS & USER LEVEL ROLES (Auto-Increment IDs)
 // ==============================================================================
 
 /**
  * 3.1 PERMISSIONS (सिस्टम अनुमतियां)
  */
 export const permissions = pgTable('permissions', {
-  code: text('code').primaryKey(), // e.g. 'complaints:manage', 'members:approve'
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  code: text('code').notNull().unique(), // e.g. 'complaints:view'
   name: text('name').notNull(),
   module: text('module').notNull(), // 'complaints', 'members', 'events', etc.
   description: text('description'),
@@ -193,16 +196,14 @@ export const permissions = pgTable('permissions', {
 export const userPermissions = pgTable(
   'user_permissions',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`('uperm_' || replace(gen_random_uuid()::text, '-', ''))`),
-    userId: text('user_id').notNull(), // references members.id
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    userId: bigint('user_id', { mode: 'number' }).notNull(),
     permissionCode: text('permission_code')
       .notNull()
       .references(() => permissions.code, { onDelete: 'cascade' }),
     scopeType: roleScopeEnum('scope_type').notNull().default('VILLAGE'),
-    scopeId: text('scope_id'), // villageId or districtId or null for global
-    isGranted: boolean('is_granted').notNull().default(true), // true = grant, false = explicit revoke
+    scopeId: bigint('scope_id', { mode: 'number' }),
+    isGranted: boolean('is_granted').notNull().default(true),
     grantedBy: text('granted_by'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -219,16 +220,14 @@ export const userPermissions = pgTable(
 export const userVillageRoles = pgTable(
   'user_village_roles',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`('uvr_' || replace(gen_random_uuid()::text, '-', ''))`),
-    userId: text('user_id').notNull(), // references members.id
-    villageId: text('village_id')
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    userId: bigint('user_id', { mode: 'number' }).notNull(),
+    villageId: bigint('village_id', { mode: 'number' })
       .notNull()
       .references(() => villages.id, { onDelete: 'cascade' }),
     role: systemRoleEnum('role').notNull().default('MEMBER'),
     isPrimary: boolean('is_primary').notNull().default(false),
-    status: text('status').notNull().default('active'),
+    assignedBy: text('assigned_by'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -239,7 +238,7 @@ export const userVillageRoles = pgTable(
 );
 
 // ==============================================================================
-// 4. DOMAIN ENTITY TABLES (Scoped by Village)
+// 4. DOMAIN ENTITY TABLES (Auto-Increment IDs)
 // ==============================================================================
 
 /**
@@ -248,13 +247,11 @@ export const userVillageRoles = pgTable(
 export const members = pgTable(
   'members',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`('mem_' || replace(gen_random_uuid()::text, '-', ''))`),
-    villageId: text('village_id').references(() => villages.id, { onDelete: 'set null' }),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'set null' }),
     supabaseUserId: uuid('supabase_user_id'),
     name: text('name').notNull(),
-    mobile: text('mobile').notNull(),
+    mobile: text('mobile').notNull().unique(),
     status: memberStatusEnum('status').notNull().default('active'),
     photoUrl: text('photo_url'),
     organizationName: text('organization_name').default('ग्रामोदय यूथ मंच'),
@@ -281,10 +278,8 @@ export const members = pgTable(
 export const complaints = pgTable(
   'complaints',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`('comp_' || replace(gen_random_uuid()::text, '-', ''))`),
-    villageId: text('village_id').references(() => villages.id, { onDelete: 'set null' }),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'set null' }),
     userId: uuid('user_id'),
     title: text('title').notNull(),
     category: complaintCategoryEnum('category').notNull().default('Other'),
@@ -298,6 +293,7 @@ export const complaints = pgTable(
     isDemo: boolean('is_demo').default(false),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('idx_complaints_village_id').on(table.villageId),
@@ -313,10 +309,8 @@ export const complaints = pgTable(
 export const socialWorks = pgTable(
   'social_works',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`('sw_' || replace(gen_random_uuid()::text, '-', ''))`),
-    villageId: text('village_id').references(() => villages.id, { onDelete: 'set null' }),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     description: text('description').notNull(),
     date: date('date').notNull().default(sql`CURRENT_DATE`),
@@ -327,6 +321,7 @@ export const socialWorks = pgTable(
     videoUrl: text('video_url'),
     status: socialWorkStatusEnum('status').notNull().default('pending'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('idx_social_works_village_id').on(table.villageId),
@@ -341,10 +336,8 @@ export const socialWorks = pgTable(
 export const events = pgTable(
   'events',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`('evt_' || replace(gen_random_uuid()::text, '-', ''))`),
-    villageId: text('village_id').references(() => villages.id, { onDelete: 'set null' }),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     description: text('description'),
     date: text('date').notNull(),
@@ -354,6 +347,7 @@ export const events = pgTable(
     videoUrl: text('video_url'),
     status: eventStatusEnum('status').notNull().default('PUBLISHED'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('idx_events_village_id').on(table.villageId),
@@ -367,16 +361,16 @@ export const events = pgTable(
 export const gallery = pgTable(
   'gallery',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`('gal_' || replace(gen_random_uuid()::text, '-', ''))`),
-    villageId: text('village_id').references(() => villages.id, { onDelete: 'set null' }),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'set null' }),
     caption: text('caption'),
     photoUrl: text('photo_url').notNull(),
     uploadedBy: text('uploaded_by').notNull().default('Admin'),
+    uploadedByMobile: text('uploaded_by_mobile'),
     date: date('date').notNull().default(sql`CURRENT_DATE`),
     status: galleryStatusEnum('status').notNull().default('published'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('idx_gallery_village_id').on(table.villageId)]
 );
@@ -387,35 +381,34 @@ export const gallery = pgTable(
 export const elders = pgTable(
   'elders',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`('eld_' || replace(gen_random_uuid()::text, '-', ''))`),
-    villageId: text('village_id').references(() => villages.id, { onDelete: 'set null' }),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'set null' }),
     name: text('name').notNull(),
-    mobile: text('mobile'),
-    location: text('location').default('Rasoolpur'),
-    details: text('details'),
+    age: text('age'),
+    role: text('role'),
+    contribution: text('contribution'),
     photoUrl: text('photo_url'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('idx_elders_village_id').on(table.villageId)]
 );
 
 /**
- * 4.7 ANNOUNCEMENTS TABLE (सार्वजनिक सूचनाएं - Local or Global Broadcast)
+ * 4.7 ANNOUNCEMENTS TABLE (सार्वजनिक सूचनाएं)
  */
 export const announcements = pgTable(
   'announcements',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`('ann_' || replace(gen_random_uuid()::text, '-', ''))`),
-    villageId: text('village_id').references(() => villages.id, { onDelete: 'set null' }), // null = global announcement
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     content: text('content').notNull(),
     publishedBy: text('published_by').notNull().default('ग्रामोदय यूथ मंच'),
+    isUrgent: boolean('is_urgent').default(false),
     date: date('date').notNull().default(sql`CURRENT_DATE`),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('idx_announcements_village_id').on(table.villageId)]
 );
@@ -426,16 +419,16 @@ export const announcements = pgTable(
 export const publicInfos = pgTable(
   'public_infos',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`('info_' || replace(gen_random_uuid()::text, '-', ''))`),
-    villageId: text('village_id').references(() => villages.id, { onDelete: 'set null' }),
-    name: text('name').notNull(),
-    mobile: text('mobile').notNull(),
-    information: text('information').notNull(),
-    photoUrl: text('photo_url'),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    description: text('description').notNull(),
+    category: text('category').notNull(),
+    submitterName: text('submitter_name').notNull(),
+    submitterMobile: text('submitter_mobile').notNull(),
     status: publicInfoStatusEnum('status').notNull().default('pending'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [index('idx_public_infos_village_id').on(table.villageId)]
 );
@@ -446,14 +439,14 @@ export const publicInfos = pgTable(
 export const groupMessages = pgTable(
   'group_messages',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`('gmsg_' || replace(gen_random_uuid()::text, '-', ''))`),
-    villageId: text('village_id').references(() => villages.id, { onDelete: 'set null' }),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'set null' }),
     senderName: text('sender_name').notNull(),
+    senderRole: text('sender_role').default('Member'),
     senderMobile: text('sender_mobile'),
     senderPhoto: text('sender_photo'),
     text: text('text').notNull(),
+    timestamp: text('timestamp').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -463,24 +456,25 @@ export const groupMessages = pgTable(
 );
 
 /**
- * 4.10 DIRECT MESSAGES TABLE (1-on-1 चैट)
+ * 4.10 DIRECT MESSAGES TABLE
  */
 export const messages = pgTable(
   'messages',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`('msg_' || replace(gen_random_uuid()::text, '-', ''))`),
-    senderMobile: text('sender_mobile').notNull(),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'set null' }),
+    roomId: text('room_id').default('general'),
+    senderId: text('sender_id').notNull(),
     senderName: text('sender_name').notNull(),
-    recipientMobile: text('recipient_mobile').notNull(),
-    recipientName: text('recipient_name').notNull(),
+    senderRole: text('sender_role').default('Member'),
+    senderMobile: text('sender_mobile'),
+    senderPhoto: text('sender_photo'),
     text: text('text').notNull(),
-    isRead: boolean('is_read').notNull().default(false),
+    photoUrl: text('photo_url'),
+    timestamp: text('timestamp').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index('idx_messages_pair').on(table.senderMobile, table.recipientMobile),
     index('idx_messages_created_at').on(table.createdAt),
   ]
 );
@@ -491,14 +485,13 @@ export const messages = pgTable(
 export const auditLogs = pgTable(
   'audit_logs',
   {
-    id: text('id')
-      .primaryKey()
-      .default(sql`('log_' || replace(gen_random_uuid()::text, '-', ''))`),
-    villageId: text('village_id').references(() => villages.id, { onDelete: 'set null' }),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'set null' }),
+    userId: text('user_id'),
+    userName: text('user_name').notNull(),
     action: text('action').notNull(),
-    adminName: text('admin_name').notNull().default('Admin'),
-    adminMobile: text('admin_mobile').notNull().default(''),
-    recordAffected: text('record_affected').notNull().default(''),
+    details: text('details'),
+    ipAddress: text('ip_address'),
     timestamp: timestamp('timestamp', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -538,7 +531,6 @@ export const membersRelations = relations(members, ({ one, many }) => ({
     fields: [members.villageId],
     references: [villages.id],
   }),
-  permissions: many(userPermissions),
   villageRoles: many(userVillageRoles),
 }));
 
@@ -546,16 +538,5 @@ export const complaintsRelations = relations(complaints, ({ one }) => ({
   village: one(villages, {
     fields: [complaints.villageId],
     references: [villages.id],
-  }),
-}));
-
-export const userPermissionsRelations = relations(userPermissions, ({ one }) => ({
-  user: one(members, {
-    fields: [userPermissions.userId],
-    references: [members.id],
-  }),
-  permission: one(permissions, {
-    fields: [userPermissions.permissionCode],
-    references: [permissions.code],
   }),
 }));
