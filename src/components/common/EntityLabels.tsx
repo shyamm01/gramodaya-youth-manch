@@ -328,11 +328,12 @@ export const VillageBadge: React.FC<VillageBadgeProps> = ({
     <span className={`inline-flex items-center font-semibold rounded-full border ${sizeClasses[size]} ${base}`}>
       {pulse && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1" />}
       <MapPin className={`${iconClass[size]} mr-0.5`} />
-      {village}
-      {gramPanchayat && <span className="opacity-60 ml-0.5">· {gramPanchayat}</span>}
+      {village && !village.includes("undefined") ? village : "Rasoolpur"}
+      {gramPanchayat && !gramPanchayat.includes("undefined") && <span className="opacity-60 ml-0.5">· {gramPanchayat}</span>}
     </span>
   );
 };
+
 
 // ─── 9. Verified Badge ────────────────────────────────────────────────────────
 interface VerifiedBadgeProps {

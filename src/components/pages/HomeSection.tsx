@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { useApp } from "../../context/AppContext";
 import { JoinModal } from "../modals/JoinModal";
 import {
@@ -40,14 +40,14 @@ export const HomeSection: React.FC = () => {
   ).length;
 
   return (
-    <div className="space-y-6 sm:space-y-8 pb-16 transition-colors duration-200">
+    <div className="space-y-8 sm:space-y-12 pb-16 transition-colors duration-200">
       {/* Join Organization Modal */}
       <JoinModal
         isOpen={isJoinModalOpen}
         onClose={() => setIsJoinModalOpen(false)}
       />
 
-      {/* 1. Hero Section with Blended Village Image & Live Metrics */}
+      {/* 1. Hero Section - Full width seamlessly spanning with background image */}
       <HomeHero
         onJoinClick={() => setIsJoinModalOpen(true)}
         activeMembersCount={activeMembersCount}
@@ -55,28 +55,32 @@ export const HomeSection: React.FC = () => {
         socialWorksCount={approvedSocialWorks.length}
         eventsCount={publishedEvents.length}
       />
-      {/* 5. Live Activity Feeds (Notices, Social Work, Events, Gallery) */}
-      <HomeActivityFeeds
-        approvedInfos={approvedInfos}
-        approvedSocialWorks={approvedSocialWorks}
-        publishedEvents={publishedEvents}
-        approvedGalleryPhotos={approvedGalleryPhotos}
-      />
 
-      {/* 2. Quick Member Directory Search & Actions */}
-      <HomeMemberSearch
-        members={members}
-        activeMembersCount={activeMembersCount}
-      />
+      {/* 2. Containerized Content for all sections below Hero */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
+        {/* Live Activity Feeds (Notices, Social Work, Events, Gallery) */}
+        <HomeActivityFeeds
+          approvedInfos={approvedInfos}
+          approvedSocialWorks={approvedSocialWorks}
+          publishedEvents={publishedEvents}
+          approvedGalleryPhotos={approvedGalleryPhotos}
+        />
 
-      {/* 3. Grievance Redressal Banner */}
-      <HomeGrievanceBanner
-        complaints={complaints}
-        resolvedComplaintsCount={resolvedComplaintsCount}
-      />
+        {/* Quick Member Directory Search & Actions */}
+        <HomeMemberSearch
+          members={members}
+          activeMembersCount={activeMembersCount}
+        />
 
-      {/* 4. Leadership & Main Executives Showcase */}
-      <HomeLeadership admins={admins} />
+        {/* Grievance Redressal Banner */}
+        <HomeGrievanceBanner
+          complaints={complaints}
+          resolvedComplaintsCount={resolvedComplaintsCount}
+        />
+
+        {/* Leadership & Main Executives Showcase */}
+        <HomeLeadership admins={admins} />
+      </div>
     </div>
   );
 };

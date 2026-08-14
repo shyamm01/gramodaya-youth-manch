@@ -31,6 +31,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   } = useApp();
 
   const isAdminRoute = pathname?.startsWith('/super-admin') || pathname?.startsWith('/admin');
+  const isHomePage = pathname === '/' || pathname === '';
 
   const footerLinks = [
     { href: '/', label: t('nav.home') },
@@ -91,7 +92,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       <Header />
       <BackButtonHeader />
 
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-8">
+      <main className={`flex-1 w-full ${isHomePage ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6'} pb-24 md:pb-8`}>
         {children}
       </main>
 

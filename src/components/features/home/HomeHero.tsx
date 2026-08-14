@@ -24,6 +24,14 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
 }) => {
   const { villageSettings, t, lang } = useApp();
 
+  const villageName = lang === 'en'
+    ? (villageSettings.name || 'Rasoolpur')
+    : (villageSettings.nameHindi || 'रसूलपुर');
+
+  const panchayatName = lang === 'en'
+    ? (villageSettings.gramPanchayat || (villageSettings as any).panchayat || 'Bahera')
+    : (villageSettings.gramPanchayatHindi || (villageSettings as any).panchayatHindi || 'बहेरा');
+
   const stats = [
     {
       value: activeMembersCount,
@@ -56,13 +64,13 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   ];
 
   return (
-    <section className="relative overflow-hidden flex flex-col justify-center items-center text-white py-16 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-8 border-b border-emerald-900/30 dark:border-slate-800/80">
+    <section className="relative overflow-hidden w-full flex flex-col justify-center items-center text-white py-16 sm:py-20 lg:py-24 px-4 sm:px-6 lg:px-8 border-b border-emerald-900/30 dark:border-slate-800/80 bg-[#0B130E] dark:bg-[#070B12]">
       {/* ── FULL COVER VILLAGE BACKGROUND IMAGE WITH LAYERED DEPTH ── */}
       <div className="absolute inset-0 w-full h-full z-0 overflow-hidden pointer-events-none">
         <img
           src="/images/village_hero.jpg"
           alt="ग्राम रसूलपुर — भारतीय गांव का विहंगम दृश्य"
-          className="w-full h-full object-cover object-center scale-100"
+          className="w-full h-full object-cover object-center scale-105"
         />
         {/* Layer 1: Ambient deep vignette backdrop */}
         <div className="absolute inset-0 bg-[#0A140E]/85 dark:bg-[#060B14]/90 backdrop-blur-[0.5px]" />
@@ -80,8 +88,8 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
         {/* Village Badge with Soft Glow */}
         <div className="flex justify-center transform hover:scale-105 transition-transform duration-300">
           <VillageBadge
-            village={`${t("header.village")} ${lang === 'en' ? villageSettings.name : villageSettings.nameHindi}`}
-            gramPanchayat={`${t("header.gramPanchayat")} ${lang === 'en' ? villageSettings.gramPanchayat : villageSettings.gramPanchayatHindi}`}
+            village={`${t("header.village")} ${villageName}`}
+            gramPanchayat={`${t("header.gramPanchayat")} ${panchayatName}`}
             variant="dark"
             pulse={true}
           />
