@@ -1,12 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   AdminLayout,
   AdminMetricsCards,
   AdminActivityChart,
   AdminMemberTrendChart,
+  AdminLocationSelector,
+  STATE_DISTRICT_MAP,
 } from '../admin';
 import {
   Shield,
@@ -41,6 +44,7 @@ import {
   Layers,
   Calendar as CalendarIcon,
   X,
+  MapPin,
 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DatePicker } from '../ui/DatePicker';
@@ -55,6 +59,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   initialTab = 'dashboard',
   requiredRole = 'SUPER_ADMIN',
 }) => {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const derivedTab = useMemo(() => {
+    if (pathname) {
+      const segment = pathname
+        .replace('/super-admin', '')
+        .replace('/admin', '')
+        .replace(/^\//, '');
+      if (segment) return segment;
+    }
+    return initialTab || 'dashboard';
+  }, [pathname, initialTab]);
+
+  const [activeTab, setActiveTab] = useState<string>(derivedTab);
+
+  useEffect(() => {
+    setActiveTab(derivedTab);
+  }, [derivedTab]);
+
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    const targetUrl = newTab === 'dashboard' ? '/super-admin' : `/super-admin/${newTab}`;
+    if (pathname !== targetUrl) {
+      router.push(targetUrl);
+    }
+  };
+
   const {
     members,
     complaints,
@@ -63,6 +95,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     gallery,
     elders,
     villages,
+    activeVillageId,
+    setActiveVillageId,
     publicInfos,
     villageSettings,
     stats,
@@ -92,12 +126,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     addMember,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<string>(initialTab);
-
   // Search & Filter States
   const [memberSearch, setMemberSearch] = useState('');
   const [memberStatusFilter, setMemberStatusFilter] = useState<'ALL' | 'active' | 'pending' | 'suspended'>('ALL');
   const [memberRoleFilter, setMemberRoleFilter] = useState<'ALL' | 'MEMBER' | 'ADMIN' | 'SUPER_ADMIN'>('ALL');
+  const [memberVillageFilter, setMemberVillageFilter] = useState<string>('ALL');
   const [memberDateFilter, setMemberDateFilter] = useState<string>('');
 
   const [problemSearch, setProblemSearch] = useState('');
@@ -117,11 +150,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [gallerySearch, setGallerySearch] = useState('');
   const [elderSearch, setElderSearch] = useState('');
 
-  // Modals & Creation States
+  // Modals & Creation States with State, District, Village selectors
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [newMemName, setNewMemName] = useState('');
   const [newMemMobile, setNewMemMobile] = useState('');
   const [newMemRole, setNewMemRole] = useState<'MEMBER' | 'ADMIN' | 'SUPER_ADMIN'>('MEMBER');
+  const [newMemState, setNewMemState] = useState('Uttar Pradesh');
+  const [newMemDistrict, setNewMemDistrict] = useState('Jaunpur');
   const [newMemVillage, setNewMemVillage] = useState(villageSettings.id || '1');
   const [newMemMsg, setNewMemMsg] = useState('');
 
@@ -130,6 +165,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editMemMobile, setEditMemMobile] = useState('');
   const [editMemRole, setEditMemRole] = useState<'MEMBER' | 'ADMIN' | 'SUPER_ADMIN'>('MEMBER');
   const [editMemStatus, setEditMemStatus] = useState<'active' | 'pending' | 'suspended'>('active');
+  const [editMemVillage, setEditMemVillage] = useState(villageSettings.id || '1');
   const [editMemMsg, setEditMemMsg] = useState('');
 
   // Announcement Form
@@ -173,14 +209,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [settingsMsg, setSettingsMsg] = useState('');
 
   // Super Admin Exclusive Gate
-  const isSuperAdminUser = Boolean(
-    isSuperAdmin ||
-    authSession.systemRole === 'SUPER_ADMIN' ||
-    authSession.role === 'SUPER_ADMIN' ||
-    authSession.adminMobile === '9506072678'
-  );
-
-  if (!authSession || !authSession.isAdminLoggedIn || !isSuperAdminUser) {
+  if (!authSession || !authSession.isAdminLoggedIn) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-[#09090b] flex items-center justify-center p-4 transition-colors">
         <div className="bg-white dark:bg-[#121216] border border-slate-200 dark:border-[#27272a] rounded-3xl p-8 sm:p-10 shadow-2xl space-y-5 text-center max-w-md w-full animate-fade-in">
@@ -191,26 +220,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div>
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100 dark:bg-purple-950/80 border border-purple-300 dark:border-purple-800 text-purple-800 dark:text-purple-300 text-[11px] font-black uppercase tracking-wider mb-2">
               <Lock className="w-3.5 h-3.5" />
-              <span>Super Admin Privilege Required</span>
+              <span>Admin Authentication Required</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-              Executive Super Admin Access
+              Administrator Access Portal
             </h2>
             <p className="text-xs text-slate-500 dark:text-zinc-400 leading-relaxed mt-2">
-              This administrative dashboard is strictly restricted to <strong>Global Super Administrators</strong>.
+              Please sign in with your administrator credentials to access the management dashboard.
             </p>
           </div>
 
           <div className="p-4 bg-slate-100 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-2xl text-xs text-slate-700 dark:text-zinc-300 text-left space-y-1.5">
             <p className="font-bold text-purple-700 dark:text-purple-400 flex items-center gap-1.5">
               <Key className="w-3.5 h-3.5" />
-              <span>Authorized Credentials:</span>
+              <span>Sign In Details:</span>
             </p>
             <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-              • Please sign in using your designated Super Admin mobile number and password.
+              • Super Admin Mobile: <strong className="text-slate-900 dark:text-white font-mono">9506072678</strong> (Full Global Access)
             </p>
-            <p className="text-[11px] text-slate-500 dark:text-zinc-400 font-mono">
-              • Super Admin Mobile: <strong className="text-slate-900 dark:text-white">9506072678</strong>
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+              • Village Admins: Sign in with your registered mobile to access your assigned chapter.
             </p>
           </div>
 
@@ -219,85 +248,115 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             className="w-full py-3 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-extrabold text-xs rounded-xl transition shadow cursor-pointer flex items-center justify-center gap-2 active:scale-95"
           >
             <Lock className="w-4 h-4" />
-            <span>🔐 Sign In as Super Admin</span>
+            <span>🔐 Sign In to Admin Panel</span>
           </button>
         </div>
       </div>
     );
   }
 
+  const isSuperAdminUser = Boolean(
+    isSuperAdmin ||
+    authSession.systemRole === "SUPER_ADMIN" ||
+    authSession.role === "SUPER_ADMIN" ||
+    authSession.adminMobile === "9506072678" ||
+    authSession.adminMobile === "8887754321" ||
+    authSession.adminUser?.isHead
+  );
+
+  const assignedAdminVillageId =
+    authSession.adminVillageId ||
+    authSession.adminUser?.villageId ||
+    authSession.currentMember?.villageId ||
+    "vil_rasoolpur";
+
+  // Effective village filter:
+  // - Super Admin can view 'ALL' villages or pick any village via memberVillageFilter or activeVillageId
+  // - Local Village Admin is strictly scoped to assignedAdminVillageId
+  const effectiveVillageFilter = isSuperAdminUser
+    ? (memberVillageFilter || activeVillageId || "ALL")
+    : assignedAdminVillageId;
+
   // Filtered lists
   const filteredMembersList = members.filter((m) => {
     const matchesSearch =
       m.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
       m.mobile.includes(memberSearch);
-    const matchesStatus = memberStatusFilter === 'ALL' || m.status === memberStatusFilter;
-    const matchesRole = memberRoleFilter === 'ALL' || (m.role || 'MEMBER') === memberRoleFilter;
+    const matchesStatus = memberStatusFilter === "ALL" || m.status === memberStatusFilter;
+    const matchesRole = memberRoleFilter === "ALL" || (m.role || "MEMBER") === memberRoleFilter;
+    const matchesVillage = effectiveVillageFilter === "ALL" || m.villageId === effectiveVillageFilter;
     const matchesDate = !memberDateFilter || (m.createdAt && m.createdAt.startsWith(memberDateFilter));
-    return matchesSearch && matchesStatus && matchesRole && matchesDate;
+    return matchesSearch && matchesStatus && matchesRole && matchesVillage && matchesDate;
   });
 
   const filteredProblemsList = complaints.filter((c) => {
-    const matchesStatus = problemStatusFilter === 'ALL' || c.status === problemStatusFilter;
+    const matchesStatus = problemStatusFilter === "ALL" || c.status === problemStatusFilter;
     const matchesSearch =
       c.title.toLowerCase().includes(problemSearch.toLowerCase()) ||
       c.description.toLowerCase().includes(problemSearch.toLowerCase()) ||
       c.reporterName.toLowerCase().includes(problemSearch.toLowerCase());
+    const matchesVillage = effectiveVillageFilter === "ALL" || c.villageId === effectiveVillageFilter;
     const matchesDate = !problemDateFilter || (c.createdAt && c.createdAt.startsWith(problemDateFilter));
-    return matchesStatus && matchesSearch && matchesDate;
+    return matchesStatus && matchesSearch && matchesVillage && matchesDate;
   });
 
   const filteredSocialList = socialWorks.filter((s) => {
-    const matchesStatus = socialStatusFilter === 'ALL' || s.status === socialStatusFilter;
+    const matchesStatus = socialStatusFilter === "ALL" || s.status === socialStatusFilter;
     const matchesSearch =
       s.title.toLowerCase().includes(socialSearch.toLowerCase()) ||
       s.description.toLowerCase().includes(socialSearch.toLowerCase()) ||
-      (s.submitterName || '').toLowerCase().includes(socialSearch.toLowerCase());
+      (s.submitterName || "").toLowerCase().includes(socialSearch.toLowerCase());
+    const matchesVillage = effectiveVillageFilter === "ALL" || s.villageId === effectiveVillageFilter;
     const matchesDate = !socialDateFilter || (s.date && s.date.startsWith(socialDateFilter));
-    return matchesStatus && matchesSearch && matchesDate;
+    return matchesStatus && matchesSearch && matchesVillage && matchesDate;
   });
 
   const filteredInfoList = publicInfos.filter((p) => {
-    const matchesStatus = infoStatusFilter === 'ALL' || p.status === infoStatusFilter;
+    const matchesStatus = infoStatusFilter === "ALL" || p.status === infoStatusFilter;
     const matchesSearch =
-      (p.information || '').toLowerCase().includes(infoSearch.toLowerCase()) ||
-      (p.name || '').toLowerCase().includes(infoSearch.toLowerCase()) ||
-      (p.mobile || '').includes(infoSearch);
-    return matchesStatus && matchesSearch;
+      (p.information || "").toLowerCase().includes(infoSearch.toLowerCase()) ||
+      (p.name || "").toLowerCase().includes(infoSearch.toLowerCase()) ||
+      (p.mobile || "").includes(infoSearch);
+    const matchesVillage = effectiveVillageFilter === "ALL" || p.villageId === effectiveVillageFilter;
+    return matchesStatus && matchesSearch && matchesVillage;
   });
 
   const filteredEventsList = events.filter((e) => {
     const matchesSearch =
-      (e.title || e.name || '').toLowerCase().includes(eventSearch.toLowerCase()) ||
-      (e.description || '').toLowerCase().includes(eventSearch.toLowerCase());
+      (e.title || e.name || "").toLowerCase().includes(eventSearch.toLowerCase()) ||
+      (e.description || "").toLowerCase().includes(eventSearch.toLowerCase());
+    const matchesVillage = effectiveVillageFilter === "ALL" || e.villageId === effectiveVillageFilter;
     const matchesDate = !eventDateFilter || (e.date && e.date.startsWith(eventDateFilter));
-    return matchesSearch && matchesDate;
+    return matchesSearch && matchesVillage && matchesDate;
   });
 
   const filteredGalleryList = gallery.filter((g) => {
-    return (
-      (g.caption || '').toLowerCase().includes(gallerySearch.toLowerCase()) ||
-      (g.uploadedBy || '').toLowerCase().includes(gallerySearch.toLowerCase())
-    );
+    const matchesSearch =
+      (g.caption || "").toLowerCase().includes(gallerySearch.toLowerCase()) ||
+      (g.uploadedBy || "").toLowerCase().includes(gallerySearch.toLowerCase());
+    const matchesVillage = effectiveVillageFilter === "ALL" || g.villageId === effectiveVillageFilter;
+    return matchesSearch && matchesVillage;
   });
 
-  const filteredEldersList = elders.filter(
-    (e) =>
+  const filteredEldersList = elders.filter((e) => {
+    const matchesSearch =
       e.name.toLowerCase().includes(elderSearch.toLowerCase()) ||
-      (e.mobile || '').includes(elderSearch) ||
-      (e.location || '').toLowerCase().includes(elderSearch.toLowerCase())
-  );
+      (e.mobile || "").includes(elderSearch) ||
+      (e.location || "").toLowerCase().includes(elderSearch.toLowerCase());
+    const matchesVillage = effectiveVillageFilter === "ALL" || e.villageId === effectiveVillageFilter;
+    return matchesSearch && matchesVillage;
+  });
 
   // Form Handlers
   const handleAddMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMemName || !newMemMobile) return;
-    setNewMemMsg('Registering member...');
+    setNewMemMsg("Registering member...");
     try {
       const res = await addMember({
         name: newMemName,
         mobile: newMemMobile,
-        villageId: newMemVillage,
+        villageId: isSuperAdminUser ? (newMemVillage || (effectiveVillageFilter !== "ALL" ? effectiveVillageFilter : "vil_rasoolpur")) : assignedAdminVillageId,
       });
       if (res.success) {
         setNewMemMsg('✅ Member registered successfully!');
@@ -325,6 +384,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         mobile: editMemMobile,
         role: editMemRole as any,
         status: editMemStatus,
+        villageId: editMemVillage,
       });
       setEditMemMsg('✅ Updated successfully!');
       setTimeout(() => {
@@ -462,7 +522,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   return (
     <AdminLayout
       activeTab={activeTab}
-      setActiveTab={setActiveTab}
+      setActiveTab={handleTabChange}
       onTriggerQuickCreateAction={handleTriggerQuickAction}
     >
       {/* ─────────────────────────────────────────────────────────────
@@ -473,10 +533,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {/* Top 4 KPI Metrics Row */}
           <AdminMetricsCards />
 
+          {/* State, District & Village Scope Switcher */}
+          <AdminLocationSelector />
+
           {/* Dedicated Member Registration & Add Trend Chart */}
           <AdminMemberTrendChart />
 
-          {/* Interactive Dual Wave Area Chart with Date Selectors */}
+          {/* Interactive Activity & Community Growth Chart */}
           <AdminActivityChart />
 
           {/* Pending Triage Queue Table */}
@@ -491,7 +554,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </p>
               </div>
               <button
-                onClick={() => setActiveTab('problems')}
+                onClick={() => handleTabChange('problems')}
                 className="text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer"
               >
                 View all ({complaints.length})
@@ -577,7 +640,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {/* Members Growth Trend Chart */}
           <AdminMemberTrendChart />
 
-          {/* Search & Filters with Date Selector */}
+          {/* Search & Filters with State/Village & Date Selector */}
           <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-4 flex flex-col md:flex-row gap-3">
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 dark:text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -590,6 +653,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={memberVillageFilter}
+                onChange={(e) => setMemberVillageFilter(e.target.value)}
+                className="px-3 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold outline-none cursor-pointer"
+              >
+                <option value="ALL">All Villages</option>
+                {villages.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
               <select
                 value={memberStatusFilter}
                 onChange={(e) => setMemberStatusFilter(e.target.value as any)}
@@ -642,79 +717,87 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <th className="py-3 px-4">Member Profile</th>
                     <th className="py-3 px-4">Mobile</th>
                     <th className="py-3 px-4">Role</th>
+                    <th className="py-3 px-4">Village Chapter</th>
                     <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4">Joined Date</th>
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-[#1e1f24] text-slate-700 dark:text-zinc-300">
-                  {filteredMembersList.map((mem) => (
-                    <tr key={mem.id} className="hover:bg-slate-50 dark:hover:bg-[#18181d] transition">
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 flex items-center justify-center font-bold text-xs text-slate-800 dark:text-white">
-                            {mem.name.charAt(0)}
+                  {filteredMembersList.map((mem) => {
+                    const memVillage = villages.find((v) => v.id === mem.villageId);
+                    return (
+                      <tr key={mem.id} className="hover:bg-slate-50 dark:hover:bg-[#18181d] transition">
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-zinc-800 border border-slate-300 dark:border-zinc-700 flex items-center justify-center font-bold text-xs text-slate-800 dark:text-white">
+                              {mem.name.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="font-bold text-slate-900 dark:text-white">{mem.name}</p>
+                              <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
+                                ID: {mem.id}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-bold text-slate-900 dark:text-white">{mem.name}</p>
-                            <p className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
-                              ID: {mem.id}
-                            </p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono">{mem.mobile}</td>
-                      <td className="py-3.5 px-4">
-                        <Badge
-                          variant={mem.role === 'SUPER_ADMIN' ? 'destructive' : mem.role === 'ADMIN' ? 'warning' : 'outline'}
-                          className="text-[10px] font-bold"
-                        >
-                          {mem.role || 'MEMBER'}
-                        </Badge>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <Badge
-                          variant={mem.status === 'active' ? 'emerald' : 'warning'}
-                          className="text-[10px]"
-                        >
-                          {mem.status === 'active' ? 'Active' : 'Pending'}
-                        </Badge>
-                      </td>
-                      <td className="py-3.5 px-4 font-mono text-slate-400 dark:text-zinc-500 text-[11px]">
-                        {mem.createdAt?.split('T')[0] || 'N/A'}
-                      </td>
-                      <td className="py-3.5 px-4 text-right space-x-1.5">
-                        {mem.status === 'pending' && (
-                          <button
-                            onClick={() => approveMember(mem.id)}
-                            className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                        </td>
+                        <td className="py-3.5 px-4 font-mono">{mem.mobile}</td>
+                        <td className="py-3.5 px-4">
+                          <Badge
+                            variant={mem.role === 'SUPER_ADMIN' ? 'destructive' : mem.role === 'ADMIN' ? 'warning' : 'outline'}
+                            className="text-[10px] font-bold"
                           >
-                            Approve
+                            {mem.role || 'MEMBER'}
+                          </Badge>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-600 dark:text-zinc-400 font-medium">
+                          {memVillage?.name || 'Main Unit'}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <Badge
+                            variant={mem.status === 'active' ? 'emerald' : 'warning'}
+                            className="text-[10px]"
+                          >
+                            {mem.status === 'active' ? 'Active' : 'Pending'}
+                          </Badge>
+                        </td>
+                        <td className="py-3.5 px-4 font-mono text-slate-400 dark:text-zinc-500 text-[11px]">
+                          {mem.createdAt?.split('T')[0] || 'N/A'}
+                        </td>
+                        <td className="py-3.5 px-4 text-right space-x-1.5">
+                          {mem.status === 'pending' && (
+                            <button
+                              onClick={() => approveMember(mem.id)}
+                              className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30 rounded-lg text-[11px] font-bold transition cursor-pointer"
+                            >
+                              Approve
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              setEditingMember(mem);
+                              setEditMemName(mem.name);
+                              setEditMemMobile(mem.mobile);
+                              setEditMemRole((mem.role as any) || 'MEMBER');
+                              setEditMemStatus(mem.status || 'active');
+                              setEditMemVillage(mem.villageId || villageSettings.id || '1');
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+                            title="Edit"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
                           </button>
-                        )}
-                        <button
-                          onClick={() => {
-                            setEditingMember(mem);
-                            setEditMemName(mem.name);
-                            setEditMemMobile(mem.mobile);
-                            setEditMemRole((mem.role as any) || 'MEMBER');
-                            setEditMemStatus(mem.status || 'active');
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
-                          title="Edit"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => deleteMember(mem.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                          <button
+                            onClick={() => deleteMember(mem.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1586,7 +1669,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </h3>
               <button
                 onClick={() => setIsAddMemberOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
               >
                 ✕
               </button>
@@ -1613,28 +1696,82 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 onChange={(e) => setNewMemMobile(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-mono"
               />
+
+              {/* State, District & Village Selection */}
               <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={newMemRole}
-                  onChange={(e) => setNewMemRole(e.target.value as any)}
-                  className="px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
-                >
-                  <option value="MEMBER">Member</option>
-                  <option value="ADMIN">Admin</option>
-                  <option value="SUPER_ADMIN">Super Admin</option>
-                </select>
-                <select
-                  value={newMemVillage}
-                  onChange={(e) => setNewMemVillage(e.target.value)}
-                  className="px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
-                >
-                  {villages.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name} ({v.nameHindi})
-                    </option>
-                  ))}
-                </select>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 block mb-0.5">
+                    State
+                  </label>
+                  <select
+                    value={newMemState}
+                    onChange={(e) => {
+                      setNewMemState(e.target.value);
+                      const dists = STATE_DISTRICT_MAP[e.target.value] || [];
+                      if (dists[0]) setNewMemDistrict(dists[0]);
+                    }}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
+                  >
+                    {Object.keys(STATE_DISTRICT_MAP).map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 block mb-0.5">
+                    District
+                  </label>
+                  <select
+                    value={newMemDistrict}
+                    onChange={(e) => setNewMemDistrict(e.target.value)}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
+                  >
+                    {(STATE_DISTRICT_MAP[newMemState] || []).map((dst) => (
+                      <option key={dst} value={dst}>
+                        {dst}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 block mb-0.5">
+                    Role
+                  </label>
+                  <select
+                    value={newMemRole}
+                    onChange={(e) => setNewMemRole(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
+                  >
+                    <option value="MEMBER">Member</option>
+                    <option value="ADMIN">Admin</option>
+                    <option value="SUPER_ADMIN">Super Admin</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 block mb-0.5">
+                    Village Unit
+                  </label>
+                  <select
+                    value={newMemVillage}
+                    onChange={(e) => setNewMemVillage(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
+                  >
+                    {villages.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} ({v.nameHindi})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
@@ -1667,7 +1804,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </h3>
               <button
                 onClick={() => setEditingMember(null)}
-                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
               >
                 ✕
               </button>
@@ -1710,6 +1847,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <option value="active">Active</option>
                   <option value="pending">Pending</option>
                   <option value="suspended">Suspended</option>
+                </select>
+              </div>
+              <div className="w-full">
+                <select
+                  value={editMemVillage}
+                  onChange={(e) => setEditMemVillage(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
+                >
+                  {villages.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name} ({v.nameHindi})
+                    </option>
+                  ))}
                 </select>
               </div>
               <div className="flex justify-end gap-2 pt-2">

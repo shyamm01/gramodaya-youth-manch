@@ -4,7 +4,8 @@ import React from 'react';
 import { useApp } from '@/src/context/AppContext';
 import { ThemeToggle } from '@/src/components/common/ThemeToggle';
 import { Badge } from '@/src/components/ui/badge';
-import { Menu, Globe, ArrowLeft } from 'lucide-react';
+import { AdminLocationSelector } from './AdminLocationSelector';
+import { Menu, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 interface AdminNavbarProps {
@@ -16,15 +17,10 @@ export const AdminNavbar: React.FC<AdminNavbarProps> = ({
   activeTab,
   onOpenMobileSidebar,
 }) => {
-  const {
-    villages,
-    activeVillageId,
-    setActiveVillageId,
-    isSuperAdmin,
-  } = useApp();
+  const { isSuperAdmin } = useApp();
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-8 py-3.5 bg-white/80 dark:bg-[#09090b]/80 backdrop-blur-md border-b border-slate-200 dark:border-[#202024] transition-colors duration-200">
+    <header className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-8 py-3 bg-white/80 dark:bg-[#09090b]/80 backdrop-blur-md border-b border-slate-200 dark:border-[#202024] transition-colors duration-200">
       <div className="flex items-center gap-3">
         <button
           onClick={onOpenMobileSidebar}
@@ -44,31 +40,16 @@ export const AdminNavbar: React.FC<AdminNavbarProps> = ({
       </div>
 
       <div className="flex items-center gap-2.5 sm:gap-3.5">
-        {/* Village Unit Switcher dropdown */}
-        {isSuperAdmin && villages.length > 1 && (
-          <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] px-3 py-1.5 rounded-xl text-xs">
-            <Globe className="w-3.5 h-3.5 text-slate-500 dark:text-zinc-400" />
-            <select
-              value={activeVillageId}
-              onChange={(e) => setActiveVillageId(e.target.value)}
-              className="bg-transparent text-slate-900 dark:text-white font-bold outline-none cursor-pointer text-xs"
-            >
-              {villages.map((v) => (
-                <option
-                  key={v.id}
-                  value={v.id}
-                  className="bg-white dark:bg-[#18181b] text-slate-900 dark:text-white"
-                >
-                  {v.name} {v.nameHindi ? `(${v.nameHindi})` : ''}
-                </option>
-              ))}
-            </select>
+        {/* State, District & Village Multi-Scope Selector */}
+        {isSuperAdmin && (
+          <div className="hidden md:block">
+            <AdminLocationSelector compact />
           </div>
         )}
 
         <Badge
           variant="emerald"
-          className="hidden sm:inline-flex bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-mono text-[10px]"
+          className="hidden xl:inline-flex bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20 font-mono text-[10px]"
         >
           ● Realtime Active
         </Badge>
@@ -79,7 +60,7 @@ export const AdminNavbar: React.FC<AdminNavbarProps> = ({
         {/* Back to Public Portal Link */}
         <Link
           href="/"
-          className="hidden md:inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white px-2.5 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
+          className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white px-2.5 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Public Portal</span>

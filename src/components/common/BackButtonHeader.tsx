@@ -62,9 +62,7 @@ export const BackButtonHeader: React.FC = () => {
     if (pathname.startsWith('/live-chat')) {
       return { title: t('nav.liveChat'), icon: MessageSquare, color: 'text-blue-600 dark:text-blue-400' };
     }
-    if (pathname.startsWith('/admin')) {
-      return { title: t('nav.admin'), icon: Shield, color: 'text-amber-600 dark:text-amber-400' };
-    }
+
     return { title: '', icon: Home, color: 'text-emerald-600 dark:text-emerald-400' };
   };
 

@@ -30,7 +30,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 flex font-sans antialiased selection:bg-slate-200 dark:selection:bg-zinc-800 selection:text-slate-900 dark:selection:text-white transition-colors duration-200">
+    <div className="h-screen w-screen overflow-hidden bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 flex font-sans antialiased selection:bg-slate-200 dark:selection:bg-zinc-800 selection:text-slate-900 dark:selection:text-white transition-colors duration-200">
       {/* Executive Collapsible Sidebar */}
       <AdminSidebar
         activeTab={activeTab}
@@ -42,15 +42,15 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         onOpenQuickCreate={() => setQuickCreateOpen(true)}
       />
 
-      {/* Main Administrative Viewport */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen overflow-x-hidden">
+      {/* Main Administrative Viewport - Fixed height with internal scroll */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         <AdminNavbar
           activeTab={activeTab}
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
         />
 
-        {/* Viewport Content */}
-        <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto space-y-8">
+        {/* Viewport Content with dedicated internal scroll */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-8 max-w-7xl w-full mx-auto space-y-8 scroll-smooth">
           {children}
         </main>
       </div>

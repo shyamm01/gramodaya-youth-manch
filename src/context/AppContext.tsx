@@ -216,15 +216,18 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
-  const [activeSection, setActiveSectionState] = useState<string>('home');
+  const [activeSection, setActiveSectionState] = useState<string>("home");
   const [historyStack, setHistoryStack] = useState<string[]>([]);
-  const [lang, setLangState] = useState<string>('hi');
+  const [lang, setLangState] = useState<string>("hi");
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [currentMemberMobile, setCurrentMemberMobileState] = useState<string | null>(null);
+  const isFetchingAuthMeRef = useRef(false);
+  const isFetchingDataRef = useRef(false);
 
   const setLang = (newLang: string) => {
     setLangState(newLang);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('gym_lang', newLang);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("gym_lang", newLang);
     }
   };
 
@@ -234,7 +237,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [villageSettings, setVillageSettings] = useState<VillageSettings>(OFFICIAL_VILLAGE);
   const [villages, setVillages] = useState<Village[]>([]);
-  const [activeVillageId, setActiveVillageId] = useState<string>('vil_rasoolpur');
+  const [activeVillageId, setActiveVillageId] = useState<string>("vil_rasoolpur");
   const [userPermissions, setUserPermissions] = useState<UserPermission[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -248,6 +251,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [integrations, setIntegrations] = useState<ApiIntegration[]>([]);
 
+  const [authSession, setAuthSession] = useState<AuthSession>({ isAdminLoggedIn: false, isMemberLoggedIn: false });
+  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState<boolean>(false);
+  const [isMemberLoginModalOpen, setIsMemberLoginModalOpen] = useState<boolean>(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState<boolean>(false);
+  const [isMyProfileModalOpen, setIsMyProfileModalOpen] = useState<boolean>(false);
+  const [selectedChatPartner, setSelectedChatPartner] = useState<Member | null>(null);
+  const [selectedIdCardMember, setSelectedIdCardMember] = useState<Member | null>(null);
+  const [groupMessages, setGroupMessages] = useState<GroupMessage[]>([]);
+  const [onlineMembers, setOnlineMembers] = useState<any[]>([]);
+
   const checkPermission = (perm: PermissionCode, villageId?: string) => {
     return hasUserPermission(authSession, perm, villageId || activeVillageId);
   };
@@ -255,8 +268,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Synchronize route pathname with activeSection
   useEffect(() => {
     if (pathname) {
-      const cleanPath = pathname.replace(/^\//, '') || 'home';
-      const mappedSection = cleanPath === 'admin' ? 'admin-panel' : cleanPath;
+      const cleanPath = pathname.replace(/^\//, "") || "home";
+      const mappedSection = (cleanPath === "admin" || cleanPath.startsWith("super-admin") || cleanPath.startsWith("admin")) ? "admin-panel" : cleanPath;
       setActiveSectionState(mappedSection);
     }
   }, [pathname]);
@@ -265,13 +278,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (newSection === activeSection) return;
     setHistoryStack((prev) => [...prev, activeSection]);
     setActiveSectionState(newSection);
-    const targetUrl = newSection === 'home' ? '/' : newSection === 'admin-panel' ? '/admin' : `/${newSection}`;
+    const targetUrl = newSection === "home" ? "/" : newSection === "admin-panel" ? "/super-admin" : `/${newSection}`;
     try {
       router.push(targetUrl);
     } catch (e) {
       /* fallback */
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const goBack = () => {
@@ -279,24 +292,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const prevSection = historyStack[historyStack.length - 1];
       setHistoryStack((prev) => prev.slice(0, -1));
       setActiveSectionState(prevSection);
-    } else if (activeSection !== 'home') {
-      setActiveSectionState('home');
+    } else if (activeSection !== "home") {
+      setActiveSectionState("home");
     }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const canGoBack = activeSection !== 'home' || historyStack.length > 0;
+  const canGoBack = activeSection !== "home" || historyStack.length > 0;
 
   useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
       if (e.state && e.state.section) {
         setActiveSectionState(e.state.section);
       } else {
-        setActiveSectionState('home');
+        setActiveSectionState("home");
       }
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
   // Supabase Auth listener
@@ -308,7 +321,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           isMemberLoggedIn: true,
           supabaseUserId: session.user.id,
           email: session.user.email,
-          role: session.user.user_metadata?.role === 'ADMIN' ? 'ADMIN' : (prev.isAdminLoggedIn ? 'ADMIN' : 'MEMBER'),
+          role: session.user.user_metadata?.role === "ADMIN" ? "ADMIN" : (prev.isAdminLoggedIn ? "ADMIN" : "MEMBER"),
         }));
       }
     });
@@ -329,20 +342,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  const [authSession, setAuthSession] = useState<AuthSession>({ isAdminLoggedIn: false });
-  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState<boolean>(false);
-  const [isMemberLoginModalOpen, setIsMemberLoginModalOpen] = useState<boolean>(false);
-  const [isJoinModalOpen, setIsJoinModalOpen] = useState<boolean>(false);
-  const [isMyProfileModalOpen, setIsMyProfileModalOpen] = useState<boolean>(false);
-  const [currentMemberMobile, setCurrentMemberMobileState] = useState<string | null>(null);
-
-  const isFetchingAuthMeRef = useRef(false);
-  const isFetchingDataRef = useRef(false);
-
   // Restore saved session on client mount & verify cookie with /api/auth/me
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedAuth = localStorage.getItem('gym_auth');
+    if (typeof window !== "undefined") {
+      const savedAuth = localStorage.getItem("gym_auth");
       if (savedAuth) {
         try {
           const parsed = JSON.parse(savedAuth);
@@ -354,25 +357,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           /* ignore */
         }
       }
-      const savedMob = localStorage.getItem('gym_member_mobile');
+      const savedMob = localStorage.getItem("gym_member_mobile");
       if (savedMob) {
         setCurrentMemberMobileState(savedMob);
       }
-      const savedLang = localStorage.getItem('gym_lang');
+      const savedLang = localStorage.getItem("gym_lang");
       if (savedLang) {
         setLangState(savedLang);
       }
 
-      // Prevent duplicate in-flight / StrictMode double calls
       if (isFetchingAuthMeRef.current) return;
       isFetchingAuthMeRef.current = true;
 
-      // Rehydrate directly from backend /api/auth/me using HTTP-Only cookie / Token
-      fetch('/api/auth/me', { credentials: 'include' })
+      fetch("/api/auth/me", { credentials: "include" })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data?.authenticated && data.user) {
-            const isAdm = Boolean(data.isAdmin || data.role === 'SUPER_ADMIN' || data.role === 'ADMIN');
+            const isAdm = Boolean(data.isAdmin || data.role === "SUPER_ADMIN" || data.role === "ADMIN");
             const newSession: AuthSession = {
               isAdminLoggedIn: isAdm,
               isMemberLoggedIn: true,
@@ -381,6 +382,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               adminMobile: isAdm ? data.user.mobile : undefined,
               adminName: isAdm ? data.user.name : undefined,
               adminId: isAdm ? data.user.id : undefined,
+              adminVillageId: data.user.villageId || undefined,
               currentMemberMobile: data.user.mobile,
               currentMember: data.user,
               email: data.user.email,
@@ -389,9 +391,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             };
             setAuthSession(newSession);
             setCurrentMemberMobileState(data.user.mobile);
-            localStorage.setItem('gym_auth', JSON.stringify(newSession));
+            localStorage.setItem("gym_auth", JSON.stringify(newSession));
             if (data.token) {
-              localStorage.setItem('gym_token', data.token);
+              localStorage.setItem("gym_token", data.token);
             }
           }
         })
@@ -405,7 +407,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const setCurrentMemberMobile = (mob: string | null) => {
-    setCurrentMemberMobileState(mob);
+
+
     if (typeof window !== 'undefined') {
       if (mob) {
         localStorage.setItem('gym_member_mobile', mob);
@@ -469,16 +472,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await refreshData();
       return { success: true, member };
     } catch (e) {
-      return { success: false, error: 'सर्वर या नेटवर्क कनेक्शन त्रुटि।' };
+      return { success: false, error: "सर्वर या नेटवर्क कनेक्शन त्रुटि।" };
     }
   };
 
   const memberLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch("/api/auth/logout", { method: "POST" });
       await supabase.auth.signOut();
     } catch (e) {
-      console.warn('Signout notice:', e);
+      console.warn("Signout notice:", e);
     }
     store.dispatch(reduxLogout());
     setCurrentMemberMobile(null);
@@ -493,21 +496,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       token: undefined,
     };
     setAuthSession(newAuth);
-    localStorage.removeItem('gym_auth');
-    localStorage.removeItem('gym_token');
-    localStorage.removeItem('gym_member_mobile');
-    setActiveSectionState('home');
+    localStorage.removeItem("gym_auth");
+    localStorage.removeItem("gym_token");
+    localStorage.removeItem("gym_member_mobile");
+    setActiveSectionState("home");
   };
-
-  const [selectedChatPartner, setSelectedChatPartner] = useState<Member | null>(null);
-  const [selectedIdCardMember, setSelectedIdCardMember] = useState<Member | null>(null);
-
-  const [groupMessages, setGroupMessages] = useState<GroupMessage[]>([]);
-  const [onlineMembers, setOnlineMembers] = useState<any[]>([]);
 
   const fetchGroupChat = async () => {
     try {
-      const res = await fetch('/api/group-chat');
+      const res = await fetch("/api/group-chat");
       if (res.ok) {
         const text = await res.text();
         let data: any = null;
@@ -522,8 +519,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
     } catch (e) {
-      // Handle transient fetch errors gracefully during server startup/restarts
-      console.warn('Group chat temporary sync pause:', e instanceof Error ? e.message : e);
+      console.warn("Group chat temporary sync pause:", e instanceof Error ? e.message : e);
     }
   };
 
@@ -533,7 +529,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     senderPhoto?: string,
     text?: string
   ) => {
-    if (!text || !text.trim()) return { success: false, error: 'Message text is required.' };
+    if (!text || !text.trim()) return { success: false, error: "Message text is required." };
     if (!isApprovedMember) {
       return {
         success: false,

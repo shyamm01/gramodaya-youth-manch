@@ -357,16 +357,7 @@ export const Header: React.FC = () => {
                         <span>{lang === 'en' ? 'Digital ID Card' : 'डिजिटल पहचान पत्र'}</span>
                       </button>
 
-                      {isAdmin && (
-                        <Link
-                          href="/admin"
-                          onClick={() => setProfileDropdownOpen(false)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl transition cursor-pointer text-left"
-                        >
-                          <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                          <span>{t('header.adminPanel')}</span>
-                        </Link>
-                      )}
+
                     </div>
 
                     {/* Logout */}

@@ -346,6 +346,7 @@ export interface AuthSession {
   permissions?: PermissionCode[];
   accessibleVillages?: string[];
   activeVillageId?: string;
+  adminVillageId?: string;
 }
 
 export interface VillageSettings {

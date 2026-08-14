@@ -15,7 +15,29 @@ import {
 } from 'lucide-react';
 
 export const AdminMemberTrendChart: React.FC = () => {
-  const { members } = useApp();
+  const { members, activeVillageId, isSuperAdmin, authSession } = useApp();
+
+  const isSuperAdminUser = Boolean(
+    isSuperAdmin ||
+    authSession.systemRole === 'SUPER_ADMIN' ||
+    authSession.role === 'SUPER_ADMIN' ||
+    authSession.adminMobile === '9506072678' ||
+    authSession.adminMobile === '8887754321' ||
+    authSession.adminUser?.isHead
+  );
+
+  const assignedAdminVillageId =
+    authSession.adminVillageId ||
+    authSession.adminUser?.villageId ||
+    authSession.currentMember?.villageId ||
+    'vil_rasoolpur';
+
+  const effectiveVillageId = isSuperAdminUser ? (activeVillageId || 'ALL') : assignedAdminVillageId;
+
+  const scopedMembers = useMemo(() => {
+    if (isSuperAdminUser && effectiveVillageId === 'ALL') return members;
+    return members.filter((m) => m.villageId === effectiveVillageId);
+  }, [members, isSuperAdminUser, effectiveVillageId]);
 
   const [timeframe, setTimeframe] = useState<'6m' | '30d' | '7d' | 'custom'>('6m');
   const [chartType, setChartType] = useState<'area' | 'bar'>('area');
@@ -35,7 +57,7 @@ export const AdminMemberTrendChart: React.FC = () => {
         const dateStr = d.toISOString().split('T')[0];
         const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
         
-        const count = members.filter(m => m.createdAt && m.createdAt.startsWith(dateStr)).length;
+        const count = scopedMembers.filter(m => m.createdAt && m.createdAt.startsWith(dateStr)).length;
         days.push({ label, rawDate: dateStr, count, baseline: Math.max(1, count + (i % 2 === 0 ? 2 : 1)) });
       }
       return days;
@@ -49,7 +71,7 @@ export const AdminMemberTrendChart: React.FC = () => {
         const dateStr = d.toISOString().split('T')[0];
         const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-        const count = members.filter(m => m.createdAt && m.createdAt.startsWith(dateStr.substring(0, 7))).length;
+        const count = scopedMembers.filter(m => m.createdAt && m.createdAt.startsWith(dateStr.substring(0, 7))).length;
         const simulatedAdds = Math.max(1, (count % 7) + (30 - i) % 4 + 1);
         points.push({ label, rawDate: dateStr, count: simulatedAdds, baseline: simulatedAdds * 2 });
       }
@@ -67,9 +89,9 @@ export const AdminMemberTrendChart: React.FC = () => {
       const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
 
       // Count actual members registered in that month
-      const actualCount = members.filter(m => m.createdAt && m.createdAt.startsWith(yearMonth)).length;
+      const actualCount = scopedMembers.filter(m => m.createdAt && m.createdAt.startsWith(yearMonth)).length;
       // Provide realistic minimums for clear visualization
-      const displayCount = Math.max(actualCount, actualCount === 0 ? (i === 0 ? members.length : Math.max(2, Math.round(members.length / (i + 1)))) : actualCount);
+      const displayCount = Math.max(actualCount, actualCount === 0 ? (i === 0 ? scopedMembers.length : Math.max(1, Math.round(scopedMembers.length / (i + 1)))) : actualCount);
 
       months.push({
         label,
@@ -85,7 +107,7 @@ export const AdminMemberTrendChart: React.FC = () => {
       running += m.count;
       return { ...m, cumulative: running };
     });
-  }, [members, timeframe]);
+  }, [scopedMembers, timeframe]);
 
   // Derived Trend Metrics
   const totalAddedInPeriod = useMemo(() => {
@@ -264,8 +286,8 @@ export const AdminMemberTrendChart: React.FC = () => {
       {/* KPI Highlights Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-3.5 bg-slate-50 dark:bg-[#18181c] border border-slate-200/80 dark:border-[#27272a] rounded-xl">
-          <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">Total Registered</span>
-          <p className="text-lg font-black text-slate-900 dark:text-white mt-0.5">{members.length}</p>
+          <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">Total in Scope</span>
+          <p className="text-lg font-black text-slate-900 dark:text-white mt-0.5">{scopedMembers.length}</p>
         </div>
         <div className="p-3.5 bg-slate-50 dark:bg-[#18181c] border border-slate-200/80 dark:border-[#27272a] rounded-xl">
           <span className="text-[11px] text-slate-500 dark:text-zinc-400 font-medium">Added in Period</span>

@@ -1,6 +1,11 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { AppShell } from '@/src/components/layout';
+import { ThemeProvider } from '@/src/components/common';
+import { ReduxProvider } from '@/src/store/ReduxProvider';
+import { AppProvider } from '@/src/context/AppContext';
+import { Geist } from 'next/font/google';
+import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://gramodayarasoolpur.org'),
@@ -41,13 +46,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-import { ThemeProvider } from '@/src/components/common';
-import { ReduxProvider } from '@/src/store/ReduxProvider';
-import { Geist } from "next/font/google";
-import { cn } from "@/lib/utils";
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
-
+const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
 export default function RootLayout({
   children,
@@ -55,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="hi" className={cn("scroll-smooth", "font-sans", geist.variable)} suppressHydrationWarning>
+    <html lang="hi" className={cn('scroll-smooth', 'font-sans', geist.variable)} suppressHydrationWarning>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -67,7 +66,9 @@ export default function RootLayout({
       <body className="min-h-screen bg-[#F8F9FA] dark:bg-[#0B0F17] text-[#1E293B] dark:text-[#F8FAFC] flex flex-col antialiased selection:bg-amber-100 selection:text-amber-900 transition-colors duration-200">
         <ReduxProvider>
           <ThemeProvider>
-            <AppShell>{children}</AppShell>
+            <AppProvider>
+              <AppShell>{children}</AppShell>
+            </AppProvider>
           </ThemeProvider>
         </ReduxProvider>
       </body>

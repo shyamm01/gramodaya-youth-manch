@@ -1,16 +1,56 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useApp } from '@/src/context/AppContext';
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, ShieldAlert, HeartHandshake, CalendarCheck } from 'lucide-react';
 
 export const AdminMetricsCards: React.FC = () => {
-  const { stats, complaints } = useApp();
+  const { members, complaints, socialWorks, events, activeVillageId, isSuperAdmin, authSession } = useApp();
 
-  const totalComplaintsCount = complaints.length || 1;
-  const resolutionPercentage = Math.round(
-    ((stats.resolvedProblems) / totalComplaintsCount) * 100
+  const isSuperAdminUser = Boolean(
+    isSuperAdmin ||
+    authSession.systemRole === 'SUPER_ADMIN' ||
+    authSession.role === 'SUPER_ADMIN' ||
+    authSession.adminMobile === '9506072678' ||
+    authSession.adminMobile === '8887754321' ||
+    authSession.adminUser?.isHead
   );
+
+  const assignedAdminVillageId =
+    authSession.adminVillageId ||
+    authSession.adminUser?.villageId ||
+    authSession.currentMember?.villageId ||
+    'vil_rasoolpur';
+
+  const effectiveVillageId = isSuperAdminUser ? (activeVillageId || 'ALL') : assignedAdminVillageId;
+
+  // Filter datasets strictly according to user's administrative scope
+  const scopedMembers = useMemo(() => {
+    if (isSuperAdminUser && effectiveVillageId === 'ALL') return members;
+    return members.filter((m) => m.villageId === effectiveVillageId);
+  }, [members, isSuperAdminUser, effectiveVillageId]);
+
+  const scopedComplaints = useMemo(() => {
+    if (isSuperAdminUser && effectiveVillageId === 'ALL') return complaints;
+    return complaints.filter((c) => c.villageId === effectiveVillageId);
+  }, [complaints, isSuperAdminUser, effectiveVillageId]);
+
+  const scopedSocialWorks = useMemo(() => {
+    if (isSuperAdminUser && effectiveVillageId === 'ALL') return socialWorks;
+    return socialWorks.filter((s) => s.villageId === effectiveVillageId);
+  }, [socialWorks, isSuperAdminUser, effectiveVillageId]);
+
+  const scopedEvents = useMemo(() => {
+    if (isSuperAdminUser && effectiveVillageId === 'ALL') return events;
+    return events.filter((e) => e.villageId === effectiveVillageId);
+  }, [events, isSuperAdminUser, effectiveVillageId]);
+
+  const activeMembersCount = scopedMembers.filter((m) => m.status === 'active').length;
+  const newProblemsCount = scopedComplaints.filter((c) => c.status === 'NEW').length;
+  const resolvedCount = scopedComplaints.filter((c) => c.status === 'RESOLVED').length;
+  const totalComplaintsCount = scopedComplaints.length || 1;
+  const resolutionPercentage = scopedComplaints.length === 0 ? 100 : Math.round((resolvedCount / totalComplaintsCount) * 100);
+  const socialCount = scopedSocialWorks.length;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -26,16 +66,18 @@ export const AdminMetricsCards: React.FC = () => {
         </div>
         <div>
           <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            {stats.actualMembers.toLocaleString()}
+            {activeMembersCount.toLocaleString()}
           </h3>
         </div>
         <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
           <span className="flex items-center gap-1 text-slate-800 dark:text-zinc-200 font-semibold">
-            Trending up this month <TrendingUp className="w-3.5 h-3.5" />
+            Active community members <TrendingUp className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
           </span>
         </div>
         <p className="text-[11px] text-slate-400 dark:text-zinc-500">
-          Verified members across all village units
+          {isSuperAdminUser && effectiveVillageId === 'ALL'
+            ? 'Verified members across all village chapters'
+            : 'Verified members in your assigned village'}
         </p>
       </div>
 
@@ -51,12 +93,12 @@ export const AdminMetricsCards: React.FC = () => {
         </div>
         <div>
           <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            {stats.newProblems}
+            {newProblemsCount}
           </h3>
         </div>
         <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
           <span className="flex items-center gap-1 text-slate-800 dark:text-zinc-200 font-semibold">
-            Down 20% this period <TrendingDown className="w-3.5 h-3.5" />
+            {scopedComplaints.length} total logged <TrendingDown className="w-3.5 h-3.5 text-rose-500" />
           </span>
         </div>
         <p className="text-[11px] text-slate-400 dark:text-zinc-500">
@@ -81,11 +123,11 @@ export const AdminMetricsCards: React.FC = () => {
         </div>
         <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
           <span className="flex items-center gap-1 text-slate-800 dark:text-zinc-200 font-semibold">
-            Strong user retention <TrendingUp className="w-3.5 h-3.5" />
+            {resolvedCount} resolved issues <TrendingUp className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
           </span>
         </div>
         <p className="text-[11px] text-slate-400 dark:text-zinc-500">
-          {stats.resolvedProblems} grievances successfully resolved
+          Successful issue turnaround in scope
         </p>
       </div>
 
@@ -101,16 +143,16 @@ export const AdminMetricsCards: React.FC = () => {
         </div>
         <div>
           <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            {stats.publishedSocialWork}
+            {socialCount}
           </h3>
         </div>
         <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
           <span className="flex items-center gap-1 text-slate-800 dark:text-zinc-200 font-semibold">
-            Steady performance <TrendingUp className="w-3.5 h-3.5" />
+            {scopedEvents.length} events planned <TrendingUp className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
           </span>
         </div>
         <p className="text-[11px] text-slate-400 dark:text-zinc-500">
-          Meets community growth projections
+          Community drives and welfare programs
         </p>
       </div>
     </div>

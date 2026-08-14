@@ -6,4 +6,5 @@ export * from './AdminSidebar';
 export * from './AdminMetricsCards';
 export * from './AdminActivityChart';
 export * from './AdminMemberTrendChart';
+export * from './AdminLocationSelector';
 export * from './AdminQuickCreateModal';

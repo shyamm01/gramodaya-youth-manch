@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useApp } from '@/src/context/AppContext';
+import { useRouter, usePathname } from 'next/navigation';
 import {
   Shield,
   Users,
@@ -44,7 +45,17 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   setMobileSidebarOpen,
   onOpenQuickCreate,
 }) => {
+  const router = useRouter();
+  const pathname = usePathname();
   const { villageSettings, villages, stats, authSession, adminLogout } = useApp();
+
+  const handleTabClick = (tabId: string) => {
+    setActiveTab(tabId);
+    const targetUrl = tabId === 'dashboard' ? '/super-admin' : `/super-admin/${tabId}`;
+    if (pathname !== targetUrl) {
+      router.push(targetUrl);
+    }
+  };
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, count: null },
@@ -87,7 +98,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               </div>
               <button
                 onClick={() => setMobileSidebarOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -113,7 +124,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                     <button
                       key={item.id}
                       onClick={() => {
-                        setActiveTab(item.id);
+                        handleTabClick(item.id);
                         setMobileSidebarOpen(false);
                       }}
                       className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
@@ -147,7 +158,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                     <button
                       key={item.id}
                       onClick={() => {
-                        setActiveTab(item.id);
+                        handleTabClick(item.id);
                         setMobileSidebarOpen(false);
                       }}
                       className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
@@ -213,7 +224,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 <span>Quick Create</span>
               </button>
               <button
-                onClick={() => setActiveTab('problems')}
+                onClick={() => handleTabClick('problems')}
                 className="p-2 bg-white dark:bg-[#18181b] hover:bg-slate-100 dark:hover:bg-[#27272a] text-slate-600 dark:text-zinc-300 hover:text-slate-900 dark:hover:text-white rounded-full border border-slate-200 dark:border-[#27272a] transition cursor-pointer shadow-2xs"
                 title="Grievances Inbox"
               >
@@ -240,7 +251,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => handleTabClick(item.id)}
                   className={`w-full flex items-center ${
                     sidebarOpen ? 'justify-between px-3.5' : 'justify-center px-0'
                   } py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
@@ -276,7 +287,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={() => handleTabClick(item.id)}
                   className={`w-full flex items-center ${
                     sidebarOpen ? 'justify-start gap-3 px-3.5' : 'justify-center px-0'
                   } py-2.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
@@ -325,3 +336,4 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     </>
   );
 };
+export default AdminSidebar;
