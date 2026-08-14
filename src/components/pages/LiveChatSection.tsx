@@ -26,6 +26,7 @@ export const LiveChatSection: React.FC = () => {
   const {
     members,
     authSession,
+    isApprovedMember,
     currentMemberMobile,
     setCurrentMemberMobile,
     setSelectedIdCardMember,
@@ -245,6 +246,15 @@ export const LiveChatSection: React.FC = () => {
   const handleSendMessage = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!messageText.trim()) return;
+
+    if (!isApprovedMember) {
+      setErrorMsg(
+        lang === 'en'
+          ? 'Your membership is pending approval. You can participate in chat once approved by an admin.'
+          : 'आपकी सदस्यता अभी सत्यापन/अनुमोदन के लिए लंबित है। एडमिन द्वारा अनुमोदन के बाद ही आप संदेश भेज सकेंगे।'
+      );
+      return;
+    }
 
     if (!currentMobile && activeTab !== 'group') {
       setErrorMsg(lang === 'en' ? 'Please confirm your member identity first.' : 'कृपया पहले अपनी सदस्य पहचान दर्ज करें।');

@@ -93,6 +93,18 @@ export function isAuthorizedAdminMobile(mob: string): boolean {
   return isAdminInList || isMemberAdmin;
 }
 
+export function isApprovedUser(mob?: string): boolean {
+  if (!mob) return false;
+  const digits = normalizeMobile(mob);
+  if (!digits) return false;
+  const store = loadStore();
+
+  if (isAuthorizedAdminMobile(mob)) return true;
+
+  const member = (store.members || []).find((m) => normalizeMobile(m.mobile) === digits);
+  return member ? member.status === 'active' : false;
+}
+
 export function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password.trim()).digest('hex');
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 import {
@@ -165,6 +165,8 @@ interface AppContextType {
   editPublicInfo: (id: string, updates: Partial<PublicInfo>) => Promise<{ success: boolean; error?: string }>;
   changeMemberRole: (id: string, role: 'SUPER_ADMIN' | 'ADMIN' | 'MEMBER', villageId?: string) => Promise<{ success: boolean; error?: string }>;
   isSuperAdmin: boolean;
+  isApprovedMember: boolean;
+  currentMemberObj: Member | null;
   canManageVillage: (villageId?: string) => boolean;
   canEditContent: (authorMobile?: string, villageId?: string) => boolean;
   canDeleteContent: (authorMobile?: string, villageId?: string) => boolean;
@@ -442,6 +444,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     text?: string
   ) => {
     if (!text || !text.trim()) return { success: false, error: 'Message text is required.' };
+    if (!isApprovedMember) {
+      return {
+        success: false,
+        error: 'आपकी सदस्यता अभी सत्यापन/अनुमोदन के लिए लंबित है। एडमिन द्वारा अनुमोदन के बाद ही आप संवाद मंच में संदेश भेज सकते हैं।',
+      };
+    }
     try {
       const res = await fetch('/api/group-chat', {
         method: 'POST',
@@ -547,6 +555,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     galleryPhotos: gallery.filter((g) => g.status === 'published').length,
     eldersCount: elders.length,
   };
+
+  const currentMemberObj = useMemo(() => {
+    if (!authSession.currentMemberMobile) return null;
+    const cleanMob = authSession.currentMemberMobile.replace(/\D/g, '').slice(-10);
+    return (
+      members.find((m) => m.mobile && m.mobile.replace(/\D/g, '').slice(-10) === cleanMob) ||
+      authSession.currentMember ||
+      null
+    );
+  }, [authSession.currentMemberMobile, authSession.currentMember, members]);
+
+  const isApprovedMember = useMemo(() => {
+    if (authSession.isAdminLoggedIn || authSession.role === 'SUPER_ADMIN' || authSession.role === 'ADMIN') {
+      return true;
+    }
+    if (authSession.isMemberLoggedIn) {
+      return currentMemberObj?.status === 'active';
+    }
+    return false;
+  }, [authSession, currentMemberObj]);
 
   const saveIntegrationConfig = async (id: string, apiKey: string) => {
     try {
@@ -1015,6 +1043,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Complaint Handlers
   const submitComplaint = async (data: Omit<Complaint, 'id' | 'createdAt' | 'status'>) => {
+    if (!isApprovedMember) {
+      return {
+        success: false,
+        error: 'आपकी सदस्यता अभी सत्यापन/अनुमोदन के लिए लंबित है। एडमिन द्वारा अनुमोदन के बाद ही आप शिकायत दर्ज कर सकते हैं।',
+      };
+    }
     try {
       const res = await fetch('/api/complaints', {
         method: 'POST',
@@ -1094,13 +1128,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Social Work
   const submitSocialWork = async (data: Omit<SocialWork, 'id' | 'createdAt' | 'status'>) => {
+    if (!isApprovedMember) {
+      return {
+        success: false,
+        error: 'आपकी सदस्यता अभी सत्यापन/अनुमोदन के लिए लंबित है। एडमिन द्वारा अनुमोदन के बाद ही आप सामाजिक कार्य पोस्ट कर सकते हैं।',
+      };
+    }
     try {
       const res = await fetch('/api/social-work', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      if (!res.ok) return { success: false, error: 'Failed to submit social work.' };
+      if (!res.ok) {
+        const result = await res.json().catch(() => ({}));
+        return { success: false, error: result.error || 'Failed to submit social work.' };
+      }
       await refreshData();
       return { success: true };
     } catch (e) {
@@ -1172,13 +1215,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Public Info
   const submitPublicInfo = async (data: Omit<PublicInfo, 'id' | 'createdAt' | 'status'>) => {
+    if (!isApprovedMember) {
+      return {
+        success: false,
+        error: 'आपकी सदस्यता अभी सत्यापन/अनुमोदन के लिए लंबित है। एडमिन द्वारा अनुमोदन के बाद ही आप सार्वजनिक सूचना पोस्ट कर सकते हैं।',
+      };
+    }
     try {
       const res = await fetch('/api/public-info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      if (!res.ok) return { success: false, error: 'Failed to submit info.' };
+      if (!res.ok) {
+        const result = await res.json().catch(() => ({}));
+        return { success: false, error: result.error || 'Failed to submit info.' };
+      }
       await refreshData();
       return { success: true };
     } catch (e) {
@@ -1293,10 +1345,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const res = await fetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...data,
-          status: data.status || 'DRAFT',
-        }),
+        body: JSON.stringify(data),
       });
       if (!res.ok) return { success: false, error: 'Failed to create event.' };
       await refreshData();
@@ -1778,6 +1827,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         editPublicInfo,
         changeMemberRole,
         isSuperAdmin,
+        isApprovedMember,
+        currentMemberObj,
         canManageVillage,
         canEditContent,
         canDeleteContent,

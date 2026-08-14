@@ -34,7 +34,9 @@ export const ProblemsSection: React.FC = () => {
     complaints,
     submitComplaint,
     authSession,
+    isApprovedMember,
     currentMemberMobile,
+    setIsMemberLoginModalOpen,
     canEditContent,
     canDeleteContent,
     updateComplaintStatus,
@@ -45,6 +47,7 @@ export const ProblemsSection: React.FC = () => {
   } = useApp();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [unapprovedAlert, setUnapprovedAlert] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
 
   const [title, setTitle] = useState('');
@@ -133,13 +136,61 @@ export const ProblemsSection: React.FC = () => {
         <Button
           variant="amber"
           size="default"
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+            if (!authSession.isAdminLoggedIn && !authSession.isMemberLoggedIn) {
+              setIsMemberLoginModalOpen(true);
+            } else if (!isApprovedMember) {
+              setUnapprovedAlert(true);
+            } else {
+              setIsModalOpen(true);
+            }
+          }}
           className="rounded-xl font-bold cursor-pointer"
         >
           <Plus className="w-4 h-4 mr-1" />
           <span>{t('problems.registerNewBtn')}</span>
         </Button>
       </div>
+
+      {/* Pending Approval Notice Banner for Unapproved Member */}
+      {authSession.isMemberLoggedIn && !isApprovedMember && (
+        <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 rounded-2xl flex items-center justify-between gap-3 text-amber-900 dark:text-amber-300 text-xs shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-600" />
+            <div>
+              <p className="font-bold">आपकी सदस्यता अभी सत्यापन/अनुमोदन के लिए लंबित है।</p>
+              <p className="text-[11px] text-amber-800 dark:text-amber-400 mt-0.5">
+                आप गांव की सभी शिकायतें, आंकड़े और जानकारी देख सकते हैं। एडमिन द्वारा अनुमोदन के बाद आप नई शिकायतें दर्ज कर सकेंगे।
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal alert popup if unapproved member tries to post */}
+      {unapprovedAlert && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl animate-scale-in">
+            <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center mx-auto mb-3 text-amber-600 dark:text-amber-400">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2">
+              सदस्यता अनुमोदन लंबित (Pending Approval)
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
+              आपकी सदस्यता का सत्यापन अभी एडमिन द्वारा किया जा रहा है। आप सभी सार्वजनिक शिकायतें और डेटा देख सकते हैं। अनुमोदन के बाद आप नई शिकायतें दर्ज कर सकेंगे।
+            </p>
+            <Button
+              variant="default"
+              size="default"
+              onClick={() => setUnapprovedAlert(false)}
+              className="w-full rounded-xl font-bold"
+            >
+              समझ गया (Got It)
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Category Filter */}
       <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-none">

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { loadStore, saveStore, logAuditAction } from '@/src/lib/serverStore';
+import { loadStore, saveStore, logAuditAction, isApprovedUser } from '@/src/lib/serverStore';
 
 export async function GET() {
   const store = loadStore();
@@ -24,6 +24,17 @@ export async function POST(req: Request) {
 
     if (!title || !description || !submitterName || !submitterMobile) {
       return NextResponse.json({ error: 'सभी आवश्यक जानकारी भरें।' }, { status: 400 });
+    }
+
+    // Unapproved Member restriction: Only active/approved members or admins can post
+    if (!isApprovedUser(submitterMobile) && !isApprovedUser(adminMobile)) {
+      return NextResponse.json(
+        {
+          error:
+            'आपकी सदस्यता अभी सत्यापन/अनुमोदन के लिए लंबित है। एडमिन द्वारा अनुमोदन के बाद ही आप सामाजिक कार्य पोस्ट कर सकते हैं।',
+        },
+        { status: 403 }
+      );
     }
 
     const store = loadStore();

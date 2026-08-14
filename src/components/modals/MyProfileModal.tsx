@@ -150,13 +150,24 @@ export const MyProfileModal: React.FC<{ isOpen: boolean; onClose: () => void }> 
                 <span>+91 {currentMember.mobile}</span>
               </p>
               <div className="mt-2 flex items-center gap-2">
-                <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full border border-emerald-300">
-                  प्रमाणित सदस्य (Verified)
-                </span>
-                <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full border border-amber-300">
-                  ग्रामोदय यूथ मंच
+                {currentMember.status === 'active' ? (
+                  <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded-full border border-emerald-300">
+                    ✓ प्रमाणित सदस्य (Active)
+                  </span>
+                ) : (
+                  <span className="px-2.5 py-0.5 bg-amber-100 text-amber-900 text-[10px] font-black rounded-full border border-amber-400 animate-pulse">
+                    ⏳ अनुमोदन लंबित (Pending)
+                  </span>
+                )}
+                <span className="px-2.5 py-0.5 bg-slate-100 text-slate-800 text-[10px] font-bold rounded-full border border-slate-300">
+                  {currentMember.role || 'MEMBER'}
                 </span>
               </div>
+              {currentMember.status !== 'active' && (
+                <p className="mt-2 text-[10px] font-medium text-amber-700 bg-amber-50 p-2 rounded-xl border border-amber-200">
+                  ⚠️ आपकी सदस्यता अभी एडमिन द्वारा समीक्षाधीन है। आप सभी सामग्री देख सकते हैं, तथा अनुमोदन के बाद नई प्रविष्टियां पोस्ट कर सकेंगे।
+                </p>
+              )}
             </div>
           </div>
 

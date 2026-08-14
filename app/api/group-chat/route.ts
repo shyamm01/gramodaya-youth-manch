@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { loadStore, saveStore } from '@/src/lib/serverStore';
+import { loadStore, saveStore, isApprovedUser } from '@/src/lib/serverStore';
 
 export async function GET() {
   const store = loadStore();
@@ -43,6 +43,17 @@ export async function POST(req: Request) {
 
     if (!text || !text.trim()) {
       return NextResponse.json({ error: 'संदेश आवश्यक है।' }, { status: 400 });
+    }
+
+    // Unapproved Member restriction: Only active/approved members or admins can chat
+    if (!isApprovedUser(senderMobile)) {
+      return NextResponse.json(
+        {
+          error:
+            'आपकी सदस्यता अभी सत्यापन/अनुमोदन के लिए लंबित है। एडमिन द्वारा अनुमोदन के बाद ही आप संवाद मंच में भाग ले सकते हैं।',
+        },
+        { status: 403 }
+      );
     }
 
     const store = loadStore();
