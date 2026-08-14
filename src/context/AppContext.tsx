@@ -65,8 +65,11 @@ interface AppContextType {
   setIsAdminLoginModalOpen: (open: boolean) => void;
   isMemberLoginModalOpen: boolean;
   setIsMemberLoginModalOpen: (open: boolean) => void;
+  isJoinModalOpen: boolean;
+  setIsJoinModalOpen: (open: boolean) => void;
   isMyProfileModalOpen: boolean;
   setIsMyProfileModalOpen: (open: boolean) => void;
+  userLogin: (user: any, token: string, role?: string) => void;
   memberLogin: (mobile: string, otpOrPassword?: string) => Promise<{ success: boolean; member?: Member; error?: string }>;
   memberLogout: () => void;
   isLoading: boolean;
@@ -100,6 +103,8 @@ interface AppContextType {
       | {
           name: string;
           mobile: string;
+          email?: string;
+          password?: string;
           photoUrl?: string;
           fatherName?: string;
           dob?: string;
@@ -311,6 +316,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [authSession, setAuthSession] = useState<AuthSession>({ isAdminLoggedIn: false });
   const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState<boolean>(false);
   const [isMemberLoginModalOpen, setIsMemberLoginModalOpen] = useState<boolean>(false);
+  const [isJoinModalOpen, setIsJoinModalOpen] = useState<boolean>(false);
   const [isMyProfileModalOpen, setIsMyProfileModalOpen] = useState<boolean>(false);
   const [currentMemberMobile, setCurrentMemberMobileState] = useState<string | null>(null);
 
@@ -966,8 +972,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setAuthSession({ isAdminLoggedIn: false });
     localStorage.removeItem('gym_auth');
+    localStorage.removeItem('gym_token');
     if (activeSection === 'admin-panel') {
       changeActiveSection('home');
+    }
+  };
+
+  const userLogin = (user: any, token: string, role?: string) => {
+    const isAdm = role === 'SUPER_ADMIN' || role === 'ADMIN' || user?.isAdmin;
+    const effectiveRole = role || user?.systemRole || user?.role || (isAdm ? 'ADMIN' : 'MEMBER');
+    const newAuthSession: AuthSession = {
+      isAdminLoggedIn: isAdm,
+      isMemberLoggedIn: !isAdm,
+      role: effectiveRole,
+      systemRole: effectiveRole,
+      adminMobile: isAdm ? user?.mobile : undefined,
+      adminName: isAdm ? user?.name : undefined,
+      adminId: isAdm ? user?.id : undefined,
+      currentMemberMobile: !isAdm ? user?.mobile : undefined,
+      currentMember: !isAdm ? user : undefined,
+      email: user?.email,
+      permissions: user?.permissions || [],
+      token,
+    };
+    setAuthSession(newAuthSession);
+    localStorage.setItem('gym_auth', JSON.stringify(newAuthSession));
+    if (token) {
+      localStorage.setItem('gym_token', token);
     }
   };
 
@@ -1809,8 +1840,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsAdminLoginModalOpen,
         isMemberLoginModalOpen,
         setIsMemberLoginModalOpen,
+        isJoinModalOpen,
+        setIsJoinModalOpen,
         isMyProfileModalOpen,
         setIsMyProfileModalOpen,
+        userLogin,
         memberLogin,
         memberLogout,
         isLoading,

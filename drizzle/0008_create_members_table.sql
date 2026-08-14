@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS "public"."members" (
     "supabase_user_id" uuid,
     "name" text NOT NULL,
     "mobile" text NOT NULL UNIQUE,
+    "email" text,
+    "password_hash" text,
     "status" "public"."member_status" DEFAULT 'active' NOT NULL,
     "photo_url" text,
     "organization_name" text DEFAULT 'ग्रामोदय यूथ मंच',

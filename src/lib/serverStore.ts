@@ -112,100 +112,12 @@ export function hashPassword(password: string): string {
 export function loadStore(): Store {
   if (cachedStore) return cachedStore;
 
-  if (fs.existsSync(DATA_FILE)) {
-    try {
-      const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-      const parsed = JSON.parse(raw);
-      cachedStore = {
-        villageSettings: parsed.villageSettings || DEFAULT_VILLAGE_SETTINGS,
-        villages: parsed.villages || [
-          {
-            id: 'vil_rasoolpur',
-            slug: 'rasoolpur',
-            name: 'Rasoolpur',
-            nameHindi: 'रसूलपुर',
-            gramPanchayatName: 'Bahera',
-            gramPanchayatNameHindi: 'बहेरा',
-            districtName: 'Jaunpur',
-            orgName: 'Gramodaya Youth Manch',
-            orgNameHindi: 'ग्रामोदय यूथ मंच',
-            sloganHindi: 'युवा शक्ति • ग्राम विकास • उज्ज्वल भविष्य',
-            taglineHindi: 'युवा शक्ति से ग्रामोदय की ओर',
-            isActive: true,
-          },
-        ],
-        userPermissions: parsed.userPermissions || [],
-        userVillageRoles: parsed.userVillageRoles || [],
-        admins: parsed.admins || [],
-        members: parsed.members || [],
-        complaints: parsed.complaints || [],
-        socialWorks: parsed.socialWorks || [],
-        publicInfos: parsed.publicInfos || [],
-        announcements: parsed.announcements || [],
-        events: parsed.events || [],
-        gallery: parsed.gallery || [],
-        elders: parsed.elders || [],
-        auditLogs: parsed.auditLogs || [],
-        apiIntegrations: parsed.apiIntegrations || [],
-        messages: parsed.messages || [],
-        groupMessages: parsed.groupMessages || [],
-        adminPasswords: parsed.adminPasswords || {},
-        memberPasswords: parsed.memberPasswords || {},
-      };
-      return cachedStore;
-    } catch (e) {
-      console.error('Failed to parse data_store.json file, re-initializing...', e);
-    }
-  }
-
   const initialIntegrations: ApiIntegration[] = [
     {
-      id: 'int_1',
-      name: 'Gemini AI',
-      status: process.env.GEMINI_API_KEY ? 'Connected' : 'Not Connected',
-      keyMasked: process.env.GEMINI_API_KEY ? 'gemini_••••••••' : 'Not Configured',
-      updatedAt: new Date().toISOString(),
-    },
-    {
       id: 'int_supabase',
-      name: 'Supabase',
-      status: (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) ? 'Connected' : 'Not Connected',
-      keyMasked: (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL) ? 'supabase_••••••••' : 'Not Configured',
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'int_2',
-      name: 'Razorpay',
-      status: process.env.RAZORPAY_KEY_ID ? 'Connected' : 'Not Connected',
-      keyMasked: process.env.RAZORPAY_KEY_ID ? 'rzp_test_••••••••' : 'Not Configured',
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'int_3',
-      name: 'Firebase',
-      status: process.env.FIREBASE_PROJECT_ID ? 'Connected' : 'Not Connected',
-      keyMasked: process.env.FIREBASE_PROJECT_ID ? 'firebase_••••••••' : 'Not Configured',
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'int_4',
-      name: 'SMS / OTP',
-      status: (process.env.SMS_API_KEY || process.env.TWILIO_ACCOUNT_SID) ? 'Connected' : 'Not Connected',
-      keyMasked: (process.env.SMS_API_KEY || process.env.TWILIO_ACCOUNT_SID) ? 'sms_••••••••' : 'Not Configured',
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'int_5',
-      name: 'Google Maps',
-      status: (process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) ? 'Connected' : 'Not Connected',
-      keyMasked: (process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) ? 'maps_••••••••' : 'Not Configured',
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'int_6',
-      name: 'Cloudinary',
-      status: process.env.CLOUDINARY_URL ? 'Connected' : 'Not Connected',
-      keyMasked: process.env.CLOUDINARY_URL ? 'cloudinary_••••••••' : 'Not Configured',
+      name: 'PostgreSQL Supabase',
+      status: 'Connected',
+      keyMasked: 'postgresql_••••••••',
       updatedAt: new Date().toISOString(),
     },
   ];
@@ -252,12 +164,7 @@ export function loadStore(): Store {
 }
 
 export function saveStore(store: Store): void {
-  try {
-    cachedStore = store;
-    fs.writeFileSync(DATA_FILE, JSON.stringify(store, null, 2), 'utf-8');
-  } catch (e) {
-    console.error('Failed to write store file:', e);
-  }
+  cachedStore = store;
 }
 
 export function logAuditAction(

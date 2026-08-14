@@ -252,6 +252,8 @@ export const members = pgTable(
     supabaseUserId: uuid('supabase_user_id'),
     name: text('name').notNull(),
     mobile: text('mobile').notNull().unique(),
+    email: text('email'),
+    passwordHash: text('password_hash'),
     status: memberStatusEnum('status').notNull().default('active'),
     photoUrl: text('photo_url'),
     organizationName: text('organization_name').default('ग्रामोदय यूथ मंच'),

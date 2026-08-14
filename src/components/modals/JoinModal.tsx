@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Member } from '../../types';
 import {
   JoinModalHeader,
-  JoinStepAuth,
-  JoinAuthMethod,
+  JoinStepCredentials,
   JoinStepPersonal,
   JoinStepBackground,
   JoinStepSuccess,
@@ -21,8 +20,6 @@ interface JoinModalProps {
 export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
   const {
     addMember,
-    sendMemberOtp,
-    verifyMemberOtp,
     villageSettings,
     villages,
     activeVillageId,
@@ -31,21 +28,14 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
     lang,
   } = useApp();
 
-  // Wizard Step: 1 = Auth (OTP / Password / OAuth), 2 = Personal Details, 3 = Background & Pledge, 4 = Success
+  // Wizard Step: 1 = Account Credentials, 2 = Personal Details, 3 = Background & Pledge, 4 = Success
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
-  const [authMethod, setAuthMethod] = useState<JoinAuthMethod>('otp');
 
-  // Step 1: Mobile & OTP State
+  // Step 1: Account Credentials State
   const [mobile, setMobile] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-  const [isOtpSent, setIsOtpSent] = useState(false);
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-  const [resendTimer, setResendTimer] = useState(0);
-
-  // Step 1: Password Auth State
-  const [emailOrMobile, setEmailOrMobile] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   // Step 2: Personal Details State
   const [name, setName] = useState('');
@@ -72,17 +62,8 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
 
   // Clean Mobile Digits
-  const cleanMobileDigits = (mobile || emailOrMobile.replace(/\D/g, '')).slice(-10);
+  const cleanMobileDigits = mobile.replace(/\D/g, '').slice(-10);
   const isMobileValid = cleanMobileDigits.length === 10;
-
-  // Countdown timer for OTP resend
-  useEffect(() => {
-    let timer: any;
-    if (resendTimer > 0) {
-      timer = setInterval(() => setResendTimer((prev) => prev - 1), 1000);
-    }
-    return () => clearInterval(timer);
-  }, [resendTimer]);
 
   // Selected Village Information
   const selectedVillageObj = useMemo(() => {
@@ -99,8 +80,9 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
     );
   }, [villages, selectedVillageId, villageSettings]);
 
-  // Handle Send OTP
-  const handleSendOtp = async () => {
+  // Step 1 Next Handler
+  const handleNextFromStep1 = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!isMobileValid) {
       setError(
         lang === 'en'
@@ -109,67 +91,24 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
       );
       return;
     }
-
-    setIsSendingOtp(true);
-    setError('');
-
-    const res = await sendMemberOtp(cleanMobileDigits);
-    setIsSendingOtp(false);
-
-    if (res.success) {
-      setIsOtpSent(true);
-      setResendTimer(60);
-    } else {
-      setError(res.error || (lang === 'en' ? 'Failed to send OTP.' : 'ओटीपी भेजने में त्रुटि हुई।'));
-    }
-  };
-
-  // Handle Verify OTP
-  const handleVerifyOtp = async () => {
-    if (!otpCode.trim() || otpCode.trim().length < 6) {
-      setError(lang === 'en' ? 'Please enter 6-digit OTP.' : 'कृपया 6-अंकीय ओटीपी कोड दर्ज करें।');
-      return;
-    }
-
-    setIsVerifyingOtp(true);
-    setError('');
-
-    const res = await verifyMemberOtp(cleanMobileDigits, otpCode.trim());
-    setIsVerifyingOtp(false);
-
-    if (res.success) {
-      setCurrentStep(2);
-    } else {
-      setError(res.error || (lang === 'en' ? 'Invalid OTP code.' : 'अमान्य ओटीपी कोड दर्ज किया गया।'));
-    }
-  };
-
-  // Handle Password-based Step 1 verification
-  const handleVerifyPasswordAccount = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailOrMobile.trim()) {
-      setError(lang === 'en' ? 'Please enter mobile or email.' : 'कृपया मोबाइल नंबर या ईमेल दर्ज करें।');
-      return;
-    }
     if (password.length < 6) {
-      setError(lang === 'en' ? 'Password must be at least 6 characters.' : 'पासवर्ड कम से कम ६ अक्षरों का होना चाहिए।');
+      setError(
+        lang === 'en'
+          ? 'Password must be at least 6 characters.'
+          : 'पासवर्ड कम से कम ६ अक्षरों का होना चाहिए।'
+      );
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError(
+        lang === 'en'
+          ? 'Password and Confirm Password do not match.'
+          : 'पासवर्ड और पुष्टि पासवर्ड मेल नहीं खा रहे हैं।'
+      );
       return;
     }
 
     setError('');
-    // If mobile number was provided in emailOrMobile, sync to mobile state
-    const digits = emailOrMobile.replace(/\D/g, '').slice(-10);
-    if (digits.length === 10) {
-      setMobile(digits);
-    }
-    setCurrentStep(2);
-  };
-
-  // Handle OAuth Success
-  const handleOAuthSuccess = (provider: string, email?: string, oAuthName?: string) => {
-    setError('');
-    if (oAuthName) setName(oAuthName);
-    if (email && !emailOrMobile) setEmailOrMobile(email);
     setCurrentStep(2);
   };
 
@@ -224,14 +163,13 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
     setError('');
     setAlreadyRegistered(false);
 
-    const effectiveMobile =
-      cleanMobileDigits.length === 10
-        ? `+91 ${cleanMobileDigits.slice(0, 5)} ${cleanMobileDigits.slice(5)}`
-        : emailOrMobile || `+91 98765 00000`;
+    const formattedMobile = `+91 ${cleanMobileDigits.slice(0, 5)} ${cleanMobileDigits.slice(5)}`;
 
     const res = await addMember({
       name: name.trim(),
-      mobile: effectiveMobile,
+      mobile: formattedMobile,
+      email: email.trim(),
+      password,
       photoUrl,
       fatherName: fatherName.trim(),
       dob: dob.trim(),
@@ -275,12 +213,10 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
 
   const handleResetForm = () => {
     setCurrentStep(1);
-    setAuthMethod('otp');
     setMobile('');
-    setOtpCode('');
-    setIsOtpSent(false);
-    setEmailOrMobile('');
+    setEmail('');
     setPassword('');
+    setConfirmPassword('');
     setName('');
     setFatherName('');
     setDob('');
@@ -328,7 +264,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
         onClick={handleResetForm}
       />
 
-      {/* ── MODERN SHADCN CONTAINER ── */}
+      {/* ── MODERN CONTAINER ── */}
       <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 shadow-2xl z-10 my-8 overflow-hidden transition-all text-slate-900 dark:text-slate-50 animate-in zoom-in-95 duration-200">
         {/* Header & Step Indicator */}
         <JoinModalHeader currentStep={currentStep} onClose={handleResetForm} />
@@ -343,29 +279,18 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
-          {/* Step 1: Authentication (OTP / Password / OAuth) */}
+          {/* Step 1: Account Setup (Mobile / Email + Password) */}
           {currentStep === 1 && (
-            <JoinStepAuth
-              authMethod={authMethod}
-              setAuthMethod={setAuthMethod}
+            <JoinStepCredentials
               mobile={mobile}
               setMobile={setMobile}
-              otpCode={otpCode}
-              setOtpCode={setOtpCode}
-              isOtpSent={isOtpSent}
-              setIsOtpSent={setIsOtpSent}
-              isSendingOtp={isSendingOtp}
-              isVerifyingOtp={isVerifyingOtp}
-              resendTimer={resendTimer}
-              isMobileValid={isMobileValid}
-              onSendOtp={handleSendOtp}
-              onVerifyOtp={handleVerifyOtp}
-              emailOrMobile={emailOrMobile}
-              setEmailOrMobile={setEmailOrMobile}
+              email={email}
+              setEmail={setEmail}
               password={password}
               setPassword={setPassword}
-              onVerifyPasswordAccount={handleVerifyPasswordAccount}
-              onOAuthSuccess={handleOAuthSuccess}
+              confirmPassword={confirmPassword}
+              setConfirmPassword={setConfirmPassword}
+              onNext={handleNextFromStep1}
             />
           )}
 

@@ -1,9 +1,40 @@
 import { NextResponse } from 'next/server';
-import { loadStore, saveStore, logAuditAction, isApprovedUser } from '@/src/lib/serverStore';
+import { getSqlClient, logAuditAction } from '@/src/lib/authUtils';
 
 export async function GET() {
-  const store = loadStore();
-  return NextResponse.json({ success: true, socialWorks: store.socialWorks });
+  try {
+    const sql = getSqlClient();
+    if (!sql) return NextResponse.json({ success: true, socialWorks: [] });
+
+    const rows = await sql`
+      SELECT 
+        id, 
+        village_id as "villageId",
+        title, 
+        description, 
+        date, 
+        location, 
+        submitter_name as "submitterName", 
+        submitter_mobile as "submitterMobile", 
+        photo_url as "photoUrl", 
+        video_url as "videoUrl", 
+        status, 
+        created_at as "createdAt"
+      FROM public.social_works 
+      ORDER BY id DESC;
+    `;
+
+    const formatted = rows.map((s: any) => ({
+      ...s,
+      id: String(s.id),
+      villageId: s.villageId ? String(s.villageId) : 'vil_rasoolpur',
+    }));
+
+    return NextResponse.json({ success: true, socialWorks: formatted });
+  } catch (err: any) {
+    console.error('Error fetching social works:', err);
+    return NextResponse.json({ error: 'Failed to fetch social works' }, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
@@ -17,53 +48,83 @@ export async function POST(req: Request) {
       submitterMobile,
       photoUrl,
       videoUrl,
+      villageId,
       status = 'pending',
       adminName,
       adminMobile,
     } = await req.json();
 
     if (!title || !description || !submitterName || !submitterMobile) {
-      return NextResponse.json({ error: 'सभी आवश्यक जानकारी भरें।' }, { status: 400 });
+      return NextResponse.json({ error: 'सभी आवश्यक विवरण भरें।' }, { status: 400 });
     }
 
-    // Unapproved Member restriction: Only active/approved members or admins can post
-    if (!isApprovedUser(submitterMobile) && !isApprovedUser(adminMobile)) {
-      return NextResponse.json(
-        {
-          error:
-            'आपकी सदस्यता अभी सत्यापन/अनुमोदन के लिए लंबित है। एडमिन द्वारा अनुमोदन के बाद ही आप सामाजिक कार्य पोस्ट कर सकते हैं।',
-        },
-        { status: 403 }
-      );
+    const sql = getSqlClient();
+    if (!sql) return NextResponse.json({ error: 'डेटाबेस अनुपलब्ध है।' }, { status: 500 });
+
+    let numericVillageId: number | null = null;
+    if (villageId && !isNaN(Number(villageId))) {
+      numericVillageId = Number(villageId);
+    } else {
+      const found = await sql`SELECT id FROM public.villages LIMIT 1;`;
+      if (found && found.length > 0) numericVillageId = found[0].id;
     }
 
-    const store = loadStore();
+    const inserted = await sql`
+      INSERT INTO public.social_works (
+        village_id,
+        title,
+        description,
+        date,
+        location,
+        submitter_name,
+        submitter_mobile,
+        photo_url,
+        video_url,
+        status,
+        created_at,
+        updated_at
+      ) VALUES (
+        ${numericVillageId},
+        ${title.trim()},
+        ${description.trim()},
+        ${date || sql`CURRENT_DATE`},
+        ${location ? location.trim() : 'Rasoolpur'},
+        ${submitterName.trim()},
+        ${submitterMobile.trim()},
+        ${photoUrl || null},
+        ${videoUrl || null},
+        ${(status || 'pending') as any},
+        NOW(),
+        NOW()
+      )
+      RETURNING *;
+    `;
+
     const newWork = {
-      id: `sw_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-      title: title.trim(),
-      description: description.trim(),
-      date: date || new Date().toISOString().split('T')[0],
-      location: location ? location.trim() : 'Rasoolpur',
-      submitterName: submitterName.trim(),
-      submitterMobile: submitterMobile.trim(),
-      photoUrl: photoUrl || '',
-      videoUrl: videoUrl || '',
-      status: (status === 'approved' || status === 'published' ? status : 'pending') as 'pending' | 'approved' | 'published',
-      createdAt: new Date().toISOString(),
+      id: String(inserted[0].id),
+      villageId: inserted[0].village_id ? String(inserted[0].village_id) : 'vil_rasoolpur',
+      title: inserted[0].title,
+      description: inserted[0].description,
+      date: inserted[0].date,
+      location: inserted[0].location,
+      submitterName: inserted[0].submitter_name,
+      submitterMobile: inserted[0].submitter_mobile,
+      photoUrl: inserted[0].photo_url || '',
+      videoUrl: inserted[0].video_url || '',
+      status: inserted[0].status,
+      createdAt: inserted[0].created_at,
     };
 
-    store.socialWorks.unshift(newWork);
-    saveStore(store);
-
     logAuditAction(
-      `Submitted Social Work (${newWork.title}) [Status: ${newWork.status}]`,
-      adminName || newWork.submitterName,
-      adminMobile || newWork.submitterMobile,
+      `Submitted Social Work (${newWork.title})`,
+      adminName || submitterName || 'Public Portal',
+      adminMobile || submitterMobile,
       newWork.title
     );
 
-    return NextResponse.json({ success: true, socialWork: newWork });
+    return NextResponse.json({ success: true, socialWork: newWork }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Error creating social work' }, { status: 500 });
+    console.error('Error submitting social work:', error);
+    return NextResponse.json({ error: error.message || 'त्रुटि हुई।' }, { status: 500 });
   }
 }

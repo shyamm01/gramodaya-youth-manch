@@ -1,9 +1,44 @@
 import { NextResponse } from 'next/server';
-import { loadStore, saveStore, logAuditAction, isApprovedUser } from '@/src/lib/serverStore';
+import { getSqlClient, logAuditAction, normalizeMobile } from '@/src/lib/authUtils';
 
 export async function GET() {
-  const store = loadStore();
-  return NextResponse.json({ success: true, complaints: store.complaints });
+  try {
+    const sql = getSqlClient();
+    if (!sql) {
+      return NextResponse.json({ success: true, complaints: [] });
+    }
+
+    const rows = await sql`
+      SELECT 
+        id, 
+        village_id as "villageId",
+        title, 
+        category, 
+        description, 
+        location, 
+        reporter_name as "reporterName", 
+        reporter_mobile as "reporterMobile", 
+        status, 
+        photo_url as "photoUrl", 
+        video_url as "videoUrl", 
+        is_demo as "isDemo",
+        resolved_at as "resolvedAt",
+        created_at as "createdAt"
+      FROM public.complaints 
+      ORDER BY id DESC;
+    `;
+
+    const formatted = rows.map((c: any) => ({
+      ...c,
+      id: String(c.id),
+      villageId: c.villageId ? String(c.villageId) : 'vil_rasoolpur',
+    }));
+
+    return NextResponse.json({ success: true, complaints: formatted });
+  } catch (err: any) {
+    console.error('Error fetching complaints from DB:', err);
+    return NextResponse.json({ error: 'Failed to fetch complaints' }, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
@@ -17,6 +52,7 @@ export async function POST(req: Request) {
       reporterMobile,
       photoUrl,
       videoUrl,
+      villageId,
       isDemo = false,
       adminName,
       adminMobile,
@@ -26,45 +62,82 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'सभी आवश्यक विवरण भरें।' }, { status: 400 });
     }
 
-    // Unapproved Member restriction: Only active/approved members or admins can post
-    if (!isApprovedUser(reporterMobile) && !isApprovedUser(adminMobile)) {
-      return NextResponse.json(
-        {
-          error:
-            'आपकी सदस्यता अभी सत्यापन/अनुमोदन के लिए लंबित है। एडमिन द्वारा अनुमोदन के बाद ही आप शिकायत या समस्या दर्ज कर सकते हैं।',
-        },
-        { status: 403 }
-      );
+    const sql = getSqlClient();
+    if (!sql) {
+      return NextResponse.json({ error: 'डेटाबेस कनेक्शन अनुपलब्ध है।' }, { status: 500 });
     }
 
-    const store = loadStore();
-    const newComplaint = {
-      id: `comp_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-      title: title.trim(),
-      category: category || 'Other',
-      description: description.trim(),
-      location: location ? location.trim() : 'Rasoolpur',
-      reporterName: reporterName.trim(),
-      reporterMobile: reporterMobile.trim(),
-      status: 'NEW' as const,
-      photoUrl: photoUrl || '',
-      videoUrl: videoUrl || '',
-      isDemo: Boolean(isDemo),
-      createdAt: new Date().toISOString(),
-    };
+    // Resolve village ID
+    let numericVillageId: number | null = null;
+    if (villageId && !isNaN(Number(villageId))) {
+      numericVillageId = Number(villageId);
+    } else {
+      const found = await sql`SELECT id FROM public.villages LIMIT 1;`;
+      if (found && found.length > 0) numericVillageId = found[0].id;
+    }
 
-    store.complaints.unshift(newComplaint);
-    saveStore(store);
+    const inserted = await sql`
+      INSERT INTO public.complaints (
+        village_id,
+        title,
+        category,
+        description,
+        location,
+        reporter_name,
+        reporter_mobile,
+        status,
+        photo_url,
+        video_url,
+        is_demo,
+        created_at,
+        updated_at
+      ) VALUES (
+        ${numericVillageId},
+        ${title.trim()},
+        ${(category || 'Other') as any},
+        ${description.trim()},
+        ${location ? location.trim() : 'Rasoolpur'},
+        ${reporterName.trim()},
+        ${reporterMobile.trim()},
+        'NEW',
+        ${photoUrl || null},
+        ${videoUrl || null},
+        ${Boolean(isDemo)},
+        NOW(),
+        NOW()
+      )
+      RETURNING *;
+    `;
+
+    const newComplaint = {
+      id: String(inserted[0].id),
+      villageId: inserted[0].village_id ? String(inserted[0].village_id) : 'vil_rasoolpur',
+      title: inserted[0].title,
+      category: inserted[0].category,
+      description: inserted[0].description,
+      location: inserted[0].location,
+      reporterName: inserted[0].reporter_name,
+      reporterMobile: inserted[0].reporter_mobile,
+      status: inserted[0].status,
+      photoUrl: inserted[0].photo_url || '',
+      videoUrl: inserted[0].video_url || '',
+      isDemo: inserted[0].is_demo,
+      createdAt: inserted[0].created_at,
+    };
 
     logAuditAction(
       `Submitted Complaint (${newComplaint.title})`,
-      adminName || newComplaint.reporterName,
-      adminMobile || newComplaint.reporterMobile,
+      adminName || reporterName || 'Public Portal',
+      adminMobile || reporterMobile,
       newComplaint.title
     );
 
-    return NextResponse.json({ success: true, complaint: newComplaint });
+    return NextResponse.json({ success: true, complaint: newComplaint }, { status: 201 });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Error creating complaint' }, { status: 500 });
+    console.error('Error creating complaint in DB:', error);
+    return NextResponse.json(
+      { error: error.message || 'शिकायत दर्ज करने में त्रुटि हुई।' },
+      { status: 500 }
+    );
   }
 }

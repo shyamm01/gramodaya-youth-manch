@@ -1,98 +1,70 @@
 import { NextResponse } from 'next/server';
-import { loadStore, saveStore, logAuditAction, normalizeMobile } from '@/src/lib/serverStore';
+import { getSqlClient, normalizeMobile, hashPassword, logAuditAction } from '@/src/lib/authUtils';
 import { signJwtToken } from '@/src/lib/jwtAuth';
-import postgres from 'postgres';
-
-const connectionString =
-  process.env.DATABASE_URL ||
-  process.env.SUPABASE_DB_URL ||
-  process.env.POSTGRES_URL;
-
-let sqlClient: postgres.Sql | null = null;
-
-function getSqlClient() {
-  if (sqlClient) return sqlClient;
-  if (connectionString) {
-    try {
-      sqlClient = postgres(connectionString, {
-        max: 5,
-        prepare: false,
-        ssl: { rejectUnauthorized: false },
-      });
-      return sqlClient;
-    } catch (e) {
-      console.warn('Postgres connection failed in members route:', e);
-    }
-  }
-  return null;
-}
 
 export async function GET() {
-  const store = loadStore();
-
-  // Try fetching fresh data from PostgreSQL database
   try {
     const sql = getSqlClient();
-    if (sql) {
-      const dbMembers = await sql`
-        SELECT 
-          id, 
-          name, 
-          mobile, 
-          photo_url as "photoUrl", 
-          father_name as "fatherName", 
-          dob, 
-          gender,
-          address, 
-          village_id as "villageId",
-          occupation,
-          designation,
-          political_background as "politicalBackground",
-          blood_group as "bloodGroup",
-          status, 
-          role, 
-          system_role as "systemRole", 
-          organization_name as "organizationName", 
-          created_at as "createdAt"
-        FROM public.members 
-        ORDER BY id DESC;
-      `;
-
-      if (dbMembers && dbMembers.length > 0) {
-        // Map database records
-        const mapped = dbMembers.map((m: any) => ({
-          id: String(m.id),
-          name: m.name,
-          mobile: m.mobile,
-          photoUrl: m.photoUrl || '',
-          fatherName: m.fatherName || '',
-          dob: m.dob || '',
-          gender: m.gender || '',
-          address: m.address || '',
-          villageId: m.villageId ? String(m.villageId) : 'vil_rasoolpur',
-          occupation: m.occupation || '',
-          designation: m.designation || '',
-          politicalBackground: m.politicalBackground || '',
-          bloodGroup: m.bloodGroup || '',
-          status: m.status || 'active',
-          role: m.role || 'MEMBER',
-          systemRole: m.systemRole || 'MEMBER',
-          organizationName: m.organizationName || 'ग्रामोदय यूथ मंच',
-          createdAt: m.createdAt ? new Date(m.createdAt).toISOString() : new Date().toISOString(),
-        }));
-
-        // Sync with local store
-        store.members = mapped;
-        saveStore(store);
-
-        return NextResponse.json({ success: true, members: mapped, source: 'database' });
-      }
+    if (!sql) {
+      return NextResponse.json({ success: true, members: [] });
     }
-  } catch (dbErr) {
-    console.warn('Direct database fetch failed, serving from data_store:', dbErr);
-  }
 
-  return NextResponse.json({ success: true, members: store.members, source: 'store' });
+    const dbMembers = await sql`
+      SELECT 
+        id, 
+        name, 
+        mobile, 
+        email,
+        photo_url as "photoUrl", 
+        father_name as "fatherName", 
+        dob, 
+        gender,
+        address, 
+        village_id as "villageId",
+        occupation,
+        designation,
+        political_background as "politicalBackground",
+        blood_group as "bloodGroup",
+        status, 
+        role, 
+        system_role as "systemRole", 
+        organization_name as "organizationName", 
+        created_at as "createdAt"
+      FROM public.members 
+      ORDER BY id DESC;
+    `;
+
+    const formatted = dbMembers.map((m: any) => ({
+      id: String(m.id),
+      villageId: m.villageId ? String(m.villageId) : 'vil_rasoolpur',
+      name: m.name,
+      mobile: m.mobile,
+      email: m.email || '',
+      photoUrl: m.photoUrl || '',
+      fatherName: m.fatherName || '',
+      dob: m.dob || '',
+      gender: m.gender || '',
+      address: m.address || 'ग्राम रसूलपुर, ग्राम पंचायत बहेरा',
+      occupation: m.occupation || '',
+      designation: m.designation || '',
+      politicalBackground: m.politicalBackground || '',
+      bloodGroup: m.bloodGroup || '',
+      status: m.status || 'active',
+      role: m.role || 'MEMBER',
+      systemRole: m.systemRole || 'MEMBER',
+      organizationName: m.organizationName || 'ग्रामोदय यूथ मंच',
+      createdAt: m.createdAt,
+    }));
+
+    return NextResponse.json({
+      success: true,
+      members: formatted,
+      source: 'postgres',
+    });
+  } catch (error: any) {
+    console.error('Error fetching members from DB:', error);
+    return NextResponse.json({ error: 'Failed to fetch members' }, { status: 500 });
+  }
 }
 
 export async function POST(req: Request) {
@@ -104,17 +76,16 @@ export async function POST(req: Request) {
       fatherName,
       dob,
       gender,
+      email,
+      password,
       address,
       villageId,
       occupation,
       designation,
       politicalBackground,
       bloodGroup,
-      status = 'pending',
+      status = 'active',
       organizationName = 'ग्रामोदय यूथ मंच',
-      adminName,
-      adminMobile,
-      createdAt,
     } = await req.json();
 
     if (!name || !name.trim()) {
@@ -126,153 +97,132 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'कृपया वैध 10-अंकीय मोबाइल नंबर दर्ज करें।' }, { status: 400 });
     }
 
+    const sql = getSqlClient();
+    if (!sql) {
+      return NextResponse.json({ error: 'डेटाबेस कनेक्शन अनुपलब्ध है।' }, { status: 500 });
+    }
+
     const formattedMobile = `+91 ${cleanMobileDigits.slice(0, 5)} ${cleanMobileDigits.slice(5)}`;
-    const store = loadStore();
+    const passwordHash = password ? hashPassword(password) : null;
 
-    // 1. Check local store duplicate
-    const existingIndex = store.members.findIndex(
-      (m) => normalizeMobile(m.mobile) === cleanMobileDigits
-    );
+    // Check duplicate in PostgreSQL
+    const existing = await sql`
+      SELECT id, name, mobile, email, status, role, system_role, village_id 
+      FROM public.members 
+      WHERE mobile LIKE ${`%${cleanMobileDigits}%`}
+      LIMIT 1;
+    `;
 
-    if (existingIndex >= 0) {
-      const existing = store.members[existingIndex];
+    if (existing && existing.length > 0) {
+      const ex = existing[0];
       const token = await signJwtToken({
-        id: String(existing.id),
-        name: existing.name,
-        mobile: existing.mobile,
-        role: existing.systemRole || existing.role || 'MEMBER',
-        systemRole: existing.systemRole || existing.role || 'MEMBER',
-        villageId: existing.villageId,
+        id: String(ex.id),
+        name: ex.name,
+        mobile: ex.mobile,
+        email: ex.email,
+        role: ex.system_role || ex.role || 'MEMBER',
+        systemRole: ex.system_role || ex.role || 'MEMBER',
+        villageId: ex.village_id ? String(ex.village_id) : 'vil_rasoolpur',
         isAdmin: false,
       });
 
       return NextResponse.json(
         {
-          error: `यह मोबाइल नंबर (${formattedMobile}) पहले से पंजीकृत है [स्थिति: ${existing.status === 'active' ? 'सक्रिय' : 'लंबित'}]।`,
+          error: `यह मोबाइल नंबर (${formattedMobile}) पहले से पंजीकृत है [स्थिति: ${ex.status === 'active' ? 'सक्रिय' : 'लंबित'}]।`,
           alreadyRegistered: true,
-          member: existing,
+          member: ex,
           token,
         },
         { status: 409 }
       );
     }
 
-    const effectiveVillageId = villageId || (store.villages && store.villages[0] ? store.villages[0].id : 'vil_rasoolpur');
-    const memberId = `mem_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-
-    const newMember = {
-      id: memberId,
-      villageId: effectiveVillageId,
-      name: name.trim(),
-      mobile: formattedMobile,
-      photoUrl: photoUrl || '',
-      fatherName: fatherName ? fatherName.trim() : '',
-      dob: dob ? dob.trim() : '',
-      gender: gender ? gender.trim() : '',
-      address: address ? address.trim() : 'ग्राम रसूलपुर, ग्राम पंचायत बहेरा',
-      occupation: occupation ? occupation.trim() : '',
-      designation: designation ? designation.trim() : '',
-      politicalBackground: politicalBackground ? politicalBackground.trim() : '',
-      bloodGroup: bloodGroup ? bloodGroup.trim() : '',
-      status: (status === 'active' ? 'active' : 'pending') as 'active' | 'pending',
-      role: 'MEMBER' as const,
-      systemRole: 'MEMBER' as const,
-      organizationName: organizationName || 'ग्रामोदय यूथ मंच',
-      createdAt: createdAt ? new Date(createdAt).toISOString() : new Date().toISOString(),
-    };
-
-    // 2. Persist to PostgreSQL Database directly
-    let dbPersisted = false;
-    try {
-      const sql = getSqlClient();
-      if (sql) {
-        // Resolve numeric villageId if available
-        let numericVillageId: number | null = null;
-        if (typeof effectiveVillageId === 'number') {
-          numericVillageId = effectiveVillageId;
-        } else if (!isNaN(Number(effectiveVillageId))) {
-          numericVillageId = Number(effectiveVillageId);
-        } else {
-          // Look up from villages table
-          const foundVillage = await sql`SELECT id FROM public.villages LIMIT 1;`;
-          if (foundVillage && foundVillage.length > 0) {
-            numericVillageId = foundVillage[0].id;
-          }
-        }
-
-        const inserted = await sql`
-          INSERT INTO public.members (
-            village_id,
-            name,
-            mobile,
-            status,
-            photo_url,
-            organization_name,
-            father_name,
-            dob,
-            gender,
-            address,
-            occupation,
-            designation,
-            political_background,
-            blood_group,
-            role,
-            system_role,
-            created_at,
-            updated_at
-          ) VALUES (
-            ${numericVillageId},
-            ${newMember.name},
-            ${newMember.mobile},
-            ${newMember.status},
-            ${newMember.photoUrl || null},
-            ${newMember.organizationName},
-            ${newMember.fatherName || null},
-            ${newMember.dob || null},
-            ${newMember.gender || null},
-            ${newMember.address},
-            ${newMember.occupation || null},
-            ${newMember.designation || null},
-            ${newMember.politicalBackground || null},
-            ${newMember.bloodGroup || null},
-            'MEMBER',
-            'MEMBER',
-            NOW(),
-            NOW()
-          )
-          ON CONFLICT (mobile) DO UPDATE SET
-            name = EXCLUDED.name,
-            photo_url = EXCLUDED.photo_url,
-            father_name = EXCLUDED.father_name,
-            dob = EXCLUDED.dob,
-            gender = EXCLUDED.gender,
-            address = EXCLUDED.address,
-            occupation = EXCLUDED.occupation,
-            designation = EXCLUDED.designation,
-            political_background = EXCLUDED.political_background,
-            blood_group = EXCLUDED.blood_group,
-            updated_at = NOW()
-          RETURNING id;
-        `;
-
-        if (inserted && inserted.length > 0) {
-          newMember.id = String(inserted[0].id);
-          dbPersisted = true;
-        }
+    // Resolve village ID
+    let numericVillageId: number | null = null;
+    if (villageId && !isNaN(Number(villageId))) {
+      numericVillageId = Number(villageId);
+    } else {
+      const foundVillage = await sql`SELECT id FROM public.villages LIMIT 1;`;
+      if (foundVillage && foundVillage.length > 0) {
+        numericVillageId = foundVillage[0].id;
       }
-    } catch (dbError) {
-      console.error('Postgres member insert error:', dbError);
     }
 
-    // 3. Save to local fast store
-    store.members.push(newMember);
-    saveStore(store);
+    const inserted = await sql`
+      INSERT INTO public.members (
+        village_id,
+        name,
+        mobile,
+        email,
+        password_hash,
+        status,
+        photo_url,
+        organization_name,
+        father_name,
+        dob,
+        gender,
+        address,
+        occupation,
+        designation,
+        political_background,
+        blood_group,
+        role,
+        system_role,
+        created_at,
+        updated_at
+      ) VALUES (
+        ${numericVillageId},
+        ${name.trim()},
+        ${formattedMobile},
+        ${email ? email.trim() : null},
+        ${passwordHash},
+        ${status as any},
+        ${photoUrl || null},
+        ${organizationName},
+        ${fatherName ? fatherName.trim() : null},
+        ${dob ? dob.trim() : null},
+        ${gender ? gender.trim() : null},
+        ${address ? address.trim() : 'ग्राम रसूलपुर, ग्राम पंचायत बहेरा'},
+        ${occupation ? occupation.trim() : null},
+        ${designation ? designation.trim() : null},
+        ${politicalBackground ? politicalBackground.trim() : null},
+        ${bloodGroup ? bloodGroup.trim() : null},
+        'MEMBER',
+        'MEMBER',
+        NOW(),
+        NOW()
+      )
+      RETURNING *;
+    `;
 
-    // 4. Generate JWT Token for newly registered member
+    const newMemberRecord = inserted[0];
+    const newMember = {
+      id: String(newMemberRecord.id),
+      villageId: newMemberRecord.village_id ? String(newMemberRecord.village_id) : 'vil_rasoolpur',
+      name: newMemberRecord.name,
+      mobile: newMemberRecord.mobile,
+      email: newMemberRecord.email || '',
+      photoUrl: newMemberRecord.photo_url || '',
+      fatherName: newMemberRecord.father_name || '',
+      dob: newMemberRecord.dob || '',
+      gender: newMemberRecord.gender || '',
+      address: newMemberRecord.address || '',
+      occupation: newMemberRecord.occupation || '',
+      designation: newMemberRecord.designation || '',
+      politicalBackground: newMemberRecord.political_background || '',
+      bloodGroup: newMemberRecord.blood_group || '',
+      status: newMemberRecord.status || 'active',
+      role: newMemberRecord.role || 'MEMBER',
+      systemRole: newMemberRecord.system_role || 'MEMBER',
+      organizationName: newMemberRecord.organization_name || 'ग्रामोदय यूथ मंच',
+      createdAt: newMemberRecord.created_at,
+    };
+
     const token = await signJwtToken({
       id: newMember.id,
       name: newMember.name,
       mobile: newMember.mobile,
+      email: newMember.email,
       role: 'MEMBER',
       systemRole: 'MEMBER',
       villageId: newMember.villageId,
@@ -280,9 +230,9 @@ export async function POST(req: Request) {
     });
 
     logAuditAction(
-      `Registered Member (${newMember.name}) [Role: MEMBER, Database Persisted: ${dbPersisted}]`,
-      adminName || 'Public Registration Portal',
-      adminMobile || newMember.mobile,
+      `Registered Member (${newMember.name}) [Role: MEMBER]`,
+      'Public Registration Portal',
+      newMember.mobile,
       newMember.name
     );
 
@@ -291,12 +241,15 @@ export async function POST(req: Request) {
         success: true,
         member: newMember,
         token,
-        persistedInDatabase: dbPersisted,
         message: 'सदस्यता सफलतापूर्वक दर्ज हो गई है।',
       },
       { status: 201 }
     );
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'सदस्य पंजीकरण करने में त्रुटि हुई।' }, { status: 500 });
+    console.error('Error adding member to Postgres:', error);
+    return NextResponse.json(
+      { error: error.message || 'सदस्य जोड़ने में त्रुटि हुई।' },
+      { status: 500 }
+    );
   }
 }

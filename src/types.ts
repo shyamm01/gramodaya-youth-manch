@@ -141,6 +141,8 @@ export interface Member {
   villageId?: string;
   name: string;
   mobile: string;
+  email?: string;
+  passwordHash?: string;
   status: 'active' | 'pending' | 'suspended';
   photoUrl?: string;
   createdAt: string;
@@ -339,6 +341,8 @@ export interface AuthSession {
   supabaseUserId?: string;
   email?: string;
   role?: 'SUPER_ADMIN' | 'ADMIN' | 'MEMBER';
+  systemRole?: 'SUPER_ADMIN' | 'ADMIN' | 'MEMBER';
+  token?: string;
   permissions?: PermissionCode[];
   accessibleVillages?: string[];
   activeVillageId?: string;

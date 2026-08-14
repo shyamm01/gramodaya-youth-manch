@@ -20,9 +20,9 @@ export const HomeSection: React.FC = () => {
     events,
     gallery,
     admins,
+    isJoinModalOpen,
+    setIsJoinModalOpen,
   } = useApp();
-
-  const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
 
   // Filtered dataset for widgets
   const approvedInfos = publicInfos.filter((p) => p.status === "approved");
