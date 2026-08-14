@@ -6,7 +6,7 @@ import { ProtectedRoute } from '@/src/components/common';
 
 export default function AdminPage() {
   return (
-    <ProtectedRoute requiredRole="ADMIN" sectionTitle="मुख्य एडमिन प्रबंधन (Admin Control Center)">
+    <ProtectedRoute requiredRole="SUPER_ADMIN" sectionTitle="मुख्य सुपर एडमिन डैशबोर्ड (Super Admin Dashboard)">
       <AdminPanel />
     </ProtectedRoute>
   );

@@ -11,14 +11,13 @@ import { MemberChatModal } from '../modals/MemberChatModal';
 import { DigitalIdCard } from '../features/DigitalIdCard';
 import { GymLogo } from '../common/GymLogo';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   Heart,
   Shield,
-  PhoneCall,
   MapPin,
   Lock,
   MessageSquare,
-  Sparkles,
 } from 'lucide-react';
 
 interface AppShellProps {
@@ -26,6 +25,7 @@ interface AppShellProps {
 }
 
 const ShellContent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const pathname = usePathname();
   const {
     t,
     lang,
@@ -33,15 +33,15 @@ const ShellContent: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     isLoading,
     isMyProfileModalOpen,
     setIsMyProfileModalOpen,
-    isAdminLoginModalOpen,
     setIsAdminLoginModalOpen,
     selectedChatPartner,
     setSelectedChatPartner,
     selectedIdCardMember,
     setSelectedIdCardMember,
     authSession,
-    adminLogout,
   } = useApp();
+
+  const isAdminRoute = pathname?.startsWith('/admin');
 
   const footerLinks = [
     { href: '/', label: t('nav.home') },
@@ -73,6 +73,34 @@ const ShellContent: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     );
   }
 
+  // Standalone Super Admin Dashboard Layout (No public Header, BottomNav, or public Footer)
+  if (isAdminRoute) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 transition-colors duration-200">
+        <main className="min-h-screen">{children}</main>
+
+        {/* Global Modals */}
+        <UnifiedLoginModal />
+        <MyProfileModal
+          isOpen={isMyProfileModalOpen}
+          onClose={() => setIsMyProfileModalOpen(false)}
+        />
+        {selectedChatPartner && (
+          <MemberChatModal
+            initialPartner={selectedChatPartner}
+            onClose={() => setSelectedChatPartner(null)}
+          />
+        )}
+        {selectedIdCardMember && (
+          <DigitalIdCard
+            member={selectedIdCardMember}
+            onClose={() => setSelectedIdCardMember(null)}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col justify-between bg-[#F8F9FA] dark:bg-[#0B0F17] transition-colors duration-200">
       <Header />
@@ -80,7 +108,7 @@ const ShellContent: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
       <main className="flex-1 pb-24 md:pb-12">{children}</main>
 
-      {/* Global Footer */}
+      {/* Global Public Footer */}
       <footer className="bg-[#18281E] dark:bg-[#0A101D] text-white border-t border-[#3B4F3D] dark:border-slate-800 mt-auto transition-colors duration-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
@@ -181,30 +209,40 @@ const ShellContent: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             </div>
           </div>
 
-          <div className="mt-8 pt-6 border-t border-[#3B4F3D] flex flex-col sm:flex-row items-center justify-between text-xs text-[#E0DCCF] gap-2">
+          <div className="mt-12 pt-6 border-t border-[#2D3E30] dark:border-slate-800 flex flex-col md:flex-row justify-between items-center text-xs text-[#8C8675] space-y-4 md:space-y-0">
             <p>
-              © {new Date().getFullYear()} {lang === 'en' ? villageSettings.orgName : villageSettings.orgNameHindi} ({lang === 'en' ? villageSettings.name : villageSettings.nameHindi}, {lang === 'en' ? villageSettings.gramPanchayat : villageSettings.gramPanchayatHindi})
+              © {new Date().getFullYear()} {lang === 'en' ? villageSettings.orgName : villageSettings.orgNameHindi}. {t('footer.allRightsReserved')}
             </p>
             <p className="flex items-center gap-1">
-              <span>{t('footer.dedicated')}</span>
-              <Heart className="w-3 h-3 text-red-400 fill-current inline" />
+              <span>{t('footer.developedWith')}</span>
+              <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500 inline" />
+              <span>{t('footer.forCommunity')}</span>
             </p>
           </div>
         </div>
       </footer>
 
-      {/* Persistent Bottom Nav for Mobile */}
-      <BottomNav />
-
       {/* Global Modals */}
       <UnifiedLoginModal />
-      <MyProfileModal isOpen={isMyProfileModalOpen} onClose={() => setIsMyProfileModalOpen(false)} />
+      <MyProfileModal
+        isOpen={isMyProfileModalOpen}
+        onClose={() => setIsMyProfileModalOpen(false)}
+      />
       {selectedChatPartner && (
-        <MemberChatModal initialPartner={selectedChatPartner} onClose={() => setSelectedChatPartner(null)} />
+        <MemberChatModal
+          initialPartner={selectedChatPartner}
+          onClose={() => setSelectedChatPartner(null)}
+        />
       )}
       {selectedIdCardMember && (
-        <DigitalIdCard member={selectedIdCardMember} onClose={() => setSelectedIdCardMember(null)} />
+        <DigitalIdCard
+          member={selectedIdCardMember}
+          onClose={() => setSelectedIdCardMember(null)}
+        />
       )}
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNav />
     </div>
   );
 };
