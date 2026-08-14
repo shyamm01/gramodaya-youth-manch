@@ -138,6 +138,7 @@ interface AppContextType {
     organizationName?: string
   ) => Promise<{ success: boolean; member?: Member; alreadyRegistered?: boolean; error?: string }>;
   approveMember: (id: string) => Promise<void>;
+  updateMember: (id: string, updates: Partial<Member>) => Promise<{ success: boolean; error?: string }>;
   deleteMember: (id: string) => Promise<void>;
   uploadPhoto: (targetType: 'admin' | 'member', targetId: string, photoUrl: string) => Promise<void>;
   submitComplaint: (data: Omit<Complaint, 'id' | 'createdAt' | 'status'>) => Promise<{ success: boolean; error?: string }>;
@@ -150,6 +151,7 @@ interface AppContextType {
   updatePublicInfoStatus: (id: string, status: 'approved' | 'rejected' | 'pending') => Promise<void>;
   deletePublicInfo: (id: string) => Promise<void>;
   publishAnnouncement: (title: string, content: string) => Promise<{ success: boolean; error?: string }>;
+  updateAnnouncement: (id: string, title: string, content: string) => Promise<{ success: boolean; error?: string }>;
   deleteAnnouncement: (id: string) => Promise<void>;
   createEvent: (data: Omit<EventItem, 'id' | 'createdAt'>) => Promise<{ success: boolean; error?: string }>;
   updateEvent: (id: string, updates: Partial<EventItem>) => Promise<{ success: boolean; error?: string }>;
@@ -1203,6 +1205,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateMember = async (id: string, updates: Partial<Member>) => {
+    if (!authSession.isAdminLoggedIn) {
+      return { success: false, error: 'Unauthorized: Admin login required.' };
+    }
+    try {
+      const res = await fetch(`/api/members/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...updates,
+          adminName: authSession.adminName,
+          adminMobile: authSession.adminMobile,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Failed to update member.' };
+      }
+      await refreshData();
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Server error.' };
+    }
+  };
+
   const deleteMember = async (id: string) => {
     if (!authSession.isAdminLoggedIn) {
       console.warn('Unauthorized attempt to delete member.');
@@ -1522,6 +1549,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
+    }
+  };
+
+  const updateAnnouncement = async (id: string, title: string, content: string) => {
+    if (!authSession.isAdminLoggedIn) {
+      return { success: false, error: 'Unauthorized: Admin login required.' };
+    }
+    try {
+      const res = await fetch(`/api/announcements/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          content,
+          adminName: authSession.adminName,
+          adminMobile: authSession.adminMobile,
+        }),
+      });
+      if (!res.ok) return { success: false, error: 'Failed to update announcement.' };
+      await refreshData();
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message || 'Server error.' };
     }
   };
 
@@ -1979,6 +2029,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         adminLogout,
         addMember,
         approveMember,
+        updateMember,
         deleteMember,
         uploadPhoto,
         submitComplaint,
@@ -1991,6 +2042,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updatePublicInfoStatus,
         deletePublicInfo,
         publishAnnouncement,
+        updateAnnouncement,
         deleteAnnouncement,
         createEvent,
         updateEvent,
