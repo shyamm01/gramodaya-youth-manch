@@ -113,8 +113,12 @@ export const LiveChatSection: React.FC = () => {
     }
   }, [selectedChatPartner]);
 
-  // Sync state if currentMemberObj changes
+  // Sync state if currentMemberObj or authSession changes
   useEffect(() => {
+    const mob = currentMemberMobile || authSession.adminMobile || authSession.currentMember?.mobile;
+    if (mob) {
+      setCurrentMobile(mob);
+    }
     if (currentMemberObj) {
       setSenderName(currentMemberObj.name);
       if (currentMemberObj.photoUrl) setSenderPhoto(currentMemberObj.photoUrl);
@@ -123,8 +127,10 @@ export const LiveChatSection: React.FC = () => {
       if (currentMemberObj.photoUrl) {
         localStorage.setItem('gym_chat_sender_photo', currentMemberObj.photoUrl);
       }
+    } else if (authSession.adminName) {
+      setSenderName(authSession.adminName);
     }
-  }, [currentMemberObj]);
+  }, [currentMemberObj, currentMemberMobile, authSession]);
 
   // Determine current active Room ID
   const getActiveRoomId = () => {

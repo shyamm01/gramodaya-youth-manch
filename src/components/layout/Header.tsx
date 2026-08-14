@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
@@ -27,6 +27,10 @@ import {
   MessageCircle,
   MoreHorizontal,
   Database,
+  User,
+  CreditCard,
+  ChevronDown,
+  Sparkles,
 } from 'lucide-react';
 
 // Primary nav — visible in desktop header
@@ -58,26 +62,79 @@ export const Header: React.FC = () => {
     currentMemberMobile,
     members,
     setIsAdminLoginModalOpen,
+    setIsMyProfileModalOpen,
+    setSelectedIdCardMember,
     adminLogout,
     memberLogout,
   } = useApp();
 
-  const isMemberLoggedIn = !!authSession.isMemberLoggedIn && !!currentMemberMobile;
-  const currentDigits = currentMemberMobile ? currentMemberMobile.replace(/\D/g, '').slice(-10) : '';
-  const currentMemberObj = (isMemberLoggedIn && currentDigits.length >= 10)
-    ? members.find((m) => {
-        const mDigits = m.mobile ? m.mobile.replace(/\D/g, '').slice(-10) : '';
-        return mDigits && mDigits === currentDigits;
-      })
-    : null;
-
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [moreDropdownOpen, setMoreDropdownOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [isSupabaseSetupOpen, setIsSupabaseSetupOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  const isSuperAdmin = authSession.systemRole === 'SUPER_ADMIN' || authSession.role === 'SUPER_ADMIN';
+  const isAdmin = Boolean(authSession.isAdminLoggedIn || authSession.role === 'ADMIN' || isSuperAdmin);
+  const isLoggedIn = Boolean(authSession.isAdminLoggedIn || authSession.isMemberLoggedIn || authSession.token || authSession.currentMember || isAdmin);
+
+  // Resolve current active member details
+  const effectiveMobile = currentMemberMobile || authSession.adminMobile || authSession.currentMember?.mobile;
+  const currentMemberObj =
+    authSession.currentMember ||
+    members.find((m) => {
+      if (!effectiveMobile) return false;
+      const cleanM = (m.mobile || '').replace(/\D/g, '').slice(-10);
+      const cleanCurr = effectiveMobile.replace(/\D/g, '').slice(-10);
+      return cleanM && cleanCurr && cleanCurr.length >= 10 && cleanM === cleanCurr;
+    }) ||
+    (isLoggedIn
+      ? {
+          id: authSession.adminId || '1',
+          name: authSession.adminName || (isSuperAdmin ? 'Super Admin' : 'Admin'),
+          mobile: effectiveMobile || '',
+          email: authSession.email || '',
+          photoUrl: '',
+          role: (authSession.role as any) || 'ADMIN',
+          systemRole: (authSession.systemRole as any) || (isSuperAdmin ? 'SUPER_ADMIN' : 'ADMIN'),
+        }
+      : null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setProfileDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const isLinkActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
+  };
+
+  const handleOpenIdCard = () => {
+    if (currentMemberObj) {
+      setSelectedIdCardMember(currentMemberObj as any);
+    }
+    setProfileDropdownOpen(false);
+  };
+
+  const handleOpenProfile = () => {
+    setIsMyProfileModalOpen(true);
+    setProfileDropdownOpen(false);
+  };
+
+  const handleLogout = () => {
+    setProfileDropdownOpen(false);
+    if (authSession.isAdminLoggedIn) {
+      adminLogout();
+    } else {
+      memberLogout();
+    }
   };
 
   const allNav = [...PRIMARY_NAV, ...SECONDARY_NAV];
@@ -137,7 +194,7 @@ export const Header: React.FC = () => {
               </button>
 
               {moreDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#131B2E] border border-[#E0DCCF] dark:border-slate-800 rounded-xl shadow-lg py-1 z-50">
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#131B2E] border border-[#E0DCCF] dark:border-slate-800 rounded-xl shadow-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-150">
                   {SECONDARY_NAV.map((item) => {
                     const active = isLinkActive(item.href);
                     const Icon = item.icon;
@@ -177,46 +234,161 @@ export const Header: React.FC = () => {
               </button>
             )}
 
-            {authSession.isAdminLoggedIn ? (
-              <div className="flex items-center gap-1">
-                <Link
-                  href="/admin"
-                  className="flex items-center gap-1 bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition cursor-pointer shadow-2xs"
-                >
-                  <Shield className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">{t('header.adminPanel')}</span>
-                </Link>
+            {/* ── PROFILE ICON / LOGIN BUTTON ── */}
+            {isLoggedIn && currentMemberObj ? (
+              <div className="relative" ref={profileMenuRef}>
                 <button
-                  onClick={adminLogout}
-                  className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition cursor-pointer"
-                  title={t('common.logout')}
+                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                  className={`flex items-center gap-2 p-1 sm:px-2.5 sm:py-1 rounded-xl transition-all cursor-pointer border ${
+                    profileDropdownOpen
+                      ? 'bg-emerald-50 dark:bg-slate-800 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-500/20'
+                      : 'bg-[#F7F5F0] dark:bg-slate-800/80 border-[#E0DCCF] dark:border-slate-700 hover:bg-emerald-50/70 dark:hover:bg-slate-800'
+                  }`}
+                  aria-label="User Profile Menu"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
+                  <div className="relative">
+                    {currentMemberObj.photoUrl ? (
+                      <img
+                        src={currentMemberObj.photoUrl}
+                        alt={currentMemberObj.name}
+                        className="w-7 h-7 rounded-lg object-cover border border-emerald-500/30"
+                      />
+                    ) : (
+                      <div
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white ${
+                          isSuperAdmin
+                            ? 'bg-gradient-to-tr from-amber-600 to-amber-500 shadow-xs'
+                            : isAdmin
+                            ? 'bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-xs'
+                            : 'bg-gradient-to-tr from-emerald-600 to-teal-500 shadow-xs'
+                        }`}
+                      >
+                        <User className="w-3.5 h-3.5" />
+                      </div>
+                    )}
+                    <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-1 ring-white dark:ring-slate-900 animate-pulse" />
+                  </div>
+
+                  <div className="hidden md:flex flex-col items-start text-left leading-tight pr-0.5">
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate max-w-[110px]">
+                      {currentMemberObj.name || (lang === 'en' ? 'Member' : 'सदस्य')}
+                    </span>
+                    <span
+                      className={`text-[9px] font-semibold tracking-wider uppercase ${
+                        isSuperAdmin
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : isAdmin
+                          ? 'text-blue-600 dark:text-blue-400'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`}
+                    >
+                      {isSuperAdmin
+                        ? 'Super Admin'
+                        : isAdmin
+                        ? 'Admin'
+                        : 'Member'}
+                    </span>
+                  </div>
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
                 </button>
-              </div>
-            ) : isMemberLoggedIn && currentMemberObj ? (
-              <div className="flex items-center gap-1">
-                <div className="flex items-center gap-1 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 px-2.5 py-1.5 rounded-xl text-[11px] font-bold shadow-2xs">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse"></span>
-                  <span className="truncate max-w-[100px] sm:max-w-[140px]">
-                    {currentMemberObj?.name || 'सदस्य'}
-                  </span>
-                </div>
-                <button
-                  onClick={memberLogout}
-                  className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition cursor-pointer"
-                  title={t('common.logout')}
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
+
+                {/* Profile Dropdown Menu */}
+                {profileDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-[#131B2E] border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-150 divide-y divide-slate-100 dark:divide-slate-800/80">
+                    {/* Header Info */}
+                    <div className="px-4 py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0 ${
+                            isSuperAdmin
+                              ? 'bg-gradient-to-tr from-amber-600 to-amber-500'
+                              : isAdmin
+                              ? 'bg-gradient-to-tr from-blue-600 to-indigo-500'
+                              : 'bg-gradient-to-tr from-emerald-600 to-teal-500'
+                          }`}
+                        >
+                          {currentMemberObj.photoUrl ? (
+                            <img
+                              src={currentMemberObj.photoUrl}
+                              alt={currentMemberObj.name}
+                              className="w-full h-full rounded-xl object-cover"
+                            />
+                          ) : (
+                            <User className="w-5 h-5 text-white" />
+                          )}
+                        </div>
+                        <div className="overflow-hidden">
+                          <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                            {currentMemberObj.name}
+                          </p>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                            {currentMemberObj.email || currentMemberObj.mobile}
+                          </p>
+                          <span
+                            className={`inline-block text-[9px] font-bold px-1.5 py-0.2 rounded-md mt-0.5 ${
+                              isSuperAdmin
+                                ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300'
+                                : isAdmin
+                                ? 'bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300'
+                                : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300'
+                            }`}
+                          >
+                            {isSuperAdmin ? 'मुख्य प्रशासक (Super Admin)' : isAdmin ? 'ग्राम प्रशासक (Admin)' : 'सदस्य (Member)'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Menu Links */}
+                    <div className="py-1.5 px-1.5 space-y-0.5">
+                      <button
+                        onClick={handleOpenProfile}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl transition cursor-pointer text-left"
+                      >
+                        <User className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span>{lang === 'en' ? 'My Profile' : 'मेरी प्रोफाइल'}</span>
+                      </button>
+
+                      <button
+                        onClick={handleOpenIdCard}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl transition cursor-pointer text-left"
+                      >
+                        <CreditCard className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                        <span>{lang === 'en' ? 'Digital ID Card' : 'डिजिटल पहचान पत्र'}</span>
+                      </button>
+
+                      {isAdmin && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setProfileDropdownOpen(false)}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl transition cursor-pointer text-left"
+                        >
+                          <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                          <span>{t('header.adminPanel')}</span>
+                        </Link>
+                      )}
+                    </div>
+
+                    {/* Logout */}
+                    <div className="pt-1 px-1.5">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition cursor-pointer text-left"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>{t('common.logout')}</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <button
                 onClick={() => setIsAdminLoginModalOpen(true)}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white shadow-2xs active:scale-95"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white shadow-2xs active:scale-95"
                 title={lang === 'en' ? 'Portal Login' : 'पोर्टल लॉगिन'}
               >
-                <Lock className="w-3.5 h-3.5" />
+                <User className="w-3.5 h-3.5" />
                 <span>{lang === 'en' ? 'Login' : 'लॉगिन'}</span>
               </button>
             )}

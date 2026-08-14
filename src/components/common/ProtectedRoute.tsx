@@ -25,19 +25,17 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     t,
   } = useApp();
 
-  const isAdminAuth = !!authSession.isAdminLoggedIn;
-  
-  // Check if member is authenticated
-  const activeMembers = members.filter((m) => m.status === 'active');
-  const currentDigits = currentMemberMobile ? currentMemberMobile.replace(/\D/g, '').slice(-10) : '';
-  const isMemberAuth =
-    !!authSession.isMemberLoggedIn &&
-    currentDigits.length >= 10 &&
-    activeMembers.some(
-      (m) =>
-        m.mobile &&
-        m.mobile.replace(/\D/g, '').slice(-10) === currentDigits
-    );
+  const isSuperAdmin = authSession.systemRole === 'SUPER_ADMIN' || authSession.role === 'SUPER_ADMIN';
+  const isAdminAuth = Boolean(authSession.isAdminLoggedIn || authSession.role === 'ADMIN' || isSuperAdmin);
+
+  // Check if member is authenticated (or is an admin/super admin, or has valid session token)
+  const isMemberAuth = Boolean(
+    authSession.isMemberLoggedIn ||
+    isAdminAuth ||
+    authSession.token ||
+    authSession.currentMember ||
+    currentMemberMobile
+  );
 
   // 1. ADMIN ONLY PROTECTION
   if (requiredRole === 'ADMIN' && !isAdminAuth) {

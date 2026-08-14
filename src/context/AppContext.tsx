@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 import {
@@ -28,6 +28,20 @@ import {
 } from '../types';
 import { hasUserPermission } from '../lib/permissions';
 import { t as translateEngine } from '../i18n';
+import { store } from '../store';
+import {
+  setMembers as reduxSetMembers,
+  setComplaints as reduxSetComplaints,
+  setSocialWorks as reduxSetSocialWorks,
+  setEvents as reduxSetEvents,
+  setGallery as reduxSetGallery,
+  setElders as reduxSetElders,
+  setAnnouncements as reduxSetAnnouncements,
+  setPublicInfos as reduxSetPublicInfos,
+  setGroupMessages as reduxSetGroupMessages,
+} from '../store/slices/communitySlice';
+import { setCredentials as reduxSetCredentials, logout as reduxLogout } from '../store/slices/authSlice';
+import { updateVillageSettings as reduxUpdateVillageSettings, setVillagesList as reduxSetVillagesList } from '../store/slices/villageSlice';
 import {
   OFFICIAL_VILLAGE,
 } from '../data/initialData';
@@ -320,13 +334,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isMyProfileModalOpen, setIsMyProfileModalOpen] = useState<boolean>(false);
   const [currentMemberMobile, setCurrentMemberMobileState] = useState<string | null>(null);
 
-  // Restore saved session on client mount
+  const isFetchingAuthMeRef = useRef(false);
+  const isFetchingDataRef = useRef(false);
+
+  // Restore saved session on client mount & verify cookie with /api/auth/me
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedAuth = localStorage.getItem('gym_auth');
       if (savedAuth) {
         try {
-          setAuthSession(JSON.parse(savedAuth));
+          const parsed = JSON.parse(savedAuth);
+          setAuthSession(parsed);
+          if (parsed.currentMemberMobile || parsed.adminMobile || parsed.currentMember?.mobile) {
+            setCurrentMemberMobileState(parsed.currentMemberMobile || parsed.adminMobile || parsed.currentMember?.mobile);
+          }
         } catch (e) {
           /* ignore */
         }
@@ -339,6 +360,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (savedLang) {
         setLangState(savedLang);
       }
+
+      // Prevent duplicate in-flight / StrictMode double calls
+      if (isFetchingAuthMeRef.current) return;
+      isFetchingAuthMeRef.current = true;
+
+      // Rehydrate directly from backend /api/auth/me using HTTP-Only cookie / Token
+      fetch('/api/auth/me', { credentials: 'include' })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.authenticated && data.user) {
+            const isAdm = Boolean(data.isAdmin || data.role === 'SUPER_ADMIN' || data.role === 'ADMIN');
+            const newSession: AuthSession = {
+              isAdminLoggedIn: isAdm,
+              isMemberLoggedIn: true,
+              role: data.role,
+              systemRole: data.role,
+              adminMobile: isAdm ? data.user.mobile : undefined,
+              adminName: isAdm ? data.user.name : undefined,
+              adminId: isAdm ? data.user.id : undefined,
+              currentMemberMobile: data.user.mobile,
+              currentMember: data.user,
+              email: data.user.email,
+              permissions: data.user.permissions || [],
+              token: data.token,
+            };
+            setAuthSession(newSession);
+            setCurrentMemberMobileState(data.user.mobile);
+            localStorage.setItem('gym_auth', JSON.stringify(newSession));
+            if (data.token) {
+              localStorage.setItem('gym_token', data.token);
+            }
+          }
+        })
+        .catch(() => {
+          /* ignore network errors during initial check */
+        })
+        .finally(() => {
+          isFetchingAuthMeRef.current = false;
+        });
     }
   }, []);
 
@@ -418,6 +478,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.warn('Signout notice:', e);
     }
+    store.dispatch(reduxLogout());
     setCurrentMemberMobile(null);
     const newAuth: AuthSession = {
       isAdminLoggedIn: false,
@@ -510,6 +571,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const refreshData = async (retryCount = 1) => {
+    if (isFetchingDataRef.current) return;
+    isFetchingDataRef.current = true;
+
     try {
       const headers: Record<string, string> = {};
       if (currentMemberMobile) {
@@ -533,31 +597,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           data = null;
         }
         if (data) {
-          if (data.villageSettings) setVillageSettings(data.villageSettings);
-          if (data.villages) setVillages(data.villages);
+          if (data.villageSettings) {
+            setVillageSettings(data.villageSettings);
+            store.dispatch(reduxUpdateVillageSettings(data.villageSettings));
+          }
+          if (data.villages) {
+            setVillages(data.villages);
+            store.dispatch(reduxSetVillagesList(data.villages));
+          }
           if (data.userPermissions) setUserPermissions(data.userPermissions);
           if (data.admins) setAdmins(data.admins);
-          if (data.members) setMembers(data.members);
-          if (data.complaints) setComplaints(data.complaints);
-          if (data.socialWorks) setSocialWorks(data.socialWorks);
-          if (data.publicInfos) setPublicInfos(data.publicInfos);
-          if (data.announcements) setAnnouncements(data.announcements);
-          if (data.events) setEvents(data.events);
-          if (data.gallery) setGallery(data.gallery);
-          if (data.elders) setElders(data.elders);
+          if (data.members) {
+            setMembers(data.members);
+            store.dispatch(reduxSetMembers(data.members));
+          }
+          if (data.complaints) {
+            setComplaints(data.complaints);
+            store.dispatch(reduxSetComplaints(data.complaints));
+          }
+          if (data.socialWorks) {
+            setSocialWorks(data.socialWorks);
+            store.dispatch(reduxSetSocialWorks(data.socialWorks));
+          }
+          if (data.publicInfos) {
+            setPublicInfos(data.publicInfos);
+            store.dispatch(reduxSetPublicInfos(data.publicInfos));
+          }
+          if (data.announcements) {
+            setAnnouncements(data.announcements);
+            store.dispatch(reduxSetAnnouncements(data.announcements));
+          }
+          if (data.events) {
+            setEvents(data.events);
+            store.dispatch(reduxSetEvents(data.events));
+          }
+          if (data.gallery) {
+            setGallery(data.gallery);
+            store.dispatch(reduxSetGallery(data.gallery));
+          }
+          if (data.elders) {
+            setElders(data.elders);
+            store.dispatch(reduxSetElders(data.elders));
+          }
           if (data.auditLogs) setAuditLogs(data.auditLogs);
           if (data.apiIntegrations) setIntegrations(data.apiIntegrations);
         }
       } else if (retryCount > 0) {
+        isFetchingDataRef.current = false;
         setTimeout(() => refreshData(retryCount - 1), 1000);
+        return;
       }
     } catch (e) {
       if (retryCount > 0) {
+        isFetchingDataRef.current = false;
         setTimeout(() => refreshData(retryCount - 1), 1000);
+        return;
       } else {
         console.warn('API sync fallback to local state:', e instanceof Error ? e.message : e);
       }
     } finally {
+      isFetchingDataRef.current = false;
       setIsLoading(false);
     }
   };
@@ -979,6 +1078,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       /* ignore */
     }
+    store.dispatch(reduxLogout());
     setAuthSession({ isAdminLoggedIn: false });
     localStorage.removeItem('gym_auth');
     localStorage.removeItem('gym_token');
@@ -988,23 +1088,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const userLogin = (user: any, token: string, role?: string) => {
-    const isAdm = role === 'SUPER_ADMIN' || role === 'ADMIN' || user?.isAdmin;
+    const isAdm = Boolean(role === 'SUPER_ADMIN' || role === 'ADMIN' || user?.isAdmin || user?.systemRole === 'SUPER_ADMIN' || user?.systemRole === 'ADMIN');
     const effectiveRole = role || user?.systemRole || user?.role || (isAdm ? 'ADMIN' : 'MEMBER');
     const newAuthSession: AuthSession = {
       isAdminLoggedIn: isAdm,
-      isMemberLoggedIn: !isAdm,
+      isMemberLoggedIn: true,
       role: effectiveRole,
       systemRole: effectiveRole,
       adminMobile: isAdm ? user?.mobile : undefined,
       adminName: isAdm ? user?.name : undefined,
       adminId: isAdm ? user?.id : undefined,
-      currentMemberMobile: !isAdm ? user?.mobile : undefined,
-      currentMember: !isAdm ? user : undefined,
+      currentMemberMobile: user?.mobile,
+      currentMember: user,
       email: user?.email,
       permissions: user?.permissions || [],
       token,
     };
     setAuthSession(newAuthSession);
+    if (user?.mobile) {
+      setCurrentMemberMobileState(user.mobile);
+    }
+    store.dispatch(
+      reduxSetCredentials({
+        user,
+        token,
+        role: effectiveRole as any,
+      })
+    );
     localStorage.setItem('gym_auth', JSON.stringify(newAuthSession));
     if (token) {
       localStorage.setItem('gym_token', token);

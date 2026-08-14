@@ -4,6 +4,7 @@ import { gymApi } from './services/gymApi';
 import authReducer from './slices/authSlice';
 import villageReducer from './slices/villageSlice';
 import uiReducer from './slices/uiSlice';
+import communityReducer from './slices/communitySlice';
 
 export const store = configureStore({
   reducer: {
@@ -11,6 +12,7 @@ export const store = configureStore({
     auth: authReducer,
     village: villageReducer,
     ui: uiReducer,
+    community: communityReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
