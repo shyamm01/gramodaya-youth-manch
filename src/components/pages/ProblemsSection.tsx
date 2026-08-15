@@ -31,7 +31,7 @@ const CATEGORY_MAP: { id: ComplaintCategory; labelHindi: string; labelEnglish: s
 
 export const ProblemsSection: React.FC = () => {
   const {
-    complaints,
+    complaints: contextComplaints,
     submitComplaint,
     authSession,
     isApprovedMember,
@@ -46,6 +46,8 @@ export const ProblemsSection: React.FC = () => {
     villageSettings,
   } = useApp();
 
+  const [fetchedComplaints, setFetchedComplaints] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unapprovedAlert, setUnapprovedAlert] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
@@ -60,6 +62,30 @@ export const ProblemsSection: React.FC = () => {
   const [videoUrl, setVideoUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
+
+  // Dedicated API Fetch: GET /api/complaints
+  const fetchComplaints = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/complaints', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.complaints)) {
+          setFetchedComplaints(data.complaints);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch /api/complaints:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchComplaints();
+  }, [fetchComplaints]);
+
+  const complaints = fetchedComplaints || contextComplaints;
 
   const filteredComplaints =
     filterCategory === 'ALL'
@@ -94,6 +120,7 @@ export const ProblemsSection: React.FC = () => {
       setDescription('');
       setPhotoUrl('');
       setVideoUrl('');
+      fetchComplaints();
       setTimeout(() => {
         setIsModalOpen(false);
         setMsg('');

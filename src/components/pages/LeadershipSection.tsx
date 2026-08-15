@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Phone, MessageSquare, ShieldCheck, UserCheck, Camera } from 'lucide-react';
 import {
@@ -14,7 +14,33 @@ import {
 import { WhatsAppIcon } from '../common';
 
 export const LeadershipSection: React.FC = () => {
-  const { admins, villageSettings, authSession, uploadPhoto, setIsAdminLoginModalOpen, t, lang } = useApp();
+  const { admins: contextAdmins, villageSettings, authSession, uploadPhoto, setIsAdminLoginModalOpen, t, lang } = useApp();
+  const [fetchedAdmins, setFetchedAdmins] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Dedicated API Fetch: GET /api/leadership
+  const fetchLeadership = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/leadership', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.leaders)) {
+          setFetchedAdmins(data.leaders);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch /api/leadership:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchLeadership();
+  }, [fetchLeadership]);
+
+  const admins = fetchedAdmins || contextAdmins;
 
   const handlePhotoUpload = (adminId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

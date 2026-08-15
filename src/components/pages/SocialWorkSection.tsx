@@ -15,7 +15,7 @@ import { WhatsAppIcon } from '../common';
 
 export const SocialWorkSection: React.FC = () => {
   const {
-    socialWorks,
+    socialWorks: contextSocialWorks,
     submitSocialWork,
     authSession,
     isApprovedMember,
@@ -29,6 +29,8 @@ export const SocialWorkSection: React.FC = () => {
     villageSettings,
   } = useApp();
 
+  const [fetchedSocialWorks, setFetchedSocialWorks] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unapprovedAlert, setUnapprovedAlert] = useState(false);
   const [title, setTitle] = useState('');
@@ -39,6 +41,30 @@ export const SocialWorkSection: React.FC = () => {
   const [photoUrl, setPhotoUrl] = useState('');
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Dedicated API Fetch: GET /api/social-work
+  const fetchSocialWorks = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/social-work', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.socialWorks)) {
+          setFetchedSocialWorks(data.socialWorks);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch /api/social-work:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchSocialWorks();
+  }, [fetchSocialWorks]);
+
+  const socialWorks = fetchedSocialWorks || contextSocialWorks;
 
   // Approved/Published social works visible to public
   const publicWorks = socialWorks.filter(
@@ -70,12 +96,13 @@ export const SocialWorkSection: React.FC = () => {
       setTitle('');
       setDescription('');
       setPhotoUrl('');
+      fetchSocialWorks();
       setTimeout(() => {
         setIsModalOpen(false);
         setMsg('');
       }, 2000);
     } else {
-      setMsg(lang === 'en' ? 'An error occurred. Please try again.' : 'त्रुटि हुई। कृपया पुनः प्रयास करें।');
+      setMsg(res.error || (lang === 'en' ? 'An error occurred. Please try again.' : 'त्रुटि हुई। कृपया पुनः प्रयास करें।'));
     }
   };
 

@@ -13,7 +13,7 @@ import {
 
 export const GallerySection: React.FC = () => {
   const {
-    gallery,
+    gallery: contextGallery,
     uploadGalleryPhoto,
     approveGalleryPhoto,
     editGalleryCaption,
@@ -24,6 +24,8 @@ export const GallerySection: React.FC = () => {
     t,
   } = useApp();
 
+  const [fetchedGallery, setFetchedGallery] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unapprovedAlert, setUnapprovedAlert] = useState(false);
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
@@ -32,6 +34,30 @@ export const GallerySection: React.FC = () => {
   const [photoUrl, setPhotoUrl] = useState('');
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Dedicated API Fetch: GET /api/gallery
+  const fetchGallery = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/gallery', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.gallery)) {
+          setFetchedGallery(data.gallery);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch /api/gallery:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchGallery();
+  }, [fetchGallery]);
+
+  const gallery = fetchedGallery || contextGallery;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +77,7 @@ export const GallerySection: React.FC = () => {
       }
       setCaption('');
       setPhotoUrl('');
+      fetchGallery();
       setTimeout(() => {
         setIsModalOpen(false);
         setMsg('');

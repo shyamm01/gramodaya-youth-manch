@@ -16,8 +16,10 @@ import {
 import { WhatsAppIcon } from '../common';
 
 export const EventsSection: React.FC = () => {
-  const { events, createEvent, updateEvent, updateEventStatus, deleteEvent, authSession, t } = useApp();
+  const { events: contextEvents, createEvent, updateEvent, updateEventStatus, deleteEvent, authSession, t } = useApp();
 
+  const [fetchedEvents, setFetchedEvents] = useState<EventItem[] | null>(null);
+  const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
@@ -30,6 +32,30 @@ export const EventsSection: React.FC = () => {
   const [status, setStatus] = useState<EventStatus>('DRAFT');
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Dedicated API Fetch: GET /api/events
+  const fetchEvents = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/events', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.events)) {
+          setFetchedEvents(data.events);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch /api/events:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+
+  const events = fetchedEvents || contextEvents;
 
   const openCreateModal = () => {
     setEditingEventId(null);

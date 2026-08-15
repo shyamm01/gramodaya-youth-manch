@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Sprout, Users, ShieldCheck, Award, ArrowRight } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import Link from 'next/link';
@@ -10,7 +10,33 @@ import {
 } from '../ui';
 
 export const AboutSection: React.FC = () => {
-  const { villageSettings, t, lang } = useApp();
+  const { villageSettings: contextVillageSettings, t, lang } = useApp();
+  const [aboutData, setAboutData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Dedicated API Fetch: GET /api/about
+  const fetchAbout = React.useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/about', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.village) {
+          setAboutData(data);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch /api/about:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchAbout();
+  }, [fetchAbout]);
+
+  const villageSettings = aboutData?.village || contextVillageSettings;
 
   return (
     <div className="py-6 px-4 sm:px-6 max-w-5xl mx-auto space-y-6 transition-colors duration-200">

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Member } from '../../types';
 import { DigitalIdCard } from '../features/DigitalIdCard';
@@ -14,12 +14,12 @@ import {
   MemberPhotoModal,
 } from '../features/members';
 import { Card, Button } from '../ui';
-import { Users } from 'lucide-react';
+import { Users, RefreshCw } from 'lucide-react';
 
 export const MembersSection: React.FC = () => {
   const {
     t,
-    members,
+    members: contextMembers,
     addMember,
     authSession,
     uploadPhoto,
@@ -32,11 +32,37 @@ export const MembersSection: React.FC = () => {
     currentMemberMobile,
   } = useApp();
 
+  const [fetchedMembers, setFetchedMembers] = useState<Member[] | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'WITH_PHOTO' | 'PENDING'>('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isGeneralChatOpen, setIsGeneralChatOpen] = useState(false);
   const [photoModalMember, setPhotoModalMember] = useState<Member | null>(null);
+
+  // Dedicated API Fetch: GET /api/members
+  const fetchMembers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetch('/api/members', { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.members)) {
+          setFetchedMembers(data.members);
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch /api/members:', e);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMembers();
+  }, [fetchMembers]);
+
+  const members = fetchedMembers || contextMembers;
 
   const activeMembers = useMemo(() => members.filter((m) => m.status === 'active'), [members]);
   const pendingMembers = useMemo(() => members.filter((m) => m.status === 'pending'), [members]);
@@ -62,6 +88,24 @@ export const MembersSection: React.FC = () => {
     }
   };
 
+  const handleApprove = async (id: string) => {
+    await approveMember(id);
+    fetchMembers();
+  };
+
+  const handleDelete = async (id: string) => {
+    await deleteMember(id);
+    fetchMembers();
+  };
+
+  const handleSavePhoto = async (photoUrl: string) => {
+    if (photoModalMember) {
+      await uploadPhoto('member', photoModalMember.id, photoUrl);
+      setPhotoModalMember(null);
+      fetchMembers();
+    }
+  };
+
   const filteredMembers = useMemo(() => {
     let list = activeMembers;
     if (activeFilter === 'WITH_PHOTO') {
@@ -76,7 +120,9 @@ export const MembersSection: React.FC = () => {
     return list.filter(
       (m) =>
         m.name.toLowerCase().includes(term) ||
-        (m.mobile && m.mobile.includes(term))
+        (m.mobile && m.mobile.includes(term)) ||
+        (m.villageName && m.villageName.toLowerCase().includes(term)) ||
+        (m.designation && m.designation.toLowerCase().includes(term))
     );
   }, [activeMembers, membersWithPhoto, pendingMembers, activeFilter, searchTerm]);
 
@@ -103,70 +149,51 @@ export const MembersSection: React.FC = () => {
         isAdminLoggedIn={authSession.isAdminLoggedIn}
       />
 
-      {/* 3. Pending Review Banner for Admin */}
-      {authSession.isAdminLoggedIn && activeFilter !== 'PENDING' && (
+      {/* 3. Pending Approvals Banner (Admin view) */}
+      {authSession.isAdminLoggedIn && pendingMembers.length > 0 && (
         <MemberPendingBanner
           pendingMembers={pendingMembers}
-          onApprove={approveMember}
-          onDelete={deleteMember}
+          onApprove={handleApprove}
+          onDelete={handleDelete}
           onViewAll={() => setActiveFilter('PENDING')}
         />
       )}
 
-      {/* 4. Active Member Directory Grid */}
+      {/* 4. Members Grid */}
       {filteredMembers.length === 0 ? (
-        <Card className="p-12 text-center rounded-2xl border border-dashed border-[#E0DCCF] dark:border-slate-800 bg-white dark:bg-[#111726]">
-          <Users className="w-10 h-10 mx-auto text-[#A59F8E] dark:text-slate-600 mb-3 opacity-60" />
-          <h3 className="text-sm font-bold text-[#2C3327] dark:text-white">
-            {t('members.noMembersTitle')}
+        <div className="text-center py-16 px-4 rounded-2xl bg-[#F8F6F0] dark:bg-[#111726] border border-dashed border-[#E0DCCF] dark:border-slate-800">
+          <Users className="w-10 h-10 mx-auto text-[#A59F8E] dark:text-slate-600 mb-3" />
+          <h3 className="text-base font-bold text-[#2C3327] dark:text-white">
+            {searchTerm ? 'कोई सदस्य नहीं मिला' : 'कोई सक्रिय सदस्य उपलब्ध नहीं है'}
           </h3>
-          <p className="text-xs text-[#8C8675] dark:text-slate-400 mt-1 max-w-sm mx-auto">
+          <p className="text-xs text-[#8C8675] dark:text-slate-400 mt-1 max-w-md mx-auto">
             {searchTerm
-              ? (t('common.village') === 'Village' ? `No records found matching "${searchTerm}".` : `"${searchTerm}" से संबंधित कोई रिकॉर्ड नहीं मिला।`)
-              : t('members.noMembersDescription')}
+              ? `"${searchTerm}" के लिए कोई परिणाम नहीं मिला। कृपया दूसरा नाम या मोबाइल नंबर खोजें।`
+              : 'ग्रामोदय यूथ मंच से जुड़ने के लिए ऊपर दिए गए "मंच से जुड़ें" बटन पर क्लिक करें।'}
           </p>
-          {searchTerm && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSearchTerm('')}
-              className="mt-4 text-xs"
-            >
-              {t('common.resetSearch')}
-            </Button>
-          )}
-        </Card>
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
           {filteredMembers.map((member) => (
             <MemberCard
               key={member.id}
               member={member}
-              onSelectIdCard={setSelectedIdCardMember}
-              onSelectChat={setSelectedChatPartner}
+              onSelectIdCard={() => setSelectedIdCardMember(member)}
+              onSelectChat={() => setSelectedChatPartner(member)}
             />
           ))}
         </div>
       )}
 
-      {/* 5. Add Member / Join Modal */}
+      {/* 5. Modals */}
       <JoinModal
         isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-      />
-
-      {/* 6. Photo Upload Modal */}
-      <MemberPhotoModal
-        member={photoModalMember}
-        onClose={() => setPhotoModalMember(null)}
-        onSave={async (photoUrl) => {
-          if (photoModalMember) {
-            await uploadPhoto('member', photoModalMember.id, photoUrl);
-          }
+        onClose={() => {
+          setIsAddModalOpen(false);
+          fetchMembers();
         }}
       />
 
-      {/* 7. Digital ID Card Modal */}
       {selectedIdCardMember && (
         <DigitalIdCard
           member={selectedIdCardMember}
@@ -174,14 +201,25 @@ export const MembersSection: React.FC = () => {
         />
       )}
 
-      {/* 8. Member Chat Modal */}
-      {(selectedChatPartner || isGeneralChatOpen) && (
+      {selectedChatPartner && (
         <MemberChatModal
           initialPartner={selectedChatPartner}
-          onClose={() => {
-            setSelectedChatPartner(null);
-            setIsGeneralChatOpen(false);
-          }}
+          onClose={() => setSelectedChatPartner(null)}
+        />
+      )}
+
+      {isGeneralChatOpen && (
+        <MemberChatModal
+          initialPartner={null}
+          onClose={() => setIsGeneralChatOpen(false)}
+        />
+      )}
+
+      {photoModalMember && (
+        <MemberPhotoModal
+          member={photoModalMember}
+          onClose={() => setPhotoModalMember(null)}
+          onSave={handleSavePhoto}
         />
       )}
     </div>
