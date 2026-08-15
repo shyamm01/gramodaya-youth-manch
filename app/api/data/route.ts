@@ -2,6 +2,19 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/src/db';
 import * as schema from '@/src/db/schema';
 import { desc, asc } from 'drizzle-orm';
+import {
+  formatVillage,
+  formatMember,
+  formatComplaint,
+  formatSocialWork,
+  formatEvent,
+  formatGallery,
+  formatElder,
+  formatAnnouncement,
+  formatPublicInfo,
+  formatGroupMessage,
+  formatAuditLog,
+} from '@/src/lib/apiResponse';
 
 export async function GET() {
   try {
@@ -72,223 +85,19 @@ export async function GET() {
       db.select().from(schema.permissions).orderBy(asc(schema.permissions.code)),
     ]);
 
-    // Format relational village records
-    const formattedVillages = villagesData.map((v) => {
-      const gp = v.gramPanchayat;
-      const dist = gp?.district;
-      const st = dist?.state;
+    const formattedVillages = villagesData.map(formatVillage).filter(Boolean);
+    const formattedMembers = membersData.map(formatMember).filter(Boolean);
+    const formattedComplaints = complaintsData.map(formatComplaint).filter(Boolean);
+    const formattedSocialWorks = socialWorksData.map(formatSocialWork).filter(Boolean);
+    const formattedEvents = eventsData.map(formatEvent).filter(Boolean);
+    const formattedGallery = galleryData.map(formatGallery).filter(Boolean);
+    const formattedElders = eldersData.map(formatElder).filter(Boolean);
+    const formattedAnnouncements = announcementsData.map(formatAnnouncement).filter(Boolean);
+    const formattedPublicInfos = publicInfosData.map(formatPublicInfo).filter(Boolean);
+    const formattedGroupMessages = groupMessagesData.map(formatGroupMessage).filter(Boolean);
+    const formattedAuditLogs = auditLogsData.map(formatAuditLog).filter(Boolean);
 
-      return {
-        id: String(v.id),
-        slug: v.slug,
-        name: v.name,
-        nameHindi: v.nameHindi,
-        gramPanchayatId: v.gramPanchayatId ? String(v.gramPanchayatId) : undefined,
-        gramPanchayatName: gp?.name || 'Bahera',
-        gramPanchayatNameHindi: gp?.nameHindi || 'बहेरा',
-        districtId: dist ? String(dist.id) : undefined,
-        districtName: dist?.name || 'Hardoi',
-        districtNameHindi: dist?.nameHindi || 'हरदोई',
-        stateId: st ? String(st.id) : undefined,
-        stateName: st?.name || 'Uttar Pradesh',
-        stateNameHindi: st?.nameHindi || 'उत्तर प्रदेश',
-        blockName: v.blockName || gp?.blockName || 'Hardoi',
-        blockNameHindi: v.blockNameHindi || gp?.blockNameHindi || 'हरदोई',
-        pincode: v.pincode || gp?.pincode || '241125',
-        postOffice: v.postOffice || gp?.postOffice || 'Bahera Rasoolpur',
-        orgName: v.orgName,
-        orgNameHindi: v.orgNameHindi,
-        sloganHindi: v.sloganHindi,
-        taglineHindi: v.taglineHindi,
-        orgPurposeHindi: v.orgPurposeHindi,
-        contactMobile: v.contactMobile,
-        contactEmail: v.contactEmail,
-        bannerPhotoUrl: v.bannerPhotoUrl,
-        isActive: v.isActive,
-      };
-    });
-
-    // Format member records with dynamically resolved geographic relations
-    const formattedMembers = membersData.map((m) => {
-      const v = m.village;
-      const gp = v?.gramPanchayat;
-      const dist = gp?.district;
-      const st = dist?.state;
-
-      return {
-        id: String(m.id),
-        villageId: m.villageId ? String(m.villageId) : '1',
-        name: m.name,
-        mobile: m.mobile,
-        email: m.email || '',
-        status: m.status,
-        photoUrl: m.photoUrl || '',
-        organizationName: v?.orgNameHindi || v?.orgName || 'ग्रामोदय यूथ मंच',
-        fatherName: m.fatherName || '',
-        dob: m.dob || '',
-        gender: m.gender || '',
-        address: m.address || '',
-        pincode: m.pincode || v?.pincode || gp?.pincode || '241125',
-        state: st?.name || 'Uttar Pradesh',
-        district: dist?.name || 'Hardoi',
-        block: v?.blockName || gp?.blockName || 'Hardoi',
-        gramPanchayat: gp?.name || 'Bahera',
-        villageName: v?.name || 'Rasoolpur',
-        postOffice: v?.postOffice || gp?.postOffice || 'Bahera Rasoolpur',
-        houseNo: m.houseNo || '',
-        street: m.street || '',
-        occupation: m.occupation || '',
-        designation: m.designation || '',
-        politicalBackground: m.politicalBackground || '',
-        bloodGroup: m.bloodGroup || '',
-        role: m.role || 'MEMBER',
-        systemRole: m.systemRole || 'MEMBER',
-        createdAt: m.createdAt,
-      };
-    });
-
-    // Format complaints
-    const formattedComplaints = complaintsData.map((c) => ({
-      id: String(c.id),
-      villageId: c.villageId ? String(c.villageId) : '1',
-      memberId: c.memberId ? String(c.memberId) : undefined,
-      title: c.title,
-      category: c.category,
-      description: c.description,
-      location: c.location,
-      reporterName: c.reporterName,
-      reporterMobile: c.reporterMobile,
-      status: c.status,
-      photoUrl: c.photoUrl || '',
-      videoUrl: c.videoUrl || '',
-      isDemo: c.isDemo || false,
-      createdAt: c.createdAt,
-      resolvedAt: c.resolvedAt,
-    }));
-
-    // Format social works
-    const formattedSocialWorks = socialWorksData.map((s) => ({
-      id: String(s.id),
-      villageId: s.villageId ? String(s.villageId) : '1',
-      memberId: s.memberId ? String(s.memberId) : undefined,
-      title: s.title,
-      description: s.description,
-      date: s.date,
-      location: s.location,
-      submitterName: s.submitterName,
-      submitterMobile: s.submitterMobile,
-      photoUrl: s.photoUrl || '',
-      videoUrl: s.videoUrl || '',
-      status: s.status,
-      createdAt: s.createdAt,
-    }));
-
-    // Format events
-    const formattedEvents = eventsData.map((e) => ({
-      id: String(e.id),
-      villageId: e.villageId ? String(e.villageId) : '1',
-      title: e.title,
-      name: e.title,
-      description: e.description || '',
-      date: e.date,
-      time: e.time,
-      location: e.location,
-      photoUrl: e.photoUrl || '',
-      videoUrl: e.videoUrl || '',
-      status: e.status,
-      createdAt: e.createdAt,
-    }));
-
-    // Format gallery items
-    const formattedGallery = galleryData.map((g) => ({
-      id: String(g.id),
-      villageId: g.villageId ? String(g.villageId) : '1',
-      caption: g.caption || '',
-      photoUrl: g.photoUrl,
-      uploadedBy: g.uploadedBy,
-      uploadedByMobile: g.uploadedByMobile || '',
-      date: g.date,
-      status: g.status,
-      createdAt: g.createdAt,
-    }));
-
-    // Format elders
-    const formattedElders = eldersData.map((el) => ({
-      id: String(el.id),
-      villageId: el.villageId ? String(el.villageId) : '1',
-      name: el.name,
-      age: el.age || '',
-      role: el.role || '',
-      contribution: el.contribution || '',
-      photoUrl: el.photoUrl || '',
-      createdAt: el.createdAt,
-    }));
-
-    // Format announcements
-    const formattedAnnouncements = announcementsData.map((a) => ({
-      id: String(a.id),
-      villageId: a.villageId ? String(a.villageId) : '1',
-      title: a.title,
-      content: a.content,
-      publishedBy: a.publishedBy,
-      isUrgent: a.isUrgent || false,
-      date: a.date,
-      createdAt: a.createdAt,
-    }));
-
-    // Format public infos
-    const formattedPublicInfos = publicInfosData.map((p) => ({
-      id: String(p.id),
-      villageId: p.villageId ? String(p.villageId) : '1',
-      title: p.title,
-      description: p.description,
-      category: p.category,
-      submitterName: p.submitterName,
-      submitterMobile: p.submitterMobile,
-      status: p.status,
-      createdAt: p.createdAt,
-    }));
-
-    // Format group chat messages
-    const formattedGroupMessages = groupMessagesData.map((gm) => ({
-      id: String(gm.id),
-      villageId: gm.villageId ? String(gm.villageId) : '1',
-      senderName: gm.senderName,
-      senderRole: gm.senderRole || 'Member',
-      senderMobile: gm.senderMobile || '',
-      senderPhoto: gm.senderPhoto || '',
-      text: gm.text,
-      createdAt: gm.createdAt,
-    }));
-
-    // Format audit logs
-    const formattedAuditLogs = auditLogsData.map((al) => ({
-      id: String(al.id),
-      action: al.action,
-      adminName: al.userName,
-      adminMobile: '',
-      recordAffected: al.details || '',
-      timestamp: al.timestamp,
-    }));
-
-    const activeVillage = formattedVillages[0] || {
-      id: '1',
-      slug: 'rasoolpur',
-      name: 'Rasoolpur',
-      nameHindi: 'रसूलपुर',
-      gramPanchayat: 'Bahera',
-      gramPanchayatHindi: 'बहेरा',
-      district: 'Hardoi',
-      districtHindi: 'हरदोई',
-      state: 'Uttar Pradesh',
-      stateHindi: 'उत्तर प्रदेश',
-      tagline: 'युवा शक्ति • ग्राम विकास • उज्ज्वल भविष्य',
-      taglineHindi: 'युवा शक्ति • ग्राम विकास • उज्ज्वल भविष्य',
-      slogan: 'युवा शक्ति से ग्रामोदय की ओर',
-      sloganHindi: 'युवा शक्ति से ग्रामोदय की ओर',
-      orgName: 'Gramodaya Youth Manch',
-      orgNameHindi: 'ग्रामोदय यूथ मंच',
-    };
+    const activeVillage = formattedVillages[0] || null;
 
     return NextResponse.json({
       success: true,
@@ -296,7 +105,7 @@ export async function GET() {
       villages: formattedVillages,
       members: formattedMembers,
       admins: formattedMembers.filter(
-        (m) => m.systemRole === 'ADMIN' || m.systemRole === 'SUPER_ADMIN'
+        (m: any) => m.systemRole === 'ADMIN' || m.systemRole === 'SUPER_ADMIN'
       ),
       complaints: formattedComplaints,
       socialWorks: formattedSocialWorks,
@@ -319,11 +128,11 @@ export async function GET() {
       ],
       stats: {
         totalMembers: formattedMembers.length,
-        activeMembers: formattedMembers.filter((m) => m.status === 'active').length,
-        pendingMembers: formattedMembers.filter((m) => m.status === 'pending').length,
+        activeMembers: formattedMembers.filter((m: any) => m.status === 'active').length,
+        pendingMembers: formattedMembers.filter((m: any) => m.status === 'pending').length,
         totalComplaints: formattedComplaints.length,
-        resolvedComplaints: formattedComplaints.filter((c) => c.status === 'RESOLVED').length,
-        pendingComplaints: formattedComplaints.filter((c) => c.status !== 'RESOLVED').length,
+        resolvedComplaints: formattedComplaints.filter((c: any) => c.status === 'RESOLVED').length,
+        pendingComplaints: formattedComplaints.filter((c: any) => c.status !== 'RESOLVED').length,
         totalSocialWorks: formattedSocialWorks.length,
         totalEvents: formattedEvents.length,
         totalGallery: formattedGallery.length,

@@ -15,6 +15,7 @@ export async function GET() {
     const formatted = rows.map((c) => ({
       id: String(c.id),
       villageId: c.villageId ? String(c.villageId) : "1",
+      memberId: c.memberId ? String(c.memberId) : undefined,
       title: c.title,
       category: c.category,
       description: c.description,
@@ -62,12 +63,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Database connection unavailable." }, { status: 500 });
     }
 
-    const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
+    let resolvedVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : undefined;
+    let resolvedMemberId: number | undefined = undefined;
+
+    // Automatically resolve village_id and member_id from logged-in / reporting user
+    if (reporterMobile) {
+      const cleanMob = reporterMobile.replace(/\D/g, "").slice(-10);
+      const matchedMember = await db.query.members.findFirst({
+        where: (m, { sql }) => sql`RIGHT(REGEXP_REPLACE(${m.mobile}, '\\D', '', 'g'), 10) = ${cleanMob}`,
+      });
+      if (matchedMember) {
+        resolvedMemberId = matchedMember.id;
+        if (!resolvedVillageId && matchedMember.villageId) {
+          resolvedVillageId = matchedMember.villageId;
+        }
+      }
+    }
+
+    const numericVillageId = resolvedVillageId || 1;
 
     const [inserted] = await db
       .insert(schema.complaints)
       .values({
         villageId: numericVillageId,
+        memberId: resolvedMemberId,
         title: title.trim(),
         category: (category as any) || "Other",
         description: description.trim(),
@@ -84,6 +103,7 @@ export async function POST(req: Request) {
     const formatted = {
       id: String(inserted.id),
       villageId: inserted.villageId ? String(inserted.villageId) : "1",
+      memberId: inserted.memberId ? String(inserted.memberId) : undefined,
       title: inserted.title,
       category: inserted.category,
       description: inserted.description,
@@ -93,15 +113,21 @@ export async function POST(req: Request) {
       status: inserted.status,
       photoUrl: inserted.photoUrl || "",
       videoUrl: inserted.videoUrl || "",
-      isDemo: inserted.isDemo || false,
+      isDemo: inserted.isDemo,
       createdAt: inserted.createdAt,
     };
 
-    logAuditAction("Registered Grievance: " + formatted.title, reporterName, reporterMobile, formatted.title);
+    await logAuditAction(
+      `शिकायत दर्ज की गई: ${inserted.title}`,
+      adminName || reporterName,
+      adminMobile || reporterMobile,
+      inserted.villageId,
+      resolvedMemberId
+    );
 
     return NextResponse.json({ success: true, complaint: formatted });
   } catch (err: any) {
-    console.error("Error submitting complaint:", err);
-    return NextResponse.json({ success: false, error: err?.message || "Failed to submit grievance" }, { status: 500 });
+    console.error("Error creating complaint:", err);
+    return NextResponse.json({ success: false, error: err?.message || "Failed to create complaint" }, { status: 500 });
   }
 }

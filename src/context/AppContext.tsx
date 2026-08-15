@@ -687,14 +687,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const currentMemberObj = useMemo(() => {
-    if (!authSession.currentMemberMobile) return null;
-    const cleanMob = authSession.currentMemberMobile.replace(/\D/g, '').slice(-10);
+    const effectiveMobile = authSession.currentMemberMobile || authSession.adminMobile || authSession.currentMember?.mobile;
+    if (!effectiveMobile) return authSession.currentMember || null;
+    const cleanMob = effectiveMobile.replace(/\D/g, '').slice(-10);
     return (
       members.find((m) => m.mobile && m.mobile.replace(/\D/g, '').slice(-10) === cleanMob) ||
       authSession.currentMember ||
       null
     );
-  }, [authSession.currentMemberMobile, authSession.currentMember, members]);
+  }, [authSession.currentMemberMobile, authSession.adminMobile, authSession.currentMember, members]);
+
+  // Synchronize activeVillageId directly from the logged-in user
+  useEffect(() => {
+    const userVillage =
+      currentMemberObj?.villageId ||
+      authSession.adminVillageId ||
+      authSession.currentMember?.villageId;
+    if (userVillage) {
+      setActiveVillageId(String(userVillage));
+    }
+  }, [currentMemberObj?.villageId, authSession.adminVillageId, authSession.currentMember?.villageId]);
 
   const isApprovedMember = useMemo(() => {
     if (authSession.isAdminLoggedIn || authSession.role === 'SUPER_ADMIN' || authSession.role === 'ADMIN') {

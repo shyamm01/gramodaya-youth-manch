@@ -2,31 +2,29 @@ import { NextResponse } from 'next/server';
 import { getDb } from '@/src/db';
 import * as schema from '@/src/db/schema';
 import { asc } from 'drizzle-orm';
-import { z } from 'zod';
-import { validateRequestBody } from '@/src/lib/validations';
+import { validateRequestBody, groupMessageSchema } from '@/src/lib/validations';
 
-const groupMessageSchema = z.object({
-  text: z.string().min(1, 'Message text is required').max(1000),
-  senderName: z.string().min(1, 'Sender name is required'),
-  senderRole: z.string().optional().default('Member'),
-  senderMobile: z.string().optional(),
-  senderPhoto: z.string().optional(),
-  villageId: z.union([z.string(), z.number()]).optional(),
-});
-
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const db = getDb();
     if (!db) return NextResponse.json({ success: true, groupMessages: [] });
 
-    const rows = await db.select().from(schema.groupMessages).orderBy(asc(schema.groupMessages.id));
+    const url = new URL(req.url);
+    const villageIdParam = url.searchParams.get('villageId');
+    const numericVillageId = villageIdParam && !isNaN(Number(villageIdParam)) ? Number(villageIdParam) : undefined;
+
+    const rows = await db
+      .select()
+      .from(schema.groupMessages)
+      .where(numericVillageId ? (schema.groupMessages.villageId as any).equals(numericVillageId) : undefined)
+      .orderBy(asc(schema.groupMessages.id));
 
     const formatted = rows.map((m) => ({
       id: String(m.id),
       villageId: m.villageId ? String(m.villageId) : '1',
       senderName: m.senderName,
-      senderRole: m.senderRole || 'Member',
-      senderMobile: m.senderMobile || '',
+      senderRole: m.senderRole,
+      senderMobile: m.senderMobile,
       senderPhoto: m.senderPhoto || '',
       text: m.text,
       timestamp: m.timestamp,
@@ -52,7 +50,20 @@ export async function POST(req: Request) {
     const db = getDb();
     if (!db) return NextResponse.json({ success: false, error: 'Database connection unavailable.' }, { status: 500 });
 
-    const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
+    let resolvedVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : undefined;
+
+    // Automatically resolve village_id from logged-in sender
+    if (senderMobile && !resolvedVillageId) {
+      const cleanMob = senderMobile.replace(/\D/g, '').slice(-10);
+      const matchedMember = await db.query.members.findFirst({
+        where: (m, { sql }) => sql`RIGHT(REGEXP_REPLACE(${m.mobile}, '\\D', '', 'g'), 10) = ${cleanMob}`,
+      });
+      if (matchedMember?.villageId) {
+        resolvedVillageId = matchedMember.villageId;
+      }
+    }
+
+    const numericVillageId = resolvedVillageId || 1;
 
     const nowStr = new Date().toLocaleTimeString('en-IN', {
       hour: '2-digit',
@@ -88,6 +99,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, message: formatted });
   } catch (err: any) {
     console.error('Error posting group message:', err);
-    return NextResponse.json({ success: false, error: err?.message || 'Failed to send message' }, { status: 500 });
+    return NextResponse.json({ success: false, error: err?.message || 'Failed to post message' }, { status: 500 });
   }
 }

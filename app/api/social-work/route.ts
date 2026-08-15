@@ -15,6 +15,7 @@ export async function GET() {
     const formatted = rows.map((s) => ({
       id: String(s.id),
       villageId: s.villageId ? String(s.villageId) : "1",
+      memberId: s.memberId ? String(s.memberId) : undefined,
       title: s.title,
       description: s.description,
       date: s.date,
@@ -29,7 +30,7 @@ export async function GET() {
 
     return NextResponse.json({ success: true, socialWorks: formatted });
   } catch (err: any) {
-    console.error("Error fetching social works:", err);
+    console.error("Error fetching social work:", err);
     return NextResponse.json({ success: false, error: "Failed to fetch social works" }, { status: 500 });
   }
 }
@@ -59,12 +60,30 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Database connection unavailable." }, { status: 500 });
     }
 
-    const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
+    let resolvedVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : undefined;
+    let resolvedMemberId: number | undefined = undefined;
+
+    // Automatically resolve village_id and member_id from logged-in / submitting user
+    if (submitterMobile) {
+      const cleanMob = submitterMobile.replace(/\D/g, "").slice(-10);
+      const matchedMember = await db.query.members.findFirst({
+        where: (m, { sql }) => sql`RIGHT(REGEXP_REPLACE(${m.mobile}, '\\D', '', 'g'), 10) = ${cleanMob}`,
+      });
+      if (matchedMember) {
+        resolvedMemberId = matchedMember.id;
+        if (!resolvedVillageId && matchedMember.villageId) {
+          resolvedVillageId = matchedMember.villageId;
+        }
+      }
+    }
+
+    const numericVillageId = resolvedVillageId || 1;
 
     const [inserted] = await db
       .insert(schema.socialWorks)
       .values({
         villageId: numericVillageId,
+        memberId: resolvedMemberId,
         title: title.trim(),
         description: description.trim(),
         location: location.trim(),
@@ -80,6 +99,7 @@ export async function POST(req: Request) {
     const formatted = {
       id: String(inserted.id),
       villageId: inserted.villageId ? String(inserted.villageId) : "1",
+      memberId: inserted.memberId ? String(inserted.memberId) : undefined,
       title: inserted.title,
       description: inserted.description,
       date: inserted.date,
@@ -92,7 +112,13 @@ export async function POST(req: Request) {
       createdAt: inserted.createdAt,
     };
 
-    logAuditAction("Submitted Social Work: " + formatted.title, submitterName, submitterMobile, formatted.title);
+    await logAuditAction(
+      `सामाजिक कार्य जोड़ा गया: ${formatted.title}`,
+      adminName || submitterName,
+      adminMobile || submitterMobile,
+      inserted.villageId,
+      resolvedMemberId
+    );
 
     return NextResponse.json({ success: true, socialWork: formatted });
   } catch (err: any) {
