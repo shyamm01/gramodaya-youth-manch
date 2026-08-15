@@ -79,5 +79,6 @@ END $$;
 
 -- 4. Seed Default Village (Rasoolpur: ID 1)
 INSERT INTO public.villages (id, slug, name, name_hindi, gram_panchayat_name, district_name, is_active)
-VALUES (1, 'rasoolpur', 'Rasoolpur', 'रसूलपुर', 'Bahera', 'Jaunpur', TRUE)
+VALUES (1, 'rasoolpur', 'Rasoolpur', 'रसूलपुर', 'Bahera', 'Hardoi', TRUE)
 ON CONFLICT (id) DO NOTHING;
+

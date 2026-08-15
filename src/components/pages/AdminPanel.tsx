@@ -8,9 +8,8 @@ import {
   AdminMetricsCards,
   AdminActivityChart,
   AdminMemberTrendChart,
-  AdminLocationSelector,
-  STATE_DISTRICT_MAP,
 } from '../admin';
+
 import {
   Shield,
   Users,
@@ -48,6 +47,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DatePicker } from '../ui/DatePicker';
+import { AddressFormFields, AddressData } from '../common/AddressFormFields';
 import { Member, Complaint, SocialWork, EventItem, GalleryItem, Elder, Village, Announcement } from '../../types';
 
 
@@ -141,6 +141,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     uploadPhoto,
   } = useApp();
 
+  // Member Creation States with State, District, Village selectors
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [newMemName, setNewMemName] = useState('');
+  const [newMemMobile, setNewMemMobile] = useState('');
+  const [newMemRole, setNewMemRole] = useState<'MEMBER' | 'ADMIN' | 'SUPER_ADMIN'>('MEMBER');
+  const [newMemState, setNewMemState] = useState(villageSettings.state || 'Uttar Pradesh');
+  const [newMemDistrict, setNewMemDistrict] = useState(villageSettings.district || 'Jaunpur');
+  const [newMemVillage, setNewMemVillage] = useState(villageSettings.id || '1');
+  const [newMemAddress, setNewMemAddress] = useState('');
+  const [newMemMsg, setNewMemMsg] = useState('');
+
+  // Dynamic Location Lists derived from registered villages
+  const dynamicMemberStates = useMemo(() => {
+    const s = new Set<string>();
+    villages.forEach((v) => {
+      const st = (v as any).state || (v as any).stateName || villageSettings.state || 'Uttar Pradesh';
+      if (st) s.add(st);
+    });
+    if (villageSettings.state) s.add(villageSettings.state);
+    return Array.from(s);
+  }, [villages, villageSettings]);
+
+  const dynamicMemberDistricts = useMemo(() => {
+    const d = new Set<string>();
+    villages.forEach((v) => {
+      const vState = (v as any).state || (v as any).stateName || villageSettings.state || 'Uttar Pradesh';
+      if (!newMemState || vState === newMemState) {
+        const dst = v.districtName || (v as any).district || villageSettings.district || 'Jaunpur';
+        if (dst) d.add(dst);
+      }
+    });
+    if (villageSettings.district) d.add(villageSettings.district);
+    return Array.from(d);
+  }, [villages, villageSettings, newMemState]);
+
   // Search & Filter States
   const [memberSearch, setMemberSearch] = useState('');
   const [memberStatusFilter, setMemberStatusFilter] = useState<'ALL' | 'active' | 'pending' | 'suspended'>('ALL');
@@ -165,15 +200,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [gallerySearch, setGallerySearch] = useState('');
   const [elderSearch, setElderSearch] = useState('');
 
-  // Modals & Creation States with State, District, Village selectors
-  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
-  const [newMemName, setNewMemName] = useState('');
-  const [newMemMobile, setNewMemMobile] = useState('');
-  const [newMemRole, setNewMemRole] = useState<'MEMBER' | 'ADMIN' | 'SUPER_ADMIN'>('MEMBER');
-  const [newMemState, setNewMemState] = useState('Uttar Pradesh');
-  const [newMemDistrict, setNewMemDistrict] = useState('Jaunpur');
-  const [newMemVillage, setNewMemVillage] = useState(villageSettings.id || '1');
-  const [newMemMsg, setNewMemMsg] = useState('');
+
 
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [editMemName, setEditMemName] = useState('');
@@ -181,6 +208,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editMemRole, setEditMemRole] = useState<'MEMBER' | 'ADMIN' | 'SUPER_ADMIN'>('MEMBER');
   const [editMemStatus, setEditMemStatus] = useState<'active' | 'pending' | 'suspended'>('active');
   const [editMemVillage, setEditMemVillage] = useState(villageSettings.id || '1');
+  const [editMemAddress, setEditMemAddress] = useState('');
   const [editMemMsg, setEditMemMsg] = useState('');
 
   // Edit Complaint State
@@ -428,6 +456,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         name: newMemName,
         mobile: newMemMobile,
         villageId: isSuperAdminUser ? (newMemVillage || (effectiveVillageFilter !== "ALL" ? effectiveVillageFilter : "vil_rasoolpur")) : assignedAdminVillageId,
+        address: newMemAddress,
       });
       if (res.success) {
         setNewMemMsg('✅ Member registered successfully!');
@@ -456,6 +485,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         role: editMemRole as any,
         status: editMemStatus,
         villageId: editMemVillage,
+        address: editMemAddress,
       });
       setEditMemMsg('✅ Updated successfully!');
       setTimeout(() => {
@@ -745,9 +775,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <div className="space-y-8 animate-fade-in">
           {/* Top 4 KPI Metrics Row */}
           <AdminMetricsCards />
-
-          {/* State, District & Village Scope Switcher */}
-          <AdminLocationSelector />
 
           {/* Dedicated Member Registration & Add Trend Chart */}
           <AdminMemberTrendChart />
@@ -1976,127 +2003,147 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ───────────────────────────────────────────────────────────── */}
       {isAddMemberOpen && (
         <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fade-in">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Register New Member
-              </h3>
+          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-lg w-full max-h-[92vh] overflow-y-auto space-y-4 shadow-2xl animate-fade-in">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-zinc-800/80">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Register New Member
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                  Create a new member profile and assign their organizational chapter
+                </p>
+              </div>
               <button
                 onClick={() => setIsAddMemberOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
               >
                 ✕
               </button>
             </div>
+
             {newMemMsg && (
-              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg">
-                {newMemMsg}
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-xl flex items-center gap-2">
+                <span>{newMemMsg}</span>
               </div>
             )}
-            <form onSubmit={handleAddMemberSubmit} className="space-y-3">
-              <input
-                type="text"
-                required
-                placeholder="Full Name"
-                value={newMemName}
-                onChange={(e) => setNewMemName(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
-              />
-              <input
-                type="tel"
-                required
-                placeholder="10-digit Mobile Number"
-                value={newMemMobile}
-                onChange={(e) => setNewMemMobile(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-              />
 
-              {/* State, District & Village Selection */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 block mb-0.5">
-                    State
-                  </label>
-                  <select
-                    value={newMemState}
-                    onChange={(e) => {
-                      setNewMemState(e.target.value);
-                      const dists = STATE_DISTRICT_MAP[e.target.value] || [];
-                      if (dists[0]) setNewMemDistrict(dists[0]);
-                    }}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
-                  >
-                    {Object.keys(STATE_DISTRICT_MAP).map((st) => (
-                      <option key={st} value={st}>
-                        {st}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 block mb-0.5">
-                    District
-                  </label>
-                  <select
-                    value={newMemDistrict}
-                    onChange={(e) => setNewMemDistrict(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
-                  >
-                    {(STATE_DISTRICT_MAP[newMemState] || []).map((dst) => (
-                      <option key={dst} value={dst}>
-                        {dst}
-                      </option>
-                    ))}
-                  </select>
+            <form onSubmit={handleAddMemberSubmit} className="space-y-4">
+              {/* Personal Details */}
+              <div className="space-y-2.5">
+                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+                  1. Member Identity
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
+                      Full Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Rahul Kumar"
+                      value={newMemName}
+                      onChange={(e) => setNewMemName(e.target.value)}
+                      className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
+                      Mobile Number <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      maxLength={10}
+                      placeholder="10-digit Mobile Number"
+                      value={newMemMobile}
+                      onChange={(e) => setNewMemMobile(e.target.value)}
+                      className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-mono outline-none focus:border-emerald-500"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 block mb-0.5">
-                    Role
-                  </label>
-                  <select
-                    value={newMemRole}
-                    onChange={(e) => setNewMemRole(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
-                  >
-                    <option value="MEMBER">Member</option>
-                    <option value="ADMIN">Admin</option>
-                    <option value="SUPER_ADMIN">Super Admin</option>
-                  </select>
+              {/* Comprehensive Address with Live Pincode Lookup */}
+              <div className="p-3.5 bg-slate-50/60 dark:bg-zinc-900/50 rounded-2xl border border-slate-200 dark:border-[#27272a] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
+                    2. Address & Location (Pincode Auto-Fill)
+                  </h5>
+                  <span className="text-[10px] text-slate-500 dark:text-zinc-400">
+                    Auto-fills District & State
+                  </span>
                 </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 dark:text-zinc-400 block mb-0.5">
-                    Village Unit
-                  </label>
-                  <select
-                    value={newMemVillage}
-                    onChange={(e) => setNewMemVillage(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
-                  >
-                    {villages.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.name} ({v.nameHindi})
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <AddressFormFields
+                  value={{ fullAddress: newMemAddress }}
+                  selectedVillageId={newMemVillage}
+                  onVillageSelect={(vId) => setNewMemVillage(vId)}
+                  onChange={(d: AddressData) => {
+                    setNewMemAddress(d.fullAddress || '');
+                    if (d.state) setNewMemState(d.state);
+                    if (d.district) setNewMemDistrict(d.district);
+                    if (d.villageId) setNewMemVillage(d.villageId);
+                  }}
+                  lang="en"
+                />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              {/* Organization Assignment */}
+              <div className="space-y-2.5">
+                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+                  3. Organization & Chapter Assignment
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
+                      Platform Role
+                    </label>
+                    <select
+                      value={newMemRole}
+                      onChange={(e) => setNewMemRole(e.target.value as any)}
+                      className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold cursor-pointer outline-none focus:border-emerald-500"
+                    >
+                      <option value="MEMBER">Member (सदस्य)</option>
+                      <option value="ADMIN">Admin (इकाई एडमिन)</option>
+                      <option value="SUPER_ADMIN">Super Admin (केंद्रीय व्यवस्थापक)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
+                      Assigned Chapter (ग्राम शाखा)
+                    </label>
+                    <select
+                      value={newMemVillage}
+                      onChange={(e) => setNewMemVillage(e.target.value)}
+                      className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold cursor-pointer outline-none focus:border-emerald-500"
+                    >
+                      {villages.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name} {v.nameHindi ? `(${v.nameHindi})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-zinc-400 leading-tight">
+                  * Note: The assigned chapter determines which village unit oversees this member and prints on their Digital ID Card.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-zinc-800/80">
                 <button
                   type="button"
                   onClick={() => setIsAddMemberOpen(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-500 dark:text-zinc-400 cursor-pointer"
+                  className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-xl transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-bold text-xs rounded-xl cursor-pointer shadow"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow transition"
                 >
                   Save Member
                 </button>
@@ -2111,82 +2158,151 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ───────────────────────────────────────────────────────────── */}
       {editingMember && (
         <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fade-in">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Edit Member Profile
-              </h3>
+          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-lg w-full max-h-[92vh] overflow-y-auto space-y-4 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-zinc-800/80">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Edit Member Profile
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                  Update personal details, role permissions, and chapter assignment
+                </p>
+              </div>
               <button
                 onClick={() => setEditingMember(null)}
-                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
               >
                 ✕
               </button>
             </div>
+
             {editMemMsg && (
-              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg">
-                {editMemMsg}
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-xl flex items-center gap-2">
+                <span>{editMemMsg}</span>
               </div>
             )}
-            <form onSubmit={handleUpdateMemberSubmit} className="space-y-3">
-              <input
-                type="text"
-                required
-                value={editMemName}
-                onChange={(e) => setEditMemName(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
-              />
-              <input
-                type="tel"
-                required
-                value={editMemMobile}
-                onChange={(e) => setEditMemMobile(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-mono"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={editMemRole}
-                  onChange={(e) => setEditMemRole(e.target.value as any)}
-                  className="px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
-                >
-                  <option value="MEMBER">Member</option>
-                  <option value="ADMIN">Admin</option>
-                  <option value="SUPER_ADMIN">Super Admin</option>
-                </select>
-                <select
-                  value={editMemStatus}
-                  onChange={(e) => setEditMemStatus(e.target.value as any)}
-                  className="px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
-                >
-                  <option value="active">Active</option>
-                  <option value="pending">Pending</option>
-                  <option value="suspended">Suspended</option>
-                </select>
+
+            <form onSubmit={handleUpdateMemberSubmit} className="space-y-4">
+              {/* Identity */}
+              <div className="space-y-2.5">
+                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+                  1. Member Identity
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editMemName}
+                      onChange={(e) => setEditMemName(e.target.value)}
+                      className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
+                      Mobile Number
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={editMemMobile}
+                      onChange={(e) => setEditMemMobile(e.target.value)}
+                      className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-mono outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
               </div>
-              <div className="w-full">
-                <select
-                  value={editMemVillage}
-                  onChange={(e) => setEditMemVillage(e.target.value)}
-                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
-                >
-                  {villages.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name} ({v.nameHindi})
-                    </option>
-                  ))}
-                </select>
+
+              {/* Address with Live Pincode Lookup */}
+              <div className="p-3.5 bg-slate-50/60 dark:bg-zinc-900/50 rounded-2xl border border-slate-200 dark:border-[#27272a] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
+                    2. Address & Location (Pincode Auto-Fill)
+                  </h5>
+                  <span className="text-[10px] text-slate-500 dark:text-zinc-400">
+                    Auto-fills District & State
+                  </span>
+                </div>
+                <AddressFormFields
+                  value={{ fullAddress: editMemAddress }}
+                  selectedVillageId={editMemVillage}
+                  onVillageSelect={(vId) => setEditMemVillage(vId)}
+                  onChange={(d: AddressData) => {
+                    setEditMemAddress(d.fullAddress || '');
+                    if (d.villageId) setEditMemVillage(d.villageId);
+                  }}
+                  lang="en"
+                />
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+
+              {/* Organization & Status */}
+              <div className="space-y-2.5">
+                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
+                  3. Organization & Chapter Assignment
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
+                      Role
+                    </label>
+                    <select
+                      value={editMemRole}
+                      onChange={(e) => setEditMemRole(e.target.value as any)}
+                      className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold cursor-pointer outline-none focus:border-emerald-500"
+                    >
+                      <option value="MEMBER">Member (सदस्य)</option>
+                      <option value="ADMIN">Admin (इकाई एडमिन)</option>
+                      <option value="SUPER_ADMIN">Super Admin</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={editMemStatus}
+                      onChange={(e) => setEditMemStatus(e.target.value as any)}
+                      className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold cursor-pointer outline-none focus:border-emerald-500"
+                    >
+                      <option value="active">Active (सक्रिय)</option>
+                      <option value="pending">Pending (समीक्षाधीन)</option>
+                      <option value="suspended">Suspended (निलंबित)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
+                      Assigned Chapter
+                    </label>
+                    <select
+                      value={editMemVillage}
+                      onChange={(e) => setEditMemVillage(e.target.value)}
+                      className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold cursor-pointer outline-none focus:border-emerald-500"
+                    >
+                      {villages.map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.name} {v.nameHindi ? `(${v.nameHindi})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-zinc-800/80">
                 <button
                   type="button"
                   onClick={() => setEditingMember(null)}
-                  className="px-4 py-2 text-xs font-bold text-slate-500 dark:text-zinc-400 cursor-pointer"
+                  className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-xl transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-bold text-xs rounded-xl cursor-pointer shadow"
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow transition"
                 >
                   Save Changes
                 </button>

@@ -122,16 +122,26 @@ export const gramPanchayats = pgTable(
   'gram_panchayats',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    districtId: bigint('district_id', { mode: 'number' })
-      .notNull()
-      .references(() => districts.id, { onDelete: 'restrict' }),
+    districtId: bigint('district_id', { mode: 'number' }).references(() => districts.id, { onDelete: 'set null' }),
+    districtName: text('district_name').notNull().default('Jaunpur'),
+    districtNameHindi: text('district_name_hindi').default('जौनपुर'),
+    stateId: bigint('state_id', { mode: 'number' }).references(() => states.id, { onDelete: 'set null' }),
+    stateName: text('state_name').notNull().default('Uttar Pradesh'),
+    stateNameHindi: text('state_name_hindi').default('उत्तर प्रदेश'),
     name: text('name').notNull(),
-    nameHindi: text('name_hindi').notNull(),
+    nameHindi: text('name_hindi'),
+    blockName: text('block_name').default('Shahganj'),
+    blockNameHindi: text('block_name_hindi').default('शाहगंज'),
+    pincode: text('pincode').default('222139'),
+    postOffice: text('post_office').default('Rasulpur'),
+    isActive: boolean('is_active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index('idx_gram_panchayats_district_id').on(table.districtId),
     index('idx_gram_panchayats_name').on(table.name),
+    index('idx_gram_panchayats_district').on(table.districtName),
+    index('idx_gram_panchayats_pincode').on(table.pincode),
   ]
 );
 
@@ -148,12 +158,22 @@ export const villages = pgTable(
     gramPanchayatId: bigint('gram_panchayat_id', { mode: 'number' }).references(() => gramPanchayats.id, {
       onDelete: 'set null',
     }),
+    gramPanchayatName: text('gram_panchayat_name').default('Bahera'),
+    gramPanchayatNameHindi: text('gram_panchayat_name_hindi').default('बहेरा'),
     districtId: bigint('district_id', { mode: 'number' }).references(() => districts.id, {
       onDelete: 'set null',
     }),
+    districtName: text('district_name').default('Jaunpur'),
+    districtNameHindi: text('district_name_hindi').default('जौनपुर'),
     stateId: bigint('state_id', { mode: 'number' }).references(() => states.id, {
       onDelete: 'set null',
     }),
+    stateName: text('state_name').default('Uttar Pradesh'),
+    stateNameHindi: text('state_name_hindi').default('उत्तर प्रदेश'),
+    blockName: text('block_name').default('Shahganj'),
+    blockNameHindi: text('block_name_hindi').default('शाहगंज'),
+    pincode: text('pincode').default('222139'),
+    postOffice: text('post_office').default('Rasulpur'),
     orgName: text('org_name').notNull().default('Gramodaya Youth Manch'),
     orgNameHindi: text('org_name_hindi').notNull().default('ग्रामोदय यूथ मंच'),
     sloganHindi: text('slogan_hindi').default('युवा शक्ति • ग्राम विकास • उज्ज्वल भविष्य'),
@@ -169,7 +189,8 @@ export const villages = pgTable(
   (table) => [
     uniqueIndex('idx_villages_slug').on(table.slug),
     index('idx_villages_panchayat_id').on(table.gramPanchayatId),
-    index('idx_villages_district_id').on(table.districtId),
+    index('idx_villages_district_name').on(table.districtName),
+    index('idx_villages_pincode').on(table.pincode),
     index('idx_villages_is_active').on(table.isActive),
   ]
 );
@@ -261,6 +282,15 @@ export const members = pgTable(
     dob: text('dob'),
     gender: text('gender'),
     address: text('address').default('ग्राम रसूलपुर, ग्राम पंचायत बहेरा'),
+    pincode: text('pincode').default('222139'),
+    state: text('state').default('Uttar Pradesh'),
+    district: text('district').default('Jaunpur'),
+    block: text('block').default('Shahganj'),
+    gramPanchayat: text('gram_panchayat').default('Bahera'),
+    villageName: text('village_name').default('Rasoolpur'),
+    postOffice: text('post_office').default('Rasulpur'),
+    houseNo: text('house_no'),
+    street: text('street'),
     occupation: text('occupation'),
     designation: text('designation'),
     politicalBackground: text('political_background'),
@@ -529,6 +559,10 @@ export const gramPanchayatsRelations = relations(gramPanchayats, ({ one, many })
   district: one(districts, {
     fields: [gramPanchayats.districtId],
     references: [districts.id],
+  }),
+  state: one(states, {
+    fields: [gramPanchayats.stateId],
+    references: [states.id],
   }),
   villages: many(villages),
 }));

@@ -9,51 +9,54 @@ export async function GET() {
       return NextResponse.json({ success: true, members: [] });
     }
 
-    const dbMembers = await sql`
-      SELECT 
-        id, 
-        name, 
-        mobile, 
-        email,
-        photo_url as "photoUrl", 
-        father_name as "fatherName", 
-        dob, 
-        gender,
-        address, 
-        village_id as "villageId",
-        occupation,
-        designation,
-        political_background as "politicalBackground",
-        blood_group as "bloodGroup",
-        status, 
-        role, 
-        system_role as "systemRole", 
-        organization_name as "organizationName", 
-        created_at as "createdAt"
-      FROM public.members 
-      ORDER BY id DESC;
-    `;
+    // Auto-ensure schema columns if not yet applied
+    try {
+      await sql`
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS pincode TEXT DEFAULT '241125';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS state TEXT DEFAULT 'Uttar Pradesh';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS district TEXT DEFAULT 'Hardoi';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS block TEXT DEFAULT 'Hardoi';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS gram_panchayat TEXT DEFAULT 'Bahera';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS village_name TEXT DEFAULT 'Rasoolpur';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS post_office TEXT DEFAULT 'Bahera Rasoolpur';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS house_no TEXT;
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS street TEXT;
+      `;
+    } catch (migErr) {
+      // Ignored if permissions are restricted
+    }
+
+    const dbMembers = await sql`SELECT * FROM public.members ORDER BY id DESC;`;
 
     const formatted = dbMembers.map((m: any) => ({
       id: String(m.id),
-      villageId: m.villageId ? String(m.villageId) : 'vil_rasoolpur',
+      villageId: m.village_id ? String(m.village_id) : 'vil_rasoolpur',
       name: m.name,
       mobile: m.mobile,
       email: m.email || '',
-      photoUrl: m.photoUrl || '',
-      fatherName: m.fatherName || '',
+      photoUrl: m.photo_url || '',
+      fatherName: m.father_name || '',
       dob: m.dob || '',
       gender: m.gender || '',
       address: m.address || 'ग्राम रसूलपुर, ग्राम पंचायत बहेरा',
+      pincode: m.pincode || '241125',
+      state: m.state || 'Uttar Pradesh',
+      district: m.district || 'Hardoi',
+      block: m.block || 'Hardoi',
+      gramPanchayat: m.gram_panchayat || 'Bahera',
+      villageName: m.village_name || 'Rasoolpur',
+      postOffice: m.post_office || 'Bahera Rasoolpur',
+      houseNo: m.house_no || '',
+      street: m.street || '',
       occupation: m.occupation || '',
       designation: m.designation || '',
-      politicalBackground: m.politicalBackground || '',
-      bloodGroup: m.bloodGroup || '',
+      politicalBackground: m.political_background || '',
+      bloodGroup: m.blood_group || '',
       status: m.status || 'active',
       role: m.role || 'MEMBER',
-      systemRole: m.systemRole || 'MEMBER',
-      organizationName: m.organizationName || 'ग्रामोदय यूथ मंच',
-      createdAt: m.createdAt,
+      systemRole: m.system_role || 'MEMBER',
+      organizationName: m.organization_name || 'ग्रामोदय यूथ मंच',
+      createdAt: m.created_at,
     }));
 
     return NextResponse.json({
@@ -79,6 +82,15 @@ export async function POST(req: Request) {
       email,
       password,
       address,
+      pincode,
+      state,
+      district,
+      block,
+      gramPanchayat,
+      villageName,
+      postOffice,
+      houseNo,
+      street,
       villageId,
       occupation,
       designation,
@@ -162,6 +174,15 @@ export async function POST(req: Request) {
         dob,
         gender,
         address,
+        pincode,
+        state,
+        district,
+        block,
+        gram_panchayat,
+        village_name,
+        post_office,
+        house_no,
+        street,
         occupation,
         designation,
         political_background,
@@ -183,6 +204,15 @@ export async function POST(req: Request) {
         ${dob ? dob.trim() : null},
         ${gender ? gender.trim() : null},
         ${address ? address.trim() : 'ग्राम रसूलपुर, ग्राम पंचायत बहेरा'},
+        ${pincode ? pincode.trim() : '222139'},
+        ${state ? state.trim() : 'Uttar Pradesh'},
+        ${district ? district.trim() : 'Jaunpur'},
+        ${block ? block.trim() : 'Shahganj'},
+        ${gramPanchayat ? gramPanchayat.trim() : 'Bahera'},
+        ${villageName ? villageName.trim() : 'Rasoolpur'},
+        ${postOffice ? postOffice.trim() : 'Rasulpur'},
+        ${houseNo ? houseNo.trim() : null},
+        ${street ? street.trim() : null},
         ${occupation ? occupation.trim() : null},
         ${designation ? designation.trim() : null},
         ${politicalBackground ? politicalBackground.trim() : null},

@@ -44,7 +44,9 @@ import { setCredentials as reduxSetCredentials, logout as reduxLogout } from '..
 import { updateVillageSettings as reduxUpdateVillageSettings, setVillagesList as reduxSetVillagesList } from '../store/slices/villageSlice';
 import {
   OFFICIAL_VILLAGE,
+  INITIAL_VILLAGES,
 } from '../data/initialData';
+
 
 interface AppContextType {
   activeSection: string;
@@ -236,7 +238,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const [villageSettings, setVillageSettings] = useState<VillageSettings>(OFFICIAL_VILLAGE);
-  const [villages, setVillages] = useState<Village[]>([]);
+  const [villages, setVillages] = useState<Village[]>(INITIAL_VILLAGES);
   const [activeVillageId, setActiveVillageId] = useState<string>("vil_rasoolpur");
   const [userPermissions, setUserPermissions] = useState<UserPermission[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);

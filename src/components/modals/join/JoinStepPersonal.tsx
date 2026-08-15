@@ -10,6 +10,7 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { Button, Input, Avatar, AvatarImage, AvatarFallback, DatePicker } from '../../ui';
+import { AddressFormFields, AddressData } from '../../common/AddressFormFields';
 import { useApp } from '../../../context/AppContext';
 
 interface JoinStepPersonalProps {
@@ -136,26 +137,8 @@ export const JoinStepPersonal: React.FC<JoinStepPersonalProps> = ({
         </div>
       </div>
 
-      {/* ── ROW 2: VILLAGE & FATHER'S NAME ── */}
+      {/* ── ROW 2: FATHER'S NAME & GENDER ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-            {t('join.selectVillage')} <span className="text-rose-500">*</span>
-          </label>
-          <select
-            value={selectedVillageId}
-            onChange={(e) => setSelectedVillageId(e.target.value)}
-            className="w-full h-9.5 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-          >
-            {(villages && villages.length > 0 ? villages : [selectedVillageObj]).map((vil: any) => (
-              <option key={vil.id || vil.slug} value={vil.id || 'vil_rasoolpur'}>
-                {lang === 'en' ? vil.name || vil.nameHindi : vil.nameHindi || vil.name} (GP:{' '}
-                {vil.gramPanchayatNameHindi || vil.gramPanchayatName || 'Bahera'})
-              </option>
-            ))}
-          </select>
-        </div>
-
         <div className="space-y-1.5">
           <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
             {t('join.fatherName')}
@@ -168,10 +151,7 @@ export const JoinStepPersonal: React.FC<JoinStepPersonalProps> = ({
             className="h-9.5 text-xs rounded-lg"
           />
         </div>
-      </div>
 
-      {/* ── ROW 3: GENDER & DOB ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         <div className="space-y-1.5">
           <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
             {lang === 'en' ? 'Gender' : 'लिंग (Gender)'}
@@ -187,35 +167,39 @@ export const JoinStepPersonal: React.FC<JoinStepPersonalProps> = ({
             <option value="other">{lang === 'en' ? 'Other (अन्य)' : 'अन्य (Other)'}</option>
           </select>
         </div>
-
-        <div className="space-y-1.5 relative z-30">
-          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-            {t('join.dob')}
-          </label>
-          <DatePicker
-            value={dob}
-            onChange={setDob}
-            placeholder={lang === 'en' ? 'Select Date of Birth' : 'जन्म तिथि चुनें'}
-            lang={lang}
-            minYear={1930}
-            maxYear={new Date().getFullYear()}
-            placement="top"
-            className="h-9.5 text-xs rounded-lg"
-          />
-        </div>
       </div>
 
-      {/* ── ROW 4: ADDRESS ── */}
-      <div className="space-y-1.5">
+      {/* ── ROW 3: DOB ── */}
+      <div className="space-y-1.5 relative z-30">
         <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-          {t('join.localAddress')}
+          {t('join.dob')}
         </label>
-        <Input
-          type="text"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          placeholder={lang === 'en' ? 'e.g. Ward No. 04' : 'उदा. वार्ड संख्या ०४'}
+        <DatePicker
+          value={dob}
+          onChange={setDob}
+          placeholder={lang === 'en' ? 'Select Date of Birth' : 'जन्म तिथि चुनें'}
+          lang={lang}
+          minYear={1930}
+          maxYear={new Date().getFullYear()}
+          placement="top"
           className="h-9.5 text-xs rounded-lg"
+        />
+      </div>
+
+      {/* ── ROW 4: COMPLETE STRUCTURED ADDRESS (WITH GRAM PANCHAYAT AUTO-FILL & PINCODE LOOKUP) ── */}
+      <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-2">
+        <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+          <span>{lang === 'en' ? 'Gram Panchayat & Address Details' : 'ग्राम पंचायत एवं पता विवरण'}</span>
+        </h4>
+        <AddressFormFields
+          value={{ fullAddress: address }}
+          selectedVillageId={selectedVillageId}
+          onVillageSelect={setSelectedVillageId}
+          onChange={(addrData: AddressData) => {
+            setAddress(addrData.fullAddress || '');
+            if (addrData.villageId) setSelectedVillageId(addrData.villageId);
+          }}
+          lang={lang === 'en' ? 'en' : 'hi'}
         />
       </div>
 

@@ -9,7 +9,30 @@ export async function GET() {
     }
 
     const villagesData = await sql`SELECT * FROM public.villages ORDER BY id ASC`;
-    const membersData = await sql`SELECT id, village_id, name, mobile, email, status, photo_url, organization_name, father_name, dob, gender, address, occupation, designation, political_background, blood_group, role, system_role, created_at FROM public.members ORDER BY id DESC`;
+    // Auto-ensure schema columns if not yet applied
+    try {
+      await sql`
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS pincode TEXT DEFAULT '241125';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS state TEXT DEFAULT 'Uttar Pradesh';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS district TEXT DEFAULT 'Hardoi';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS block TEXT DEFAULT 'Hardoi';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS gram_panchayat TEXT DEFAULT 'Bahera';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS village_name TEXT DEFAULT 'Rasoolpur';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS post_office TEXT DEFAULT 'Bahera Rasoolpur';
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS house_no TEXT;
+        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS street TEXT;
+        ALTER TABLE public.villages ADD COLUMN IF NOT EXISTS pincode TEXT DEFAULT '241125';
+        ALTER TABLE public.villages ADD COLUMN IF NOT EXISTS gram_panchayat_name TEXT DEFAULT 'Bahera';
+        ALTER TABLE public.villages ADD COLUMN IF NOT EXISTS district_name TEXT DEFAULT 'Hardoi';
+        ALTER TABLE public.villages ADD COLUMN IF NOT EXISTS state_name TEXT DEFAULT 'Uttar Pradesh';
+        ALTER TABLE public.villages ADD COLUMN IF NOT EXISTS block_name TEXT DEFAULT 'Hardoi';
+        ALTER TABLE public.villages ADD COLUMN IF NOT EXISTS post_office TEXT DEFAULT 'Bahera Rasoolpur';
+      `;
+    } catch (migErr) {
+      // Ignored if permissions are restricted or columns already exist
+    }
+
+    const membersData = await sql`SELECT * FROM public.members ORDER BY id DESC`;
     const complaintsData = await sql`SELECT * FROM public.complaints ORDER BY id DESC`;
     const socialWorksData = await sql`SELECT * FROM public.social_works ORDER BY id DESC`;
     const eventsData = await sql`SELECT * FROM public.events ORDER BY id DESC`;
@@ -27,6 +50,16 @@ export async function GET() {
       slug: v.slug,
       name: v.name,
       nameHindi: v.name_hindi,
+      gramPanchayatName: v.gram_panchayat_name || 'Bahera',
+      gramPanchayatNameHindi: v.gram_panchayat_name_hindi || 'बहेरा',
+      districtName: v.district_name || 'Hardoi',
+      districtNameHindi: v.district_name_hindi || 'जौनपुर',
+      stateName: v.state_name || 'Uttar Pradesh',
+      stateNameHindi: v.state_name_hindi || 'उत्तर प्रदेश',
+      blockName: v.block_name || 'Hardoi',
+      blockNameHindi: v.block_name_hindi || 'शाहगंज',
+      pincode: v.pincode || '241125',
+      postOffice: v.post_office || 'Bahera Rasoolpur',
       orgName: v.org_name,
       orgNameHindi: v.org_name_hindi,
       sloganHindi: v.slogan_hindi,
@@ -47,6 +80,15 @@ export async function GET() {
       dob: m.dob || '',
       gender: m.gender || '',
       address: m.address || '',
+      pincode: m.pincode || '241125',
+      state: m.state || 'Uttar Pradesh',
+      district: m.district || 'Hardoi',
+      block: m.block || 'Hardoi',
+      gramPanchayat: m.gram_panchayat || 'Bahera',
+      villageName: m.village_name || 'Rasoolpur',
+      postOffice: m.post_office || 'Bahera Rasoolpur',
+      houseNo: m.house_no || '',
+      street: m.street || '',
       occupation: m.occupation || '',
       designation: m.designation || '',
       politicalBackground: m.political_background || '',
@@ -173,7 +215,7 @@ export async function GET() {
       nameHindi: 'रसूलपुर',
       gramPanchayat: 'Bahera',
       gramPanchayatHindi: 'बहेरा',
-      district: 'Jaunpur',
+      district: 'Hardoi',
       districtHindi: 'जौनपुर',
       state: 'Uttar Pradesh',
       stateHindi: 'उत्तर प्रदेश',

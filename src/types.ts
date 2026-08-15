@@ -76,9 +76,19 @@ export interface District {
 
 export interface GramPanchayat {
   id: string;
-  districtId: string;
+  districtId?: string;
+  districtName?: string;
+  districtNameHindi?: string;
+  stateId?: string;
+  stateName?: string;
+  stateNameHindi?: string;
   name: string;
-  nameHindi: string;
+  nameHindi?: string;
+  blockName?: string;
+  blockNameHindi?: string;
+  pincode?: string;
+  postOffice?: string;
+  isActive?: boolean;
 }
 
 export interface Village {
@@ -91,7 +101,14 @@ export interface Village {
   gramPanchayatNameHindi?: string;
   districtId?: string;
   districtName?: string;
+  districtNameHindi?: string;
   stateId?: string;
+  stateName?: string;
+  stateNameHindi?: string;
+  blockName?: string;
+  blockNameHindi?: string;
+  pincode?: string;
+  postOffice?: string;
   orgName: string;
   orgNameHindi: string;
   sloganHindi?: string;
@@ -151,6 +168,15 @@ export interface Member {
   dob?: string;
   gender?: string;
   address?: string;
+  pincode?: string;
+  state?: string;
+  district?: string;
+  block?: string;
+  gramPanchayat?: string;
+  villageName?: string;
+  postOffice?: string;
+  houseNo?: string;
+  street?: string;
   occupation?: string;
   designation?: string;
   politicalBackground?: string;
@@ -360,6 +386,10 @@ export interface VillageSettings {
   districtHindi?: string;
   state?: string;
   stateHindi?: string;
+  block?: string;
+  blockHindi?: string;
+  pincode?: string;
+  postOffice?: string;
   tagline?: string;
   taglineHindi: string;
   slogan?: string;

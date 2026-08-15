@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { MapPin, Building, Globe, ChevronDown, Check, Lock } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { MapPin, Globe, ChevronDown, Lock } from 'lucide-react';
 import { useApp } from '@/src/context/AppContext';
 
 export interface LocationScope {
@@ -10,80 +10,31 @@ export interface LocationScope {
   villageId: string;
 }
 
-export const STATE_DISTRICT_MAP: Record<string, string[]> = {
-  'Uttar Pradesh': [
-    'Jaunpur',
-    'Varanasi',
-    'Prayagraj',
-    'Gorakhpur',
-    'Azamgarh',
-    'Lucknow',
-    'Ayodhya',
-    'Mirzapur',
-    'Ghazipur',
-    'Ballia',
-    'Sultanpur',
-    'Bhadohi',
-    'Kanpur Nagar',
-  ],
-  'Bihar': [
-    'Patna',
-    'Gaya',
-    'Muzaffarpur',
-    'Bhagalpur',
-    'Darbhanga',
-    'Saran',
-    'Rohtas',
-    'Bhojpur',
-  ],
-  'Madhya Pradesh': [
-    'Bhopal',
-    'Indore',
-    'Jabalpur',
-    'Gwalior',
-    'Rewa',
-    'Satna',
-  ],
-  'Rajasthan': [
-    'Jaipur',
-    'Jodhpur',
-    'Kota',
-    'Udaipur',
-    'Bikaner',
-  ],
-  'Maharashtra': [
-    'Mumbai',
-    'Pune',
-    'Nagpur',
-    'Nashik',
-    'Thane',
-  ],
-  'Delhi': [
-    'Central Delhi',
-    'New Delhi',
-    'North Delhi',
-    'South Delhi',
-  ],
-};
-
 interface AdminLocationSelectorProps {
   selectedState?: string;
   selectedDistrict?: string;
   selectedVillageId?: string;
-  onChange?: (scope: { state: string; district: string; villageId: string }) => void;
+  onChange?: (scope: LocationScope) => void;
   compact?: boolean;
   className?: string;
 }
 
 export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
-  selectedState = 'Uttar Pradesh',
-  selectedDistrict = 'Jaunpur',
+  selectedState = 'ALL',
+  selectedDistrict = 'ALL',
   selectedVillageId = '',
   onChange,
   compact = false,
   className = '',
 }) => {
-  const { villages, activeVillageId, setActiveVillageId, authSession, isSuperAdmin } = useApp();
+  const {
+    villages,
+    activeVillageId,
+    setActiveVillageId,
+    authSession,
+    isSuperAdmin,
+    villageSettings,
+  } = useApp();
 
   const isSuperAdminUser = Boolean(
     isSuperAdmin ||
@@ -108,7 +59,7 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
       : assignedAdminVillageId
   );
 
-  // Sync if assigned village changes
+  // Sync if assigned village changes for local admin
   useEffect(() => {
     if (!isSuperAdminUser && assignedAdminVillageId) {
       setVillageId(assignedAdminVillageId);
@@ -116,19 +67,58 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
     }
   }, [isSuperAdminUser, assignedAdminVillageId, setActiveVillageId]);
 
-  const availableDistricts = STATE_DISTRICT_MAP[state] || ['All Districts'];
+  // 1. Dynamically derive unique States from registered villages & settings
+  const dynamicStates = useMemo(() => {
+    const states = new Set<string>();
+    villages.forEach((v) => {
+      const st = (v as any).state || (v as any).stateName || villageSettings.state || 'Uttar Pradesh';
+      if (st) states.add(st);
+    });
+    if (villageSettings.state) states.add(villageSettings.state);
+    return Array.from(states);
+  }, [villages, villageSettings]);
+
+  // 2. Dynamically derive unique Districts for the chosen State
+  const dynamicDistricts = useMemo(() => {
+    const districts = new Set<string>();
+    villages.forEach((v) => {
+      const vState = (v as any).state || (v as any).stateName || villageSettings.state || 'Uttar Pradesh';
+      if (state === 'ALL' || !state || vState === state) {
+        const dst = v.districtName || (v as any).district || villageSettings.district || 'Jaunpur';
+        if (dst) districts.add(dst);
+      }
+    });
+    if (villageSettings.district) districts.add(villageSettings.district);
+    return Array.from(districts);
+  }, [villages, villageSettings, state]);
+
+  // 3. Dynamically filter Villages based on selected State & District
+  const dynamicFilteredVillages = useMemo(() => {
+    return villages.filter((v) => {
+      const vState = (v as any).state || (v as any).stateName || villageSettings.state || 'Uttar Pradesh';
+      const vDistrict = v.districtName || (v as any).district || villageSettings.district || 'Jaunpur';
+
+      const matchesState = state === 'ALL' || !state || vState === state;
+      const matchesDistrict = district === 'ALL' || !district || vDistrict === district;
+      return matchesState && matchesDistrict;
+    });
+  }, [villages, villageSettings, state, district]);
+
   const currentVillage = villages.find((v) => v.id === villageId) || villages[0];
 
   const handleStateChange = (newState: string) => {
     setState(newState);
-    const firstDistrict = STATE_DISTRICT_MAP[newState]?.[0] || 'All Districts';
-    setDistrict(firstDistrict);
-    onChange?.({ state: newState, district: firstDistrict, villageId });
+    setDistrict('ALL');
+    setVillageId('ALL');
+    setActiveVillageId('ALL');
+    onChange?.({ state: newState, district: 'ALL', villageId: 'ALL' });
   };
 
   const handleDistrictChange = (newDistrict: string) => {
     setDistrict(newDistrict);
-    onChange?.({ state, district: newDistrict, villageId });
+    setVillageId('ALL');
+    setActiveVillageId('ALL');
+    onChange?.({ state, district: newDistrict, villageId: 'ALL' });
   };
 
   const handleVillageChange = (newVillageId: string) => {
@@ -141,7 +131,9 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
   if (!isSuperAdminUser) {
     if (compact) {
       return (
-        <div className={`flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 px-2.5 py-1 rounded-xl text-xs ${className}`}>
+        <div
+          className={`flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 px-2.5 py-1 rounded-xl text-xs ${className}`}
+        >
           <Lock className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
           <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
             {currentVillage?.name || 'Local Chapter'}
@@ -154,7 +146,9 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
     }
 
     return (
-      <div className={`bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-4 shadow-xs space-y-2 ${className}`}>
+      <div
+        className={`bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-4 shadow-xs space-y-2 ${className}`}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -167,17 +161,24 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
           </span>
         </div>
         <p className="text-xs text-slate-600 dark:text-zinc-400">
-          You are signed in as the chapter admin for <strong className="text-slate-900 dark:text-white font-bold">{currentVillage?.name} {currentVillage?.nameHindi ? `(${currentVillage.nameHindi})` : ''}</strong>. You have permissions to view and manage only your village&apos;s data.
+          You are signed in as the chapter admin for{' '}
+          <strong className="text-slate-900 dark:text-white font-bold">
+            {currentVillage?.name}{' '}
+            {currentVillage?.nameHindi ? `(${currentVillage.nameHindi})` : ''}
+          </strong>
+          . You have permissions to view and manage only your village&apos;s data.
         </p>
       </div>
     );
   }
 
-  // Super Admin view: full selector
+  // Super Admin view: fully dynamic selector
   if (compact) {
     return (
-      <div className={`flex items-center gap-1.5 bg-slate-100 dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] p-1 rounded-xl text-xs ${className}`}>
-        {/* State Selector */}
+      <div
+        className={`flex items-center gap-1.5 bg-slate-100 dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] p-1 rounded-xl text-xs ${className}`}
+      >
+        {/* Dynamic State Selector */}
         <div className="relative flex items-center">
           <select
             value={state}
@@ -185,8 +186,15 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
             className="appearance-none bg-transparent pl-2 pr-5 py-1 text-[11px] font-bold text-slate-800 dark:text-zinc-200 outline-none cursor-pointer"
             title="Select State"
           >
-            {Object.keys(STATE_DISTRICT_MAP).map((st) => (
-              <option key={st} value={st} className="bg-white dark:bg-[#18181b] text-slate-900 dark:text-white">
+            <option value="ALL" className="bg-white dark:bg-[#18181b] text-slate-900 dark:text-white">
+              All States
+            </option>
+            {dynamicStates.map((st) => (
+              <option
+                key={st}
+                value={st}
+                className="bg-white dark:bg-[#18181b] text-slate-900 dark:text-white"
+              >
                 {st}
               </option>
             ))}
@@ -196,7 +204,7 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
 
         <span className="text-slate-300 dark:text-zinc-700">/</span>
 
-        {/* District Selector */}
+        {/* Dynamic District Selector */}
         <div className="relative flex items-center">
           <select
             value={district}
@@ -204,8 +212,15 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
             className="appearance-none bg-transparent pl-2 pr-5 py-1 text-[11px] font-bold text-slate-800 dark:text-zinc-200 outline-none cursor-pointer"
             title="Select District"
           >
-            {availableDistricts.map((dst) => (
-              <option key={dst} value={dst} className="bg-white dark:bg-[#18181b] text-slate-900 dark:text-white">
+            <option value="ALL" className="bg-white dark:bg-[#18181b] text-slate-900 dark:text-white">
+              All Districts
+            </option>
+            {dynamicDistricts.map((dst) => (
+              <option
+                key={dst}
+                value={dst}
+                className="bg-white dark:bg-[#18181b] text-slate-900 dark:text-white"
+              >
                 {dst}
               </option>
             ))}
@@ -215,7 +230,7 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
 
         <span className="text-slate-300 dark:text-zinc-700">/</span>
 
-        {/* Village Selector */}
+        {/* Dynamic Village Selector */}
         <div className="relative flex items-center">
           <Globe className="w-3 h-3 text-emerald-600 dark:text-emerald-400 ml-1 mr-0.5" />
           <select
@@ -224,11 +239,18 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
             className="appearance-none bg-transparent pl-1 pr-5 py-1 text-[11px] font-black text-emerald-700 dark:text-emerald-400 outline-none cursor-pointer"
             title="Select Village Unit"
           >
-            <option value="ALL" className="bg-white dark:bg-[#18181b] text-slate-900 dark:text-white">
+            <option
+              value="ALL"
+              className="bg-white dark:bg-[#18181b] text-slate-900 dark:text-white"
+            >
               All Villages
             </option>
-            {villages.map((v) => (
-              <option key={v.id} value={v.id} className="bg-white dark:bg-[#18181b] text-slate-900 dark:text-white">
+            {dynamicFilteredVillages.map((v) => (
+              <option
+                key={v.id}
+                value={v.id}
+                className="bg-white dark:bg-[#18181b] text-slate-900 dark:text-white"
+              >
                 {v.name} {v.nameHindi ? `(${v.nameHindi})` : ''}
               </option>
             ))}
@@ -240,7 +262,9 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
   }
 
   return (
-    <div className={`bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-4 shadow-xs space-y-3 ${className}`}>
+    <div
+      className={`bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-4 shadow-xs space-y-3 ${className}`}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -254,7 +278,7 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* State Select */}
+        {/* Dynamic State Select */}
         <div>
           <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">
             State
@@ -265,7 +289,8 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
               onChange={(e) => handleStateChange(e.target.value)}
               className="w-full pl-3 pr-8 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
             >
-              {Object.keys(STATE_DISTRICT_MAP).map((st) => (
+              <option value="ALL">All States</option>
+              {dynamicStates.map((st) => (
                 <option key={st} value={st}>
                   {st}
                 </option>
@@ -275,7 +300,7 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
           </div>
         </div>
 
-        {/* District Select */}
+        {/* Dynamic District Select */}
         <div>
           <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">
             District
@@ -286,7 +311,8 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
               onChange={(e) => handleDistrictChange(e.target.value)}
               className="w-full pl-3 pr-8 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
             >
-              {availableDistricts.map((dst) => (
+              <option value="ALL">All Districts</option>
+              {dynamicDistricts.map((dst) => (
                 <option key={dst} value={dst}>
                   {dst}
                 </option>
@@ -296,7 +322,7 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
           </div>
         </div>
 
-        {/* Village Unit Select */}
+        {/* Dynamic Village Unit Select */}
         <div>
           <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">
             Village Chapter
@@ -308,7 +334,7 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
               className="w-full pl-3 pr-8 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
             >
               <option value="ALL">All Villages (Global View)</option>
-              {villages.map((v) => (
+              {dynamicFilteredVillages.map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name} {v.nameHindi ? `(${v.nameHindi})` : ''}
                 </option>

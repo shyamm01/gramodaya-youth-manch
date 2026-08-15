@@ -15,6 +15,13 @@
       "when": 1786734386955,
       "tag": "0001_perpetual_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786787345470,
+      "tag": "0002_fat_korath",
+      "breakpoints": true
     }
   ]
 }
