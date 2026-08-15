@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/src/db';
 import * as schema from '@/src/db/schema';
-import { asc } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { validateRequestBody, groupMessageSchema } from '@/src/lib/validations';
 
 export async function GET(req: Request) {
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     const rows = await db
       .select()
       .from(schema.groupMessages)
-      .where(numericVillageId ? (schema.groupMessages.villageId as any).equals(numericVillageId) : undefined)
+      .where(numericVillageId ? eq(schema.groupMessages.villageId, numericVillageId) : undefined)
       .orderBy(asc(schema.groupMessages.id));
 
     const formatted = rows.map((m) => ({

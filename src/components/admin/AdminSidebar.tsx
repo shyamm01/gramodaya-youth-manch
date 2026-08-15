@@ -14,6 +14,7 @@ import {
   LogOut,
   Plus,
   Mail,
+  MessageSquare,
   PanelLeftClose,
   PanelLeft,
   LayoutDashboard,
@@ -60,6 +61,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, count: null },
     { id: 'members', label: 'Members', icon: Users, count: stats.pendingMembers },
+    { id: 'helpdesk', label: 'Admin Helpdesk', icon: MessageSquare, count: null },
     { id: 'problems', label: 'Grievances', icon: AlertTriangle, count: stats.newProblems },
     { id: 'social-work', label: 'Social Works', icon: HeartHandshake, count: stats.pendingSocialWork },
     { id: 'announcements', label: 'Announcements', icon: Volume2, count: null },

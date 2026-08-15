@@ -5,6 +5,7 @@ import { useApp } from '../../context/AppContext';
 import { Member } from '../../types';
 import {
   getOrCreateGroupRoom,
+  getOrCreateAdminHelpdeskRoom,
   getOrCreatePersonalRoom,
   sendRoomMessage,
   fetchRoomMessages,
@@ -33,13 +34,17 @@ export const LiveChatSection: React.FC = () => {
     setSelectedIdCardMember,
     selectedChatPartner,
     setSelectedChatPartner,
-    fetchGroupChat,
     t,
     lang,
     villageSettings,
   } = useApp();
 
-  const activeMembers = members.filter((m) => m.status === 'active');
+  const currentVillageId = String(villageSettings.id || '1');
+
+  // Filter active members belonging to this village
+  const activeMembers = members.filter(
+    (m) => m.status === 'active' && (!m.villageId || String(m.villageId) === currentVillageId)
+  );
 
   // Identify logged in member / sender identity
   const [currentMobile, setCurrentMobile] = useState<string>(() => {
@@ -141,29 +146,31 @@ export const LiveChatSection: React.FC = () => {
     }
   }, [currentMemberObj, currentMemberMobile, authSession]);
 
-  // Determine current active Room ID
+  // Determine current active Room ID (Village Scoped)
   const getActiveRoomId = () => {
     if (activeTab === 'group') {
-      return 'common_group_room';
+      return `room_village_${currentVillageId}`;
     }
     if (activeTab === 'admin') {
       const uDigits = (currentMobile || 'user').replace(/\D/g, '').slice(-10);
-      return `room_admin_${uDigits}`;
+      return `room_admin_${currentVillageId}_${uDigits}`;
     }
     if (activePartner && activePartner.mobile) {
       const uDigits = (currentMobile || 'user').replace(/\D/g, '').slice(-10);
       const pDigits = activePartner.mobile.replace(/\D/g, '').slice(-10);
       return `room_pv_${[uDigits, pDigits].sort().join('_')}`;
     }
-    return 'common_group_room';
+    return `room_village_${currentVillageId}`;
   };
 
   // Load Room Messages
   const loadRoomMessages = async () => {
     const roomId = getActiveRoomId();
-    const msgs = await fetchRoomMessages(roomId, currentMobile);
+    const msgs = await fetchRoomMessages(roomId, currentMobile, currentVillageId);
     if (msgs && msgs.length > 0) {
       setMessages(msgs);
+    } else {
+      setMessages([]);
     }
     if (currentMobile) {
       markRoomMessagesAsRead(roomId, currentMobile);
@@ -230,7 +237,7 @@ export const LiveChatSection: React.FC = () => {
       ? currentMobile.replace(/\D/g, '').slice(-10)
       : `anon_${Math.random().toString(36).substring(7)}`;
 
-    const presenceChannel = supabase.channel('online-presence', {
+    const presenceChannel = supabase.channel(`online-presence-${currentVillageId}`, {
       config: { presence: { key: userKey } },
     });
 
@@ -249,6 +256,7 @@ export const LiveChatSection: React.FC = () => {
             onlineAt: new Date().toISOString(),
             name: senderName,
             mobile: currentMobile,
+            villageId: currentVillageId,
           });
         }
       });
@@ -258,7 +266,7 @@ export const LiveChatSection: React.FC = () => {
       supabase.removeChannel(presenceChannel);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
-  }, [activeTab, activePartner, currentMobile, isSoundEnabled]);
+  }, [activeTab, activePartner, currentMobile, currentVillageId, isSoundEnabled]);
 
   // Handle Typing Broadcast
   const handleUserTyping = () => {
@@ -275,7 +283,6 @@ export const LiveChatSection: React.FC = () => {
   const handleReactToMessage = (msgId: string, emoji: string) => {
     const myMobile = currentMobile || '+91 9999999999';
 
-    // 1. Update local state
     setMessages((prev) =>
       prev.map((msg) => {
         if (msg.id !== msgId) return msg;
@@ -288,7 +295,6 @@ export const LiveChatSection: React.FC = () => {
       })
     );
 
-    // 2. Broadcast reaction over active channel
     if (activeChannelRef.current) {
       activeChannelRef.current.send({
         type: 'broadcast',
@@ -317,7 +323,11 @@ export const LiveChatSection: React.FC = () => {
     );
 
     if (!found) {
-      setLoginError(lang === 'en' ? 'Mobile number not found in active members list.' : 'यह नंबर सदस्य सूची में नहीं मिला। केवल स्वीकृत सदस्य संवाद कर सकते हैं।');
+      setLoginError(
+        lang === 'en'
+          ? `Mobile number not found in ${villageSettings.name || 'this village'} member directory.`
+          : `यह नंबर ग्राम ${villageSettings.nameHindi || villageSettings.name || ''} की सदस्य सूची में नहीं मिला। केवल स्वीकृत सदस्य ही संवाद कर सकते हैं।`
+      );
       return;
     }
 
@@ -373,21 +383,30 @@ export const LiveChatSection: React.FC = () => {
     setMessageText('');
 
     if (activeTab === 'group') {
-      await getOrCreateGroupRoom();
+      await getOrCreateGroupRoom(currentVillageId, villageSettings.name);
     } else if (activeTab === 'admin') {
-      await getOrCreatePersonalRoom(myMobile, '+91 9876543210', myName, 'ग्रामोदय एडमिन', 'admin');
+      await getOrCreateAdminHelpdeskRoom(myMobile, currentVillageId, myName, villageSettings.name);
     } else if (activePartner) {
       await getOrCreatePersonalRoom(
         myMobile,
         activePartner.mobile,
         myName,
-        activePartner.name,
-        'personal'
+        activePartner.name
       );
     }
 
     // 1. Send to Supabase Realtime Store
-    const res = await sendRoomMessage(roomId, myMobile, myName, myPhoto, textToSend, memberIdCode, attachmentUrl, audioUrl);
+    const res = await sendRoomMessage(
+      roomId,
+      myMobile,
+      myName,
+      myPhoto,
+      textToSend,
+      memberIdCode,
+      attachmentUrl,
+      audioUrl,
+      currentVillageId
+    );
 
     // 2. Broadcast immediately over Supabase Realtime channel
     if (res.message && activeChannelRef.current) {
@@ -395,6 +414,7 @@ export const LiveChatSection: React.FC = () => {
         ...res.message,
         photo_url: attachmentUrl || undefined,
         audio_url: audioUrl || undefined,
+        village_id: currentVillageId,
       };
       activeChannelRef.current.send({
         type: 'broadcast',
@@ -420,11 +440,30 @@ export const LiveChatSection: React.FC = () => {
             senderMobile: myMobile,
             senderPhoto: myPhoto,
             text: textToSend,
-            villageId: villageSettings.id || '1',
+            villageId: currentVillageId,
           }),
         });
       } catch (e) {
         console.warn('Group chat backup note:', e);
+      }
+    } else if (activeTab === 'admin') {
+      try {
+        await fetch('/api/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            senderMobile: myMobile,
+            senderName: myName,
+            senderPhoto: myPhoto,
+            recipientMobile: 'ADMIN',
+            recipientName: villageSettings.orgNameHindi || 'ग्रामोदय एडमिन',
+            text: textToSend,
+            villageId: currentVillageId,
+            type: 'helpdesk',
+          }),
+        });
+      } catch (e) {
+        console.warn('Admin helpdesk backup note:', e);
       }
     } else if (activePartner) {
       try {
@@ -434,9 +473,11 @@ export const LiveChatSection: React.FC = () => {
           body: JSON.stringify({
             senderMobile: myMobile,
             senderName: myName,
+            senderPhoto: myPhoto,
             recipientMobile: activePartner.mobile,
             recipientName: activePartner.name,
             text: textToSend,
+            villageId: currentVillageId,
           }),
         });
       } catch (e) {
@@ -459,10 +500,8 @@ export const LiveChatSection: React.FC = () => {
   const handleDeleteMessage = async (msgId: string) => {
     const roomId = getActiveRoomId();
 
-    // 1. Optimistic local removal
     setMessages((prev) => prev.filter((m) => m.id !== msgId));
 
-    // 2. Broadcast deletion to all users in room
     if (activeChannelRef.current) {
       activeChannelRef.current.send({
         type: 'broadcast',
@@ -471,7 +510,6 @@ export const LiveChatSection: React.FC = () => {
       });
     }
 
-    // 3. Delete across database & backends
     const res = await deleteChatMessage(
       msgId,
       currentMobile || '',
@@ -485,7 +523,7 @@ export const LiveChatSection: React.FC = () => {
     }
   };
 
-  // Search Filtered Members
+  // Search Filtered Members within this Village
   const filteredMembers = activeMembers.filter((m) => {
     if (currentMemberObj && m.id === currentMemberObj.id) return false;
     const term = searchTerm.toLowerCase().trim();

@@ -8,6 +8,7 @@ import {
   AdminMetricsCards,
   AdminActivityChart,
   AdminMemberTrendChart,
+  AdminHelpdeskSection,
 } from '../admin';
 
 import {
@@ -15,6 +16,7 @@ import {
   Users,
   AlertTriangle,
   HeartHandshake,
+  MessageSquare,
   Volume2,
   Calendar,
   Image as ImageIcon,
@@ -854,7 +856,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </table>
             </div>
           </div>
+
+          {/* Admin Helpdesk Inbox Callout Banner */}
+          <div className="bg-gradient-to-r from-emerald-900 via-teal-950 to-slate-900 border border-emerald-500/30 rounded-2xl p-5 sm:p-6 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center flex-shrink-0">
+                <MessageSquare className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-white">
+                  Admin Helpdesk & Citizen Inquiries
+                </h4>
+                <p className="text-xs text-emerald-200/80 mt-0.5">
+                  Citizen messages sent from the live chat Helpdesk tab appear here in real-time.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => handleTabChange('helpdesk')}
+              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition shadow-lg flex items-center justify-center gap-2 flex-shrink-0 cursor-pointer"
+            >
+              <span>Open Helpdesk Inbox</span>
+              <Eye className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          TAB: ADMIN HELPDESK & CITIZEN INQUIRIES
+      ───────────────────────────────────────────────────────────── */}
+      {activeTab === 'helpdesk' && (
+        <AdminHelpdeskSection />
       )}
 
       {/* ─────────────────────────────────────────────────────────────

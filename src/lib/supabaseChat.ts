@@ -5,6 +5,7 @@ export interface SupabaseRoom {
   id: string;
   name: string;
   type: 'group' | 'personal' | 'admin';
+  village_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -23,6 +24,7 @@ export interface SupabaseRoomMember {
 export interface SupabaseMessage {
   id: string;
   room_id: string;
+  village_id?: string;
   sender_mobile: string;
   sender_name: string;
   sender_photo?: string;
@@ -52,13 +54,11 @@ export interface ChatRoomListItem {
   lastSeen?: string;
 }
 
-const COMMON_GROUP_NAME = 'ग्रामोदय यूथ मंच — Group Chat';
-
 // Cache to prevent repeated PGRST205 calls if table is missing in Supabase schema cache
 let isChatMessagesTableAvailable = false;
 let isChatRoomsTableAvailable = false;
 
-// ── 0. Web Audio API Chime Synthesizer (No external asset dependency) ──
+// ── 0. Web Audio API Chime Synthesizer ──
 export function playChatChime() {
   if (typeof window === 'undefined') return;
   try {
@@ -66,7 +66,6 @@ export function playChatChime() {
     if (!AudioCtx) return;
     const ctx = new AudioCtx();
 
-    // Pleasant two-tone chime (F#5 -> A#5)
     const now = ctx.currentTime;
     const osc1 = ctx.createOscillator();
     const osc2 = ctx.createOscillator();
@@ -92,7 +91,7 @@ export function playChatChime() {
     osc1.stop(now + 0.35);
     osc2.stop(now + 0.35);
   } catch (e) {
-    // Audio context may be restricted by browser autoplay policy
+    // Non-blocking
   }
 }
 
@@ -151,12 +150,16 @@ export async function uploadToMemberPhotosBucket(
   }
 }
 
-// 2. Fetch or Create Common Group Room
-export async function getOrCreateGroupRoom(): Promise<SupabaseRoom> {
+// 2. Fetch or Create Village Forum Group Room (Scoped by villageId)
+export async function getOrCreateGroupRoom(villageId: string = '1', villageName?: string): Promise<SupabaseRoom> {
+  const roomId = `room_village_${villageId}`;
+  const roomName = villageName ? `${villageName} — Village Forum` : 'ग्रामोदय समूह मंच';
+
   const defaultRoom: SupabaseRoom = {
-    id: 'common_group_room',
-    name: COMMON_GROUP_NAME,
+    id: roomId,
+    name: roomName,
     type: 'group',
+    village_id: villageId,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -169,8 +172,7 @@ export async function getOrCreateGroupRoom(): Promise<SupabaseRoom> {
     const { data: rooms, error } = await supabase
       .from('chat_rooms')
       .select('*')
-      .eq('type', 'group')
-      .eq('name', COMMON_GROUP_NAME)
+      .eq('id', roomId)
       .limit(1);
 
     if (error) {
@@ -200,22 +202,22 @@ export async function getOrCreateGroupRoom(): Promise<SupabaseRoom> {
   }
 }
 
-// 3. Fetch or Create Personal / Admin Room (1-to-1)
-export async function getOrCreatePersonalRoom(
+// 3. Fetch or Create Admin Helpdesk Room (Scoped by villageId & citizen mobile)
+export async function getOrCreateAdminHelpdeskRoom(
   userMobile: string,
-  partnerMobile: string,
-  userName: string,
-  partnerName: string,
-  type: 'personal' | 'admin' = 'personal'
+  villageId: string = '1',
+  userName: string = 'Member',
+  villageName?: string
 ): Promise<SupabaseRoom> {
   const uDigits = userMobile.replace(/\D/g, '').slice(-10);
-  const pDigits = partnerMobile.replace(/\D/g, '').slice(-10);
-  const roomId = `room_pv_${[uDigits, pDigits].sort().join('_')}`;
+  const roomId = `room_admin_${villageId}_${uDigits}`;
+  const roomName = `${userName} — ${villageName || 'ग्राम'} एडमिन हेल्प`;
 
   const defaultRoom: SupabaseRoom = {
     id: roomId,
-    name: `${userName} & ${partnerName}`,
-    type,
+    name: roomName,
+    type: 'admin',
+    village_id: villageId,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -241,30 +243,6 @@ export async function getOrCreatePersonalRoom(
     }
 
     await supabase.from('chat_rooms').upsert([defaultRoom]);
-
-    const roomMembers = [
-      {
-        id: `cm_${roomId}_${uDigits}`,
-        room_id: roomId,
-        member_id: uDigits,
-        mobile: userMobile,
-        name: userName,
-        role: 'member' as const,
-        joined_at: new Date().toISOString(),
-      },
-      {
-        id: `cm_${roomId}_${pDigits}`,
-        room_id: roomId,
-        member_id: pDigits,
-        mobile: partnerMobile,
-        name: partnerName,
-        role: type === 'admin' ? ('admin' as const) : ('member' as const),
-        joined_at: new Date().toISOString(),
-      },
-    ];
-
-    await supabase.from('chat_members').upsert(roomMembers);
-
     return defaultRoom;
   } catch (e) {
     isChatRoomsTableAvailable = false;
@@ -272,7 +250,54 @@ export async function getOrCreatePersonalRoom(
   }
 }
 
-// 4. Send Message to Supabase Room
+// 4. Fetch or Create Personal Room (1-to-1)
+export async function getOrCreatePersonalRoom(
+  userMobile: string,
+  partnerMobile: string,
+  userName: string,
+  partnerName: string
+): Promise<SupabaseRoom> {
+  const uDigits = userMobile.replace(/\D/g, '').slice(-10);
+  const pDigits = partnerMobile.replace(/\D/g, '').slice(-10);
+  const roomId = `room_pv_${[uDigits, pDigits].sort().join('_')}`;
+
+  const defaultRoom: SupabaseRoom = {
+    id: roomId,
+    name: `${userName} & ${partnerName}`,
+    type: 'personal',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  if (!isChatRoomsTableAvailable) {
+    return defaultRoom;
+  }
+
+  try {
+    const { data: existingRoom, error } = await supabase
+      .from('chat_rooms')
+      .select('*')
+      .eq('id', roomId)
+      .maybeSingle();
+
+    if (error) {
+      isChatRoomsTableAvailable = false;
+      return defaultRoom;
+    }
+
+    if (existingRoom) {
+      return existingRoom;
+    }
+
+    await supabase.from('chat_rooms').upsert([defaultRoom]);
+    return defaultRoom;
+  } catch (e) {
+    isChatRoomsTableAvailable = false;
+    return defaultRoom;
+  }
+}
+
+// 5. Send Message to Supabase Room
 export async function sendRoomMessage(
   roomId: string,
   senderMobile: string,
@@ -281,11 +306,13 @@ export async function sendRoomMessage(
   text: string,
   senderMemberId?: string,
   photoUrl?: string,
-  audioUrl?: string
+  audioUrl?: string,
+  villageId?: string
 ): Promise<{ success: boolean; message: SupabaseMessage; error?: string }> {
   const newMsg: SupabaseMessage = {
     id: `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
     room_id: roomId,
+    village_id: villageId,
     sender_mobile: senderMobile,
     sender_name: senderName,
     sender_photo: senderPhoto || '',
@@ -328,8 +355,12 @@ export async function sendRoomMessage(
   return { success: true, message: newMsg };
 }
 
-// 5. Fetch Messages for Room (with reliable REST backend)
-export async function fetchRoomMessages(roomId: string, userMobile?: string): Promise<SupabaseMessage[]> {
+// 6. Fetch Messages for Room (Scoped by villageId for Village Forum)
+export async function fetchRoomMessages(
+  roomId: string,
+  userMobile?: string,
+  villageId?: string
+): Promise<SupabaseMessage[]> {
   // 1. If Supabase table is marked available, try Supabase
   if (isChatMessagesTableAvailable) {
     try {
@@ -352,15 +383,18 @@ export async function fetchRoomMessages(roomId: string, userMobile?: string): Pr
   }
 
   // 2. Fetch from Next.js REST API
-  if (roomId === 'common_group_room') {
+  // If Village Forum room (room_village_X or common_group_room)
+  if (roomId.startsWith('room_village_') || roomId === 'common_group_room') {
     try {
-      const res = await fetch('/api/group-chat', { credentials: 'include' });
+      const vId = villageId || (roomId.startsWith('room_village_') ? roomId.replace('room_village_', '') : '1');
+      const res = await fetch(`/api/group-chat?villageId=${encodeURIComponent(vId)}`, { credentials: 'include' });
       if (res.ok) {
         const apiData = await res.json();
         if (apiData.success && Array.isArray(apiData.groupMessages)) {
           return apiData.groupMessages.map((m: any) => ({
             id: String(m.id),
-            room_id: 'common_group_room',
+            room_id: roomId,
+            village_id: m.villageId || vId,
             sender_mobile: m.senderMobile || '',
             sender_name: m.senderName || 'Member',
             sender_photo: m.senderPhoto || '',
@@ -407,14 +441,13 @@ export async function fetchRoomMessages(roomId: string, userMobile?: string): Pr
   return [];
 }
 
-// 6. Delete Message (Sender or Admin) with multi-tier persistence
+// 7. Delete Message (Sender or Admin) with multi-tier persistence
 export async function deleteChatMessage(
   messageId: string,
   userMobile: string,
   isAdmin: boolean = false,
   roomId?: string
 ): Promise<{ success: boolean; error?: string }> {
-  // 1. Supabase Deletion
   if (isChatMessagesTableAvailable) {
     try {
       await supabase.from('chat_messages').delete().eq('id', messageId);
@@ -423,9 +456,8 @@ export async function deleteChatMessage(
     }
   }
 
-  // 2. Next.js Backend DB Deletion
   try {
-    if (roomId === 'common_group_room') {
+    if (roomId && (roomId.startsWith('room_village_') || roomId === 'common_group_room')) {
       await fetch(`/api/group-chat/${messageId}`, {
         method: 'DELETE',
         credentials: 'include',
@@ -448,7 +480,7 @@ export async function deleteChatMessage(
   return { success: true };
 }
 
-// 7. Mark Messages as Read
+// 8. Mark Messages as Read
 export async function markRoomMessagesAsRead(roomId: string, userMobile: string) {
   if (!isChatMessagesTableAvailable) return;
   try {
