@@ -102,7 +102,7 @@ export const eventCreateSchema = z.object({
   villageId: z.union([z.string(), z.number()]).optional(),
   photoUrl: z.string().optional(),
   videoUrl: z.string().optional(),
-  status: z.enum(['upcoming', 'completed', 'cancelled']).default('upcoming'),
+  status: z.string().default('PUBLISHED'),
   adminName: z.string().optional(),
   adminMobile: z.string().optional(),
 });
