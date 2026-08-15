@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore, logAuditAction } from '@/src/lib/serverStore';
 import { deleteSupabaseObjectByUrl } from '@/src/lib/supabaseStorage';
+import { requireAuth } from '@/src/lib/jwtAuth';
 import { getDb } from '@/src/db';
 import * as schema from '@/src/db/schema';
 import { eq } from 'drizzle-orm';
@@ -10,6 +11,10 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req, 'gallery:moderate');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const { id } = await params;
     const { status, caption, adminName, adminMobile } = await req.json();
 
@@ -36,13 +41,13 @@ export async function PATCH(
 
       logAuditAction(
         `Updated Gallery Item (${item.caption || id})`,
-        adminName || 'Admin',
-        adminMobile || '',
+        adminName || currentUser.name || 'Admin',
+        adminMobile || currentUser.mobile || '',
         item.caption || id
       );
     }
 
-    return NextResponse.json({ success: true, item });
+    return NextResponse.json({ success: true, item: item || { id, status, caption } });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Error updating item' }, { status: 500 });
   }
@@ -53,6 +58,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req, 'gallery:moderate');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
     const { adminName, adminMobile } = body;
@@ -83,18 +92,15 @@ export async function DELETE(
     store.gallery = store.gallery.filter((g) => g.id !== id);
     saveStore(store);
 
-    // Auto-clean storage object from Supabase bucket
     if (photoToDelete) {
-      deleteSupabaseObjectByUrl(photoToDelete).catch((err) =>
-        console.warn('Storage delete error on gallery delete:', err)
-      );
+      deleteSupabaseObjectByUrl(photoToDelete).catch(() => {});
     }
 
     if (item) {
       logAuditAction(
         `Deleted Gallery Photo (${item.caption || id})`,
-        adminName || 'Admin',
-        adminMobile || '',
+        adminName || currentUser.name || 'Admin',
+        adminMobile || currentUser.mobile || '',
         item.caption || id
       );
     }

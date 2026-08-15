@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore, logAuditAction } from '@/src/lib/serverStore';
+import { requireAuth } from '@/src/lib/jwtAuth';
 
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req, 'public_info:manage');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const { id } = await params;
     const { status, adminName, adminMobile } = await req.json();
 
@@ -21,8 +26,8 @@ export async function PATCH(
 
     logAuditAction(
       `Updated Public Info Status to "${status}" (${info.name})`,
-      adminName || 'Admin',
-      adminMobile || '',
+      adminName || currentUser.name || 'Admin',
+      adminMobile || currentUser.mobile || '',
       info.name
     );
 
@@ -37,6 +42,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req, 'public_info:manage');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
     const { adminName, adminMobile } = body;
@@ -49,8 +58,8 @@ export async function DELETE(
     if (item) {
       logAuditAction(
         `Deleted Public Info (${item.name})`,
-        adminName || 'Admin',
-        adminMobile || '',
+        adminName || currentUser.name || 'Admin',
+        adminMobile || currentUser.mobile || '',
         item.name
       );
     }

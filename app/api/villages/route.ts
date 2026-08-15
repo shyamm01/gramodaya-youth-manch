@@ -1,6 +1,7 @@
 import { validateRequestBody, villageCreateSchema } from '@/src/lib/validations';
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore, logAuditAction } from '@/src/lib/serverStore';
+import { requireAuth } from '@/src/lib/jwtAuth';
 
 export async function GET() {
   try {
@@ -13,6 +14,10 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req, 'village:manage', 'ADMIN');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const validation = await validateRequestBody(req, villageCreateSchema);
     if (!validation.success) {
       return validation.response;
@@ -58,25 +63,26 @@ export async function POST(req: Request) {
       blockName: blockName ? blockName.trim() : 'Hardoi',
       blockNameHindi: blockNameHindi ? blockNameHindi.trim() : 'हरदोई',
       pincode: pincode ? pincode.trim() : '241125',
-      postOffice: postOffice ? postOffice.trim() : 'Bahera Rasoolpur',
-      orgName: orgName ? orgName.trim() : 'Gramodaya Youth Manch',
-      orgNameHindi: orgNameHindi ? orgNameHindi.trim() : 'ग्रामोदय यूथ मंच',
-      sloganHindi: sloganHindi ? sloganHindi.trim() : 'युवा शक्ति • ग्राम विकास • उज्ज्वल भविष्य',
-      taglineHindi: taglineHindi ? taglineHindi.trim() : 'युवा शक्ति से ग्रामोदय की ओर',
+      postOffice: postOffice ? postOffice.trim() : 'Bahera',
+      orgName: orgName ? orgName.trim() : `Gramodaya Youth Manch ${name}`,
+      orgNameHindi: orgNameHindi ? orgNameHindi.trim() : `ग्रामोदय यूथ मंच ${nameHindi}`,
+      sloganHindi: sloganHindi ? sloganHindi.trim() : 'सशक्त युवा, समर्थ ग्राम',
+      taglineHindi: taglineHindi ? taglineHindi.trim() : 'एक कदम समग्र ग्राम विकास की ओर',
       isActive: true,
     };
 
-    store.villages = [...(store.villages || []), newVillage];
+    if (!store.villages) store.villages = [];
+    store.villages.push(newVillage);
     saveStore(store);
 
     logAuditAction(
-      `Created Village Unit: ${newVillage.nameHindi}`,
-      adminName || 'Super Admin',
-      adminMobile || '',
-      newVillage.name
+      `Added New Village: ${newVillage.nameHindi} (${newVillage.name})`,
+      adminName || currentUser.name || 'Admin',
+      adminMobile || currentUser.mobile || '',
+      newVillage.nameHindi
     );
 
-    return NextResponse.json({ success: true, village: newVillage, villages: store.villages });
+    return NextResponse.json({ success: true, village: newVillage });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Error creating village' }, { status: 500 });
   }

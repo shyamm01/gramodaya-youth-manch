@@ -4,6 +4,8 @@ import * as schema from "@/src/db/schema";
 import { desc } from "drizzle-orm";
 import { validateRequestBody, elderCreateSchema } from "@/src/lib/validations";
 import { logAuditAction } from "@/src/lib/authUtils";
+import { requireAuth } from "@/src/lib/jwtAuth";
+import { ensureSupabaseUrl } from "@/src/lib/supabaseStorage";
 
 export async function GET() {
   try {
@@ -32,6 +34,11 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    // 1. Enforce RBAC Permission for Elder Management
+    const auth = await requireAuth(req, 'elders:manage');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const validation = await validateRequestBody(req, elderCreateSchema);
     if (!validation.success) {
       return validation.response;
@@ -53,16 +60,17 @@ export async function POST(req: Request) {
     }
 
     const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
+    const cdnPhotoUrl = await ensureSupabaseUrl(photoUrl, "elders", "elder");
 
     const [inserted] = await db
       .insert(schema.elders)
       .values({
         villageId: numericVillageId,
         name: name.trim(),
-        age: age.trim(),
-        role: role.trim(),
-        contribution: contribution.trim(),
-        photoUrl: photoUrl.trim() || null,
+        age: age ? age.trim() : null,
+        role: role ? role.trim() : null,
+        contribution: contribution ? contribution.trim() : null,
+        photoUrl: cdnPhotoUrl || null,
       })
       .returning();
 
@@ -77,7 +85,12 @@ export async function POST(req: Request) {
       createdAt: inserted.createdAt,
     };
 
-    logAuditAction("Added Elder Record: " + formatted.name, adminName || "Admin", adminMobile || "", formatted.name);
+    logAuditAction(
+      "Added Elder: " + formatted.name,
+      adminName || currentUser.name || "Admin",
+      adminMobile || currentUser.mobile || "",
+      formatted.name
+    );
 
     return NextResponse.json({ success: true, elder: formatted });
   } catch (err: any) {

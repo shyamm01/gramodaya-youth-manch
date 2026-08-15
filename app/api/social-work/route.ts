@@ -4,6 +4,8 @@ import * as schema from "@/src/db/schema";
 import { desc } from "drizzle-orm";
 import { validateRequestBody, socialWorkCreateSchema } from "@/src/lib/validations";
 import { logAuditAction } from "@/src/lib/authUtils";
+import { requireAuth } from "@/src/lib/jwtAuth";
+import { ensureSupabaseUrl } from "@/src/lib/supabaseStorage";
 
 export async function GET() {
   try {
@@ -37,6 +39,11 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    // 1. Enforce RBAC Permission for Submitting Social Work
+    const auth = await requireAuth(req, 'social_works:manage');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const validation = await validateRequestBody(req, socialWorkCreateSchema);
     if (!validation.success) {
       return validation.response;
@@ -60,48 +67,28 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Database connection unavailable." }, { status: 500 });
     }
 
-    let resolvedVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : undefined;
-    let resolvedMemberId: number | undefined = undefined;
-
-    // Automatically resolve village_id and member_id from logged-in / submitting user
-    if (submitterMobile) {
-      const cleanMob = submitterMobile.replace(/\D/g, "").slice(-10);
-      const matchedMember = await db.query.members.findFirst({
-        where: (m, { sql }) => sql`RIGHT(REGEXP_REPLACE(${m.mobile}, '\\D', '', 'g'), 10) = ${cleanMob}`,
-      });
-      if (matchedMember) {
-        resolvedMemberId = matchedMember.id;
-        if (!resolvedVillageId && matchedMember.villageId) {
-          resolvedVillageId = matchedMember.villageId;
-        }
-      }
-    }
-
-    const numericVillageId = resolvedVillageId || 1;
-    const { ensureSupabaseUrl } = await import("@/src/lib/supabaseStorage");
-    const cdnPhotoUrl = photoUrl ? await ensureSupabaseUrl(photoUrl, "social_work", "social") : null;
+    const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
+    const cdnPhotoUrl = await ensureSupabaseUrl(photoUrl, "social-work", "social");
 
     const [inserted] = await db
       .insert(schema.socialWorks)
       .values({
         villageId: numericVillageId,
-        memberId: resolvedMemberId,
         title: title.trim(),
         description: description.trim(),
-        location: location.trim(),
-        submitterName: submitterName.trim(),
-        submitterMobile: submitterMobile.trim(),
         date: date || new Date().toISOString().split("T")[0],
-        photoUrl: cdnPhotoUrl || photoUrl || null,
-        videoUrl: videoUrl || null,
-        status: "pending",
+        location: location ? location.trim() : "Rasoolpur",
+        submitterName: submitterName ? submitterName.trim() : (currentUser.name || "ग्राम सदस्य"),
+        submitterMobile: submitterMobile ? submitterMobile.trim() : (currentUser.mobile || ""),
+        photoUrl: cdnPhotoUrl || null,
+        videoUrl: videoUrl ? videoUrl.trim() : null,
+        status: "approved",
       })
       .returning();
 
     const formatted = {
       id: String(inserted.id),
       villageId: inserted.villageId ? String(inserted.villageId) : "1",
-      memberId: inserted.memberId ? String(inserted.memberId) : undefined,
       title: inserted.title,
       description: inserted.description,
       date: inserted.date,
@@ -114,10 +101,11 @@ export async function POST(req: Request) {
       createdAt: inserted.createdAt,
     };
 
-    await logAuditAction(
-      `सामाजिक कार्य जोड़ा गया: ${formatted.title}`,
-      adminName || submitterName,
-      `Mobile: ${adminMobile || submitterMobile}`
+    logAuditAction(
+      "Created Social Work: " + formatted.title,
+      adminName || currentUser.name || "Admin",
+      adminMobile || currentUser.mobile || "",
+      formatted.title
     );
 
     return NextResponse.json({ success: true, socialWork: formatted });

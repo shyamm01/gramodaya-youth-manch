@@ -4,6 +4,8 @@ import * as schema from "@/src/db/schema";
 import { desc } from "drizzle-orm";
 import { validateRequestBody, eventCreateSchema } from "@/src/lib/validations";
 import { logAuditAction } from "@/src/lib/authUtils";
+import { requireAuth } from "@/src/lib/jwtAuth";
+import { ensureSupabaseUrl } from "@/src/lib/supabaseStorage";
 
 export async function GET() {
   try {
@@ -36,6 +38,11 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    // 1. Enforce RBAC Permission for Event Creation
+    const auth = await requireAuth(req, 'events:manage');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const validation = await validateRequestBody(req, eventCreateSchema);
     if (!validation.success) {
       return validation.response;
@@ -61,8 +68,14 @@ export async function POST(req: Request) {
 
     const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
 
-    const { ensureSupabaseUrl } = await import("@/src/lib/supabaseStorage");
-    const cdnPhotoUrl = photoUrl ? await ensureSupabaseUrl(photoUrl, "events", "event") : null;
+    // Enforce Supabase public CDN URL for event banner
+    const finalPhotoUrl = await ensureSupabaseUrl(photoUrl, 'events', 'event');
+
+    const validStatus = (
+      ['DRAFT', 'PENDING', 'PUBLISHED', 'COMPLETED', 'CANCELLED'].includes(status?.toUpperCase())
+        ? status.toUpperCase()
+        : 'PUBLISHED'
+    ) as 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'COMPLETED' | 'CANCELLED';
 
     const [inserted] = await db
       .insert(schema.events)
@@ -70,12 +83,12 @@ export async function POST(req: Request) {
         villageId: numericVillageId,
         title: title.trim(),
         description: description.trim(),
-        date: date.trim(),
-        time: time.trim(),
-        location: location.trim(),
-        photoUrl: cdnPhotoUrl || photoUrl || null,
-        videoUrl: videoUrl || null,
-        status: status as any,
+        date: date || new Date().toISOString().split("T")[0],
+        time: time ? time.trim() : null,
+        location: location ? location.trim() : null,
+        photoUrl: finalPhotoUrl || null,
+        videoUrl: videoUrl ? videoUrl.trim() : null,
+        status: validStatus,
       })
       .returning();
 
@@ -94,7 +107,12 @@ export async function POST(req: Request) {
       createdAt: inserted.createdAt,
     };
 
-    logAuditAction("Created Event: " + formatted.title, adminName || "Admin", adminMobile || "", formatted.title);
+    logAuditAction(
+      "Created Event: " + formatted.title,
+      adminName || currentUser.name || "Admin",
+      adminMobile || currentUser.mobile || "",
+      formatted.title
+    );
 
     return NextResponse.json({ success: true, event: formatted });
   } catch (err: any) {

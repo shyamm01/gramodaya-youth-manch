@@ -4,6 +4,8 @@ import * as schema from "@/src/db/schema";
 import { desc } from "drizzle-orm";
 import { validateRequestBody, galleryCreateSchema } from "@/src/lib/validations";
 import { logAuditAction } from "@/src/lib/authUtils";
+import { requireAuth } from "@/src/lib/jwtAuth";
+import { ensureSupabaseUrl } from "@/src/lib/supabaseStorage";
 
 export async function GET() {
   try {
@@ -33,6 +35,11 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    // 1. Enforce RBAC Permission for Gallery Upload
+    const auth = await requireAuth(req, 'gallery:upload');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const validation = await validateRequestBody(req, galleryCreateSchema);
     if (!validation.success) {
       return validation.response;
@@ -53,18 +60,17 @@ export async function POST(req: Request) {
     }
 
     const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
-
-    const { ensureSupabaseUrl } = await import("@/src/lib/supabaseStorage");
     const cdnPhotoUrl = await ensureSupabaseUrl(photoUrl, "gallery", "gallery");
 
     const [inserted] = await db
       .insert(schema.gallery)
       .values({
         villageId: numericVillageId,
-        photoUrl: cdnPhotoUrl || photoUrl.trim(),
         caption: caption.trim(),
-        uploadedBy: uploadedBy.trim(),
-        uploadedByMobile: uploadedByMobile.trim(),
+        photoUrl: cdnPhotoUrl,
+        uploadedBy: uploadedBy || currentUser.name || "Admin",
+        uploadedByMobile: uploadedByMobile || currentUser.mobile || "",
+        date: new Date().toISOString().split("T")[0],
         status: "published",
       })
       .returning();
@@ -72,20 +78,25 @@ export async function POST(req: Request) {
     const formatted = {
       id: String(inserted.id),
       villageId: inserted.villageId ? String(inserted.villageId) : "1",
-      caption: inserted.caption || "",
+      caption: inserted.caption,
       photoUrl: inserted.photoUrl,
       uploadedBy: inserted.uploadedBy,
-      uploadedByMobile: inserted.uploadedByMobile || "",
+      uploadedByMobile: inserted.uploadedByMobile,
       date: inserted.date,
       status: inserted.status,
       createdAt: inserted.createdAt,
     };
 
-    logAuditAction("Uploaded Gallery Photo: " + formatted.caption, adminName || uploadedBy, adminMobile || uploadedByMobile, formatted.caption);
+    logAuditAction(
+      "Uploaded Gallery Photo: " + (formatted.caption || formatted.id),
+      adminName || currentUser.name || "Admin",
+      adminMobile || currentUser.mobile || "",
+      formatted.caption || formatted.id
+    );
 
-    return NextResponse.json({ success: true, photo: formatted, item: formatted });
+    return NextResponse.json({ success: true, item: formatted });
   } catch (err: any) {
-    console.error("Error uploading photo to gallery:", err);
-    return NextResponse.json({ success: false, error: err?.message || "Failed to upload photo" }, { status: 500 });
+    console.error("Error creating gallery item:", err);
+    return NextResponse.json({ success: false, error: err?.message || "Failed to upload gallery photo" }, { status: 500 });
   }
 }

@@ -572,8 +572,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const authenticatedFetch = useCallback(
+    async (url: string, init: RequestInit = {}) => {
+      const token =
+        (typeof window !== 'undefined' ? localStorage.getItem('gym_token') : null) ||
+        authSession.token;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...((init.headers as Record<string, string>) || {}),
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      if (currentMemberMobile) {
+        headers['x-member-mobile'] = currentMemberMobile;
+      }
+      if (authSession.isAdminLoggedIn) {
+        headers['x-admin-token'] = 'admin_active';
+      }
+
+      return fetch(url, {
+        ...init,
+        headers,
+        credentials: 'include',
+      });
+    },
+    [authSession.isAdminLoggedIn, authSession.token, currentMemberMobile]
+  );
+
   const refreshData = async (force = false, retryCount = 0) => {
-    // Cache guard: Don't spam /api/data on every minor action or re-render
     const now = Date.now();
     if (!force && lastDataFetchTimeRef.current > 0 && now - lastDataFetchTimeRef.current < 120000) {
       return;
@@ -583,60 +610,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isFetchingDataRef.current = true;
 
     try {
-      const headers: Record<string, string> = {};
-      if (currentMemberMobile) {
-        headers['x-member-mobile'] = currentMemberMobile;
-      }
-      if (authSession.isAdminLoggedIn) {
-        headers['x-admin-token'] = 'admin_active';
-      }
-      const token = (typeof window !== 'undefined' ? localStorage.getItem('gym_token') : null) || authSession.token;
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+      const [authRes, villagesRes] = await Promise.all([
+        authenticatedFetch('/api/auth/me').catch(() => null),
+        authenticatedFetch('/api/villages').catch(() => null),
+      ]);
+
+      if (authRes && authRes.ok) {
+        const authData = await authRes.json();
+        if (authData?.user) {
+          const user = authData.user;
+          const isAdm = Boolean(
+            authData.isAdmin ||
+            user.isAdmin ||
+            user.systemRole === 'SUPER_ADMIN' ||
+            user.systemRole === 'ADMIN'
+          );
+          setAuthSession((prev) => ({
+            ...prev,
+            isAdminLoggedIn: isAdm,
+            isMemberLoggedIn: true,
+            role: user.role,
+            systemRole: user.systemRole,
+            adminMobile: isAdm ? user.mobile : prev.adminMobile,
+            adminName: isAdm ? user.name : prev.adminName,
+            adminId: isAdm ? user.id : prev.adminId,
+            adminVillageId: user.villageId,
+            currentMemberMobile: user.mobile,
+            currentMember: user,
+            email: user.email,
+            permissions: user.permissions || [],
+          }));
+          if (user.permissions) setUserPermissions(user.permissions);
+        }
       }
 
-      const res = await fetch('/api/data', { headers, credentials: 'include' });
-      if (res.ok) {
-        lastDataFetchTimeRef.current = Date.now();
-        const text = await res.text();
-        let data: any = null;
-        try {
-          data = JSON.parse(text);
-        } catch {
-          data = null;
-        }
-        if (data) {
-          if (data.villageSettings) {
-            setVillageSettings(data.villageSettings);
-            store.dispatch(reduxUpdateVillageSettings(data.villageSettings));
-          }
-          if (data.villages) {
-            setVillages(data.villages);
-            store.dispatch(reduxSetVillagesList(data.villages));
-          }
-          if (data.userPermissions) setUserPermissions(data.userPermissions);
-          if (data.user) {
-            const isAdm = Boolean(data.isAdmin || data.user.isAdmin || data.user.isSuperAdmin);
-            setAuthSession((prev) => ({
-              ...prev,
-              isAdminLoggedIn: isAdm,
-              isMemberLoggedIn: true,
-              role: data.user.role,
-              systemRole: data.user.systemRole,
-              adminMobile: isAdm ? data.user.mobile : prev.adminMobile,
-              adminName: isAdm ? data.user.name : prev.adminName,
-              adminId: isAdm ? data.user.id : prev.adminId,
-              adminVillageId: data.user.villageId,
-              currentMemberMobile: data.user.mobile,
-              currentMember: data.user,
-              email: data.user.email,
-              permissions: data.user.permissions || data.userPermissions || [],
-            }));
+      if (villagesRes && villagesRes.ok) {
+        const vData = await villagesRes.json();
+        if (vData?.villages && Array.isArray(vData.villages)) {
+          setVillages(vData.villages);
+          store.dispatch(reduxSetVillagesList(vData.villages));
+          const currentV =
+            vData.villages.find((v: any) => v.id === activeVillageId) || vData.villages[0];
+          if (currentV) {
+            setVillageSettings(currentV);
+            store.dispatch(reduxUpdateVillageSettings(currentV));
           }
         }
       }
+
+      lastDataFetchTimeRef.current = Date.now();
     } catch (e) {
-      console.warn('API sync fallback note:', e instanceof Error ? e.message : e);
+      console.warn('Bootstrap sync note:', e instanceof Error ? e.message : e);
     } finally {
       isFetchingDataRef.current = false;
       setIsLoading(false);
@@ -794,19 +818,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateVillageSettings = async (newSettings: Partial<VillageSettings>) => {
     try {
-      const res = await fetch('/api/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const targetId = activeVillageId || 'vil_rasoolpur';
+      const res = await authenticatedFetch(`/api/villages/${targetId}`, {
+        method: 'PUT',
         body: JSON.stringify({
-          action: 'update-settings',
-          data: newSettings,
+          ...newSettings,
           adminName: authSession.adminName,
           adminMobile: authSession.adminMobile,
         }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        if (data.villageSettings) setVillageSettings(data.villageSettings);
+        if (data.village) {
+          setVillageSettings(data.village);
+          store.dispatch(reduxUpdateVillageSettings(data.village));
+        }
         return { success: true };
       }
       return { success: false, error: data.error || 'सेटिंग्स अपडेट करने में विफल।' };

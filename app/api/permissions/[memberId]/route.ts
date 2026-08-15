@@ -4,13 +4,17 @@ import * as schema from '@/src/db/schema';
 import { eq } from 'drizzle-orm';
 import { logAuditAction } from '@/src/lib/authUtils';
 import { ALL_SYSTEM_PERMISSIONS, ROLE_DEFAULT_PERMISSIONS } from '@/src/lib/permissions';
+import { requireAuth } from '@/src/lib/jwtAuth';
 
 interface RouteContext {
   params: Promise<{ memberId: string }>;
 }
 
-export async function GET(_req: Request, context: RouteContext) {
+export async function GET(req: Request, context: RouteContext) {
   try {
+    const auth = await requireAuth(req, 'permissions:manage');
+    if (!auth.success) return auth.response;
+
     const { memberId: rawMemberId } = await context.params;
     const memberId = Number(rawMemberId);
     if (!memberId || isNaN(memberId)) {
@@ -88,6 +92,10 @@ export async function GET(_req: Request, context: RouteContext) {
 
 export async function POST(req: Request, context: RouteContext) {
   try {
+    const auth = await requireAuth(req, 'permissions:manage', 'ADMIN');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const { memberId: rawMemberId } = await context.params;
     const memberId = Number(rawMemberId);
     if (!memberId || isNaN(memberId)) {
@@ -98,17 +106,11 @@ export async function POST(req: Request, context: RouteContext) {
     }
 
     const body = await req.json();
-    const {
-      permissions: permissionCodes,
-      adminName = 'Super Admin',
-      adminMobile = '',
-      scopeType = 'VILLAGE',
-      scopeId,
-    } = body;
+    const { permissions, grantedBy, grantedByMobile, reason } = body;
 
-    if (!Array.isArray(permissionCodes)) {
+    if (!Array.isArray(permissions)) {
       return NextResponse.json(
-        { success: false, error: 'Permissions must be an array of permission codes.' },
+        { success: false, error: 'Permissions array is required.' },
         { status: 400 }
       );
     }
@@ -121,50 +123,35 @@ export async function POST(req: Request, context: RouteContext) {
       );
     }
 
-    // 1. Verify member exists
-    const member = await db.query.members.findFirst({
-      where: (m, { eq }) => eq(m.id, memberId),
-    });
+    // 1. Remove existing user permission overrides
+    await db.delete(schema.userPermissions).where(eq(schema.userPermissions.memberId, memberId));
 
-    if (!member) {
-      return NextResponse.json(
-        { success: false, error: 'Member not found.' },
-        { status: 404 }
+    // 2. Insert new overrides
+    if (permissions.length > 0) {
+      await db.insert(schema.userPermissions).values(
+        permissions.map((p: any) => ({
+          memberId,
+          permissionCode: p.code,
+          isGranted: p.isGranted !== false,
+          grantedBy: grantedBy || currentUser.name || 'Admin',
+          grantedByMobile: grantedByMobile || currentUser.mobile || '',
+          reason: reason || 'Admin Override',
+        }))
       );
     }
 
-    // 2. Clear existing user permission overrides for clean sync
-    await db.delete(schema.userPermissions).where(eq(schema.userPermissions.memberId, memberId));
-
-    // 3. Insert updated permission overrides
-    if (permissionCodes.length > 0) {
-      const insertRecords = permissionCodes.map((code: string) => ({
-        memberId,
-        permissionCode: code,
-        scopeType: (scopeType as any) || 'VILLAGE',
-        scopeId: scopeId ? Number(scopeId) : member.villageId,
-        isGranted: true,
-        grantedBy: adminName,
-      }));
-
-      await db.insert(schema.userPermissions).values(insertRecords);
-    }
-
-    await logAuditAction(
-      `सदस्य अनुमतियां अपडेट की गईं: ${member.name} (${permissionCodes.length} अनुमतियां)`,
-      adminName,
-      `Mobile: ${adminMobile}`
+    logAuditAction(
+      `Updated custom permissions for Member #${memberId} (${permissions.length} items)`,
+      grantedBy || currentUser.name || 'Admin',
+      grantedByMobile || currentUser.mobile || '',
+      `Member #${memberId}`
     );
 
-    return NextResponse.json({
-      success: true,
-      message: `Permissions updated successfully for ${member.name}`,
-      totalPermissions: permissionCodes.length,
-    });
+    return NextResponse.json({ success: true, count: permissions.length });
   } catch (err: any) {
     console.error('Error updating member permissions:', err);
     return NextResponse.json(
-      { success: false, error: err?.message || 'Failed to update permissions' },
+      { success: false, error: err?.message || 'Failed to update member permissions' },
       { status: 500 }
     );
   }

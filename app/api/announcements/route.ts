@@ -4,6 +4,7 @@ import * as schema from "@/src/db/schema";
 import { desc } from "drizzle-orm";
 import { validateRequestBody, announcementCreateSchema } from "@/src/lib/validations";
 import { logAuditAction } from "@/src/lib/authUtils";
+import { requireAuth } from "@/src/lib/jwtAuth";
 
 export async function GET() {
   try {
@@ -32,6 +33,11 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    // 1. Enforce RBAC Permission for Publishing Announcements
+    const auth = await requireAuth(req, 'announcements:publish');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const validation = await validateRequestBody(req, announcementCreateSchema);
     if (!validation.success) {
       return validation.response;
@@ -77,7 +83,12 @@ export async function POST(req: Request) {
       createdAt: inserted.createdAt,
     };
 
-    logAuditAction("Created Announcement: " + formatted.title, adminName || "Admin", adminMobile || "", formatted.title);
+    logAuditAction(
+      "Created Announcement: " + formatted.title,
+      adminName || currentUser.name || "Admin",
+      adminMobile || currentUser.mobile || "",
+      formatted.title
+    );
 
     return NextResponse.json({ success: true, announcement: formatted });
   } catch (err: any) {

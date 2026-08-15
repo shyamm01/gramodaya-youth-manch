@@ -37,10 +37,10 @@ export const fetchAppData = createAsyncThunk(
   'community/fetchAppData',
   async (_, { rejectWithValue }) => {
     try {
-      const data = await apiClient.get('/api/data');
+      const data = await apiClient.get('/api/villages');
       return data;
     } catch (err: any) {
-      return rejectWithValue(err.message || 'Failed to load application data');
+      return rejectWithValue(err.message || 'Failed to load villages data');
     }
   }
 );
