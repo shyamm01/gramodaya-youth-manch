@@ -8,6 +8,7 @@ import {
   X,
   ArrowRight,
   ArrowLeft,
+  MapPin,
 } from 'lucide-react';
 import { Button, Input, Avatar, AvatarImage, AvatarFallback, DatePicker } from '../../ui';
 import { AddressFormFields, AddressData } from '../../common/AddressFormFields';
@@ -186,20 +187,26 @@ export const JoinStepPersonal: React.FC<JoinStepPersonalProps> = ({
         />
       </div>
 
-      {/* ── ROW 4: COMPLETE STRUCTURED ADDRESS (WITH GRAM PANCHAYAT AUTO-FILL & PINCODE LOOKUP) ── */}
-      <div className="p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-2">
-        <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
-          <span>{lang === 'en' ? 'Gram Panchayat & Address Details' : 'ग्राम पंचायत एवं पता विवरण'}</span>
-        </h4>
+      {/* ── ROW 4: COMPLETE STRUCTURED ADDRESS ── */}
+      <div className="p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/40 space-y-3">
+        <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-slate-800/60">
+          <h4 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+            <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>{lang === "en" ? "Address & Village Chapter" : "ग्राम पंचायत, शाखा एवं पता विवरण"}</span>
+          </h4>
+          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-100/60 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full border border-emerald-300/30 dark:border-emerald-800/40">
+            {lang === "en" ? "Smart Auto-Fill" : "स्वतः पूर्ण"}
+          </span>
+        </div>
         <AddressFormFields
           value={{ fullAddress: address }}
           selectedVillageId={selectedVillageId}
           onVillageSelect={setSelectedVillageId}
           onChange={(addrData: AddressData) => {
-            setAddress(addrData.fullAddress || '');
+            setAddress(addrData.fullAddress || "");
             if (addrData.villageId) setSelectedVillageId(addrData.villageId);
           }}
-          lang={lang === 'en' ? 'en' : 'hi'}
+          lang={lang === "en" ? "en" : "hi"}
         />
       </div>
 

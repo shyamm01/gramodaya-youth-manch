@@ -78,8 +78,6 @@ async function seed() {
         name: store.villageSettings?.name || 'Rasoolpur',
         nameHindi: store.villageSettings?.nameHindi || 'रसूलपुर',
         gramPanchayatId,
-        districtId,
-        stateId,
         orgName: store.villageSettings?.orgName || 'Gramodaya Youth Manch',
         orgNameHindi: store.villageSettings?.orgNameHindi || 'ग्रामोदय यूथ मंच',
         sloganHindi: store.villageSettings?.sloganHindi || 'युवा शक्ति • ग्राम विकास • उज्ज्वल भविष्य',
