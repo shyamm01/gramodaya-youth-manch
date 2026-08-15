@@ -1,4 +1,11 @@
+import { S3Client, PutObjectCommand, DeleteObjectCommand, CreateBucketCommand, HeadBucketCommand } from '@aws-sdk/client-s3';
 import { supabase } from './supabase';
+
+const SUPABASE_PROJECT_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://yynnbfuinskyhdwjpnja.supabase.co';
+const S3_ENDPOINT = process.env.SUPABASE_S3_ENDPOINT || 'https://yynnbfuinskyhdwjpnja.storage.supabase.co/storage/v1/s3';
+const S3_ACCESS_KEY = process.env.SUPABASE_S3_ACCESS_KEY_ID || 'cbe3ac16d213f140d53c724f7b2c5145';
+const S3_SECRET_KEY = process.env.SUPABASE_S3_SECRET_ACCESS_KEY || 'fde18ea545ef6f87041e7a035e082cd0d0b7b8bfb1190f2a8742d60c0699d3f4';
+const S3_REGION = process.env.SUPABASE_S3_REGION || 'ap-southeast-2';
 
 export interface UploadOptions {
   bucket?: string;
@@ -15,12 +22,27 @@ export interface UploadResult {
   error?: string;
 }
 
-const DEFAULT_BUCKET = 'images';
+let s3ClientInstance: S3Client | null = null;
+
+export function getSupabaseS3Client(): S3Client {
+  if (!s3ClientInstance) {
+    s3ClientInstance = new S3Client({
+      region: S3_REGION,
+      endpoint: S3_ENDPOINT,
+      credentials: {
+        accessKeyId: S3_ACCESS_KEY,
+        secretAccessKey: S3_SECRET_KEY,
+      },
+      forcePathStyle: true,
+    });
+  }
+  return s3ClientInstance;
+}
 
 /**
- * Converts a base64 data URL to a Uint8Array and mime type.
+ * Converts a base64 data URL to a Uint8Array buffer and mime type.
  */
-function parseBase64(base64: string): { buffer: Uint8Array; mimeType: string } {
+export function parseBase64(base64: string): { buffer: Uint8Array; mimeType: string } {
   let mimeType = 'image/jpeg';
   let cleanData = base64;
 
@@ -42,37 +64,45 @@ function parseBase64(base64: string): { buffer: Uint8Array; mimeType: string } {
 }
 
 /**
- * Upload an image (File, Blob, or base64 string) to Supabase Storage.
+ * Returns the public CDN URL for an object stored in Supabase Storage.
+ */
+export function getSupabasePublicUrl(bucket: string, path: string): string {
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+  return `${SUPABASE_PROJECT_URL}/storage/v1/object/public/${bucket}/${cleanPath}`;
+}
+
+/**
+ * Upload an image (File, Blob, or base64 string) to Supabase Storage via S3 or REST API.
  */
 export async function uploadToSupabaseStorage(
   fileOrBase64: File | Blob | string,
   options: UploadOptions = {}
 ): Promise<UploadResult> {
   const {
-    bucket = DEFAULT_BUCKET,
+    bucket = 'images',
     folder = 'uploads',
     filename,
     contentType,
-    upsert = true,
   } = options;
 
   try {
-    // If it's already a remote hosted URL, return as is
+    // If it's already a hosted URL, return as is
     if (typeof fileOrBase64 === 'string' && (fileOrBase64.startsWith('http://') || fileOrBase64.startsWith('https://'))) {
       return { success: true, publicUrl: fileOrBase64 };
     }
 
-    let fileBody: Uint8Array | Blob | File;
+    let fileBuffer: Uint8Array;
     let detectedType = contentType || 'image/jpeg';
     let ext = 'jpg';
 
     if (typeof fileOrBase64 === 'string') {
       const parsed = parseBase64(fileOrBase64);
-      fileBody = parsed.buffer;
+      fileBuffer = parsed.buffer;
       detectedType = contentType || parsed.mimeType;
       ext = detectedType.split('/')[1] || 'jpg';
     } else {
-      fileBody = fileOrBase64;
+      const arrayBuffer = await fileOrBase64.arrayBuffer();
+      fileBuffer = new Uint8Array(arrayBuffer);
       if (fileOrBase64.type) {
         detectedType = contentType || fileOrBase64.type;
         ext = detectedType.split('/')[1] || 'jpg';
@@ -83,58 +113,76 @@ export async function uploadToSupabaseStorage(
       ? filename.replace(/[^a-zA-Z0-9.-]/g, '_')
       : `img_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${ext}`;
 
-    const filePath = folder ? `${folder}/${safeName}` : safeName;
+    const key = folder ? `${folder}/${safeName}` : safeName;
 
-    // 1. Upload file to Supabase Storage bucket
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(filePath, fileBody, {
-        contentType: detectedType,
-        cacheControl: '3600',
-        upsert,
-      });
+    // 1. Primary: Upload via Supabase S3 Protocol
+    try {
+      const s3 = getSupabaseS3Client();
+      let targetBucket = bucket;
 
-    if (error) {
-      // If primary bucket failed, try 'member-photos' fallback bucket
-      if (bucket !== 'member-photos') {
-        const fallbackRes = await supabase.storage
-          .from('member-photos')
-          .upload(filePath, fileBody, {
-            contentType: detectedType,
-            cacheControl: '3600',
-            upsert,
+      try {
+        const command = new PutObjectCommand({
+          Bucket: targetBucket,
+          Key: key,
+          Body: fileBuffer,
+          ContentType: detectedType,
+          CacheControl: 'max-age=3600',
+        });
+        await s3.send(command);
+        return {
+          success: true,
+          publicUrl: getSupabasePublicUrl(targetBucket, key),
+          path: key,
+        };
+      } catch (err: any) {
+        // Fallback to confirmed Supabase project bucket
+        if (targetBucket !== 'gramodaya-youth-munch') {
+          targetBucket = 'gramodaya-youth-munch';
+          const command = new PutObjectCommand({
+            Bucket: targetBucket,
+            Key: key,
+            Body: fileBuffer,
+            ContentType: detectedType,
+            CacheControl: 'max-age=3600',
           });
-
-        if (!fallbackRes.error && fallbackRes.data) {
-          const { data: urlData } = supabase.storage
-            .from('member-photos')
-            .getPublicUrl(fallbackRes.data.path);
+          await s3.send(command);
           return {
             success: true,
-            publicUrl: urlData.publicUrl,
-            path: fallbackRes.data.path,
+            publicUrl: getSupabasePublicUrl(targetBucket, key),
+            path: key,
           };
         }
+        throw err;
+      }
+    } catch (s3Error: any) {
+      console.warn('Supabase S3 upload note, attempting Supabase JS SDK fallback:', s3Error?.message);
+
+      // 2. Fallback: Supabase Client SDK upload
+      const { data, error } = await supabase.storage
+        .from('gramodaya-youth-munch')
+        .upload(key, fileBuffer, {
+          contentType: detectedType,
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (!error && data) {
+        const { data: urlData } = supabase.storage.from('gramodaya-youth-munch').getPublicUrl(data.path);
+        return {
+          success: true,
+          publicUrl: urlData.publicUrl,
+          path: data.path,
+        };
       }
 
-      console.warn('Supabase storage upload note:', error.message);
-      // Fallback: If base64 was passed, return it so UI doesn't break
       if (typeof fileOrBase64 === 'string') {
-        return { success: true, publicUrl: fileOrBase64, path: filePath };
+        return { success: true, publicUrl: fileOrBase64, path: key };
       }
-      return { success: false, error: error.message };
+
+      return { success: false, error: error?.message || s3Error?.message || 'Upload failed' };
     }
-
-    // 2. Retrieve the public CDN URL
-    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(data.path);
-
-    return {
-      success: true,
-      publicUrl: urlData.publicUrl,
-      path: data.path,
-    };
   } catch (err: any) {
-    console.warn('Supabase storage exception:', err);
+    console.error('Supabase storage upload error:', err);
     if (typeof fileOrBase64 === 'string') {
       return { success: true, publicUrl: fileOrBase64 };
     }
@@ -143,19 +191,27 @@ export async function uploadToSupabaseStorage(
 }
 
 /**
- * Delete a file from Supabase Storage.
+ * Delete an object from Supabase Storage.
  */
 export async function deleteFromSupabaseStorage(
   filePath: string,
-  bucket: string = DEFAULT_BUCKET
+  bucket: string = 'images'
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase.storage.from(bucket).remove([filePath]);
-    if (error) {
-      return { success: false, error: error.message };
-    }
+    const s3 = getSupabaseS3Client();
+    const command = new DeleteObjectCommand({
+      Bucket: bucket,
+      Key: filePath,
+    });
+    await s3.send(command);
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'Delete failed' };
+  } catch (s3Err) {
+    try {
+      const { error } = await supabase.storage.from(bucket).remove([filePath]);
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Delete failed' };
+    }
   }
 }
