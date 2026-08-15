@@ -49,6 +49,7 @@ import { Badge } from '../ui/badge';
 import { DatePicker } from '../ui/DatePicker';
 import { AddressFormFields, AddressData } from '../common/AddressFormFields';
 import { Member, Complaint, SocialWork, EventItem, GalleryItem, Elder, Village, Announcement } from '../../types';
+import { MemberPermissionsModal } from '../modals/MemberPermissionsModal';
 
 
 interface AdminPanelProps {
@@ -103,6 +104,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     stats,
     isSuperAdmin,
     authSession,
+    refreshData,
     setIsAdminLoginModalOpen,
     approveMember,
     updateMember,
@@ -202,6 +204,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
 
 
+  const [permissionsMember, setPermissionsMember] = useState<Member | null>(null);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [editMemName, setEditMemName] = useState('');
   const [editMemMobile, setEditMemMobile] = useState('');
@@ -1013,6 +1016,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               Approve
                             </button>
                           )}
+                          <button
+                            onClick={() => setPermissionsMember(mem)}
+                            className="p-1.5 text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition cursor-pointer"
+                            title="अनुमतियां प्रबंधित करें (Manage Permissions)"
+                          >
+                            <Shield className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => {
                               setEditingMember(mem);
@@ -2890,6 +2900,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
       )}
+      {/* Member Permissions Manager Modal */}
+      <MemberPermissionsModal
+        isOpen={Boolean(permissionsMember)}
+        member={permissionsMember}
+        onClose={() => setPermissionsMember(null)}
+        onSuccess={() => {
+          refreshData();
+        }}
+      />
     </AdminLayout>
   );
 };
