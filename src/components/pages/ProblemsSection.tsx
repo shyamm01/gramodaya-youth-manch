@@ -12,6 +12,7 @@ import {
   Textarea,
   Dialog,
   Badge,
+  ImageUploader,
 } from '../ui';
 
 const CATEGORY_MAP: { id: ComplaintCategory; labelHindi: string; labelEnglish: string; icon: string }[] = [
@@ -473,14 +474,14 @@ export const ProblemsSection: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
-                {t('problems.uploadPhotoLabel')}
-              </label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="w-full text-xs text-[#8C8675] dark:text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-950 file:text-emerald-800 dark:file:text-emerald-300 hover:file:bg-emerald-100"
+              <ImageUploader
+                value={photoUrl}
+                onChange={setPhotoUrl}
+                onRemove={() => setPhotoUrl('')}
+                bucket="images"
+                folder="grievances"
+                label={t('problems.uploadPhotoLabel')}
+                hint="समस्या की फ़ोटो खींचें या चुनें"
               />
             </div>
 

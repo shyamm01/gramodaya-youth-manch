@@ -52,9 +52,23 @@ export const LeadershipSection: React.FC = () => {
 
   const admins = fetchedAdmins || contextAdmins;
 
-  const handlePhotoUpload = (adminId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (adminId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      try {
+        const { uploadToSupabaseStorage } = await import('@/src/lib/supabaseStorage');
+        const res = await uploadToSupabaseStorage(file, {
+          bucket: 'member-photos',
+          folder: 'leadership',
+          filename: `admin_${adminId}_${Date.now()}.jpg`,
+        });
+        if (res.success && res.publicUrl) {
+          uploadPhoto('admin', adminId, res.publicUrl);
+          return;
+        }
+      } catch (err) {
+        console.warn('Supabase storage upload error:', err);
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === 'string') {

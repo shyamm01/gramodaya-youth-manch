@@ -10,7 +10,7 @@ import {
   ArrowLeft,
   MapPin,
 } from 'lucide-react';
-import { Button, Input, Avatar, AvatarImage, AvatarFallback, DatePicker } from '../../ui';
+import { Button, Input, Avatar, AvatarImage, AvatarFallback, DatePicker, ImageUploader } from '../../ui';
 import { AddressFormFields, AddressData } from '../../common/AddressFormFields';
 import { useApp } from '../../../context/AppContext';
 
@@ -61,45 +61,17 @@ export const JoinStepPersonal: React.FC<JoinStepPersonalProps> = ({
 
   return (
     <form onSubmit={onNext} className="space-y-4 animate-in fade-in duration-200">
-      {/* ── PHOTO UPLOAD CARD ── */}
-      <div className="flex items-center gap-4 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50">
-        <div className="relative group">
-          <Avatar className="w-14 h-14 border-2 border-slate-200 dark:border-slate-700 shadow-xs">
-            {photoUrl ? (
-              <AvatarImage src={photoUrl} alt="Avatar Preview" className="object-cover" />
-            ) : (
-              <AvatarFallback className="bg-slate-100 dark:bg-slate-800 text-slate-400">
-                <User className="w-6 h-6" />
-              </AvatarFallback>
-            )}
-          </Avatar>
-          {photoUrl && (
-            <button
-              type="button"
-              onClick={() => setPhotoUrl('')}
-              className="absolute -top-1 -right-1 p-0.5 bg-rose-600 text-white rounded-full hover:bg-rose-700 transition-colors shadow-xs"
-              title={t('join.changePhoto')}
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-            {t('join.passportPhoto')}
-          </h4>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
-            {lang === 'en'
-              ? 'JPG, PNG up to 5MB (ID Card Photo)'
-              : 'JPG, PNG अधिकतम 5MB (ID कार्ड हेतु फ़ोटो)'}
-          </p>
-          <label className="cursor-pointer inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 mt-1">
-            <Camera className="w-3.5 h-3.5" />
-            <span>{photoUrl ? t('join.changePhoto') : t('join.uploadPhoto')}</span>
-            <input type="file" accept="image/*" onChange={onPhotoSelect} className="hidden" />
-          </label>
-        </div>
+      {/* ── PHOTO UPLOAD (Drag & Drop with Supabase Storage) ── */}
+      <div>
+        <ImageUploader
+          value={photoUrl}
+          onChange={setPhotoUrl}
+          onRemove={() => setPhotoUrl('')}
+          bucket="member-photos"
+          folder="profiles"
+          label={t('join.passportPhoto')}
+          hint={lang === 'en' ? 'JPG, PNG up to 5MB (ID Card Photo)' : 'JPG, PNG अधिकतम 5MB (ID कार्ड हेतु फ़ोटो)'}
+        />
       </div>
 
       {/* ── ROW 1: FULL NAME & VERIFIED MOBILE ── */}

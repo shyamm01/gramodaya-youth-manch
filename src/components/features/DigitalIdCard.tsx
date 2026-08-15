@@ -121,9 +121,23 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
     );
   }, [member, formattedMemberId, dob, address, joinDate]);
 
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      try {
+        const { uploadToSupabaseStorage } = await import('@/src/lib/supabaseStorage');
+        const res = await uploadToSupabaseStorage(file, {
+          bucket: 'member-photos',
+          folder: 'profiles',
+          filename: `member_${member.id}_${Date.now()}.jpg`,
+        });
+        if (res.success && res.publicUrl) {
+          setPreviewPhoto(res.publicUrl);
+          return;
+        }
+      } catch (err) {
+        console.warn('Supabase storage upload error:', err);
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === 'string') {

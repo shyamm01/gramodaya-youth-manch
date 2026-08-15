@@ -12,6 +12,7 @@ import {
   Textarea,
   Dialog,
   DatePicker,
+  ImageUploader,
 } from '../ui';
 import { WhatsAppIcon } from '../common';
 
@@ -395,13 +396,17 @@ export const EventsSection: React.FC = () => {
             />
           </div>
 
+          {/* Event Photo Upload with Drag & Drop & Supabase Storage */}
           <div>
-            <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">फोटो अपलोड करें</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="w-full text-xs text-[#8C8675] dark:text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-950 file:text-emerald-800 dark:file:text-emerald-300"
+            <ImageUploader
+              value={photoUrl}
+              onChange={setPhotoUrl}
+              onRemove={() => setPhotoUrl('')}
+              bucket="images"
+              folder="events"
+              label="फोटो अपलोड करें"
+              aspectRatio="video"
+              hint="इवेंट फ़ोटो यहाँ खींचें या क्लिक करें (Drag & Drop or Click)"
             />
           </div>
 

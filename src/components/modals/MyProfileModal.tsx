@@ -143,9 +143,24 @@ export const MyProfileModal: React.FC<{ isOpen: boolean; onClose: () => void }> 
     }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      try {
+        const { uploadToSupabaseStorage } = await import('@/src/lib/supabaseStorage');
+        const res = await uploadToSupabaseStorage(file, {
+          bucket: 'member-photos',
+          folder: 'profiles',
+          filename: `member_${currentMember.id}_${Date.now()}.jpg`,
+        });
+        if (res.success && res.publicUrl) {
+          setPhotoUrl(res.publicUrl);
+          uploadPhoto('member', currentMember.id, res.publicUrl);
+          return;
+        }
+      } catch (sbErr) {
+        console.warn('Supabase storage direct upload note:', sbErr);
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;

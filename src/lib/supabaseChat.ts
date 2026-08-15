@@ -95,53 +95,27 @@ export function playChatChime() {
   }
 }
 
-// 1. Storage Helper: Upload to Supabase 'member-photos' Bucket
+// 1. Storage Helper: Upload to Supabase Storage (with fallback)
 export async function uploadToMemberPhotosBucket(
   fileOrBase64: string | File,
   memberId: string
 ): Promise<{ success: boolean; publicUrl?: string; error?: string }> {
   try {
-    const bucketName = 'member-photos';
+    const { uploadToSupabaseStorage } = await import('./supabaseStorage');
+    const res = await uploadToSupabaseStorage(fileOrBase64, {
+      bucket: 'member-photos',
+      folder: 'chat_attachments',
+      filename: `chat_${memberId}_${Date.now()}.jpg`,
+    });
 
-    let fileBody: Blob | File;
-    let fileName = `member_${memberId}_${Date.now()}.jpg`;
+    if (res.success && res.publicUrl) {
+      return { success: true, publicUrl: res.publicUrl };
+    }
 
     if (typeof fileOrBase64 === 'string') {
-      if (fileOrBase64.startsWith('data:')) {
-        const arr = fileOrBase64.split(',');
-        const mimeMatch = arr[0].match(/:(.*?);/);
-        const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
-        }
-        fileBody = new Blob([u8arr], { type: mime });
-      } else {
-        return { success: true, publicUrl: fileOrBase64 };
-      }
-    } else {
-      fileBody = fileOrBase64;
-      fileName = `${memberId}_${Date.now()}_${fileOrBase64.name}`;
+      return { success: true, publicUrl: fileOrBase64 };
     }
-
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from(bucketName)
-      .upload(fileName, fileBody, {
-        cacheControl: '3600',
-        upsert: true,
-      });
-
-    if (uploadError) {
-      if (typeof fileOrBase64 === 'string') {
-        return { success: true, publicUrl: fileOrBase64 };
-      }
-      return { success: false, error: uploadError.message };
-    }
-
-    const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(uploadData.path);
-    return { success: true, publicUrl: urlData.publicUrl };
+    return { success: false, error: res.error || 'Upload failed' };
   } catch (err: any) {
     if (typeof fileOrBase64 === 'string') {
       return { success: true, publicUrl: fileOrBase64 };
