@@ -239,7 +239,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [villageSettings, setVillageSettings] = useState<VillageSettings>(OFFICIAL_VILLAGE);
   const [villages, setVillages] = useState<Village[]>(INITIAL_VILLAGES);
-  const [activeVillageId, setActiveVillageId] = useState<string>("vil_rasoolpur");
+  const [activeVillageId, setActiveVillageId] = useState<string>("1");
   const [userPermissions, setUserPermissions] = useState<UserPermission[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [members, setMembers] = useState<Member[]>([]);

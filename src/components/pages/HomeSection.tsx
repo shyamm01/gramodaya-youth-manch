@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { JoinModal } from '../modals/JoinModal';
 import {
@@ -27,32 +27,55 @@ export const HomeSection: React.FC = () => {
 
   const [homeData, setHomeData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const inFlightControllerRef = useRef<AbortController | null>(null);
+  const lastFetchedIdRef = useRef<string | null>(null);
 
-  // Fetch dynamic page-specific data from /api/home
+  // Fetch dynamic page-specific data from /api/home (deduplicated & abort-safe)
   useEffect(() => {
-    let isMounted = true;
+    const targetVillageId = activeVillageId || '1';
+
+    // Prevent duplicate fetch if already loaded for this village
+    if (lastFetchedIdRef.current === targetVillageId && homeData) {
+      return;
+    }
+
+    // Abort any pending in-flight request
+    if (inFlightControllerRef.current) {
+      inFlightControllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    inFlightControllerRef.current = controller;
+
     const fetchHomeFeed = async () => {
       try {
         setLoading(true);
-        const res = await fetch(`/api/home?villageId=${encodeURIComponent(activeVillageId || '1')}`, {
+        const res = await fetch(`/api/home?villageId=${encodeURIComponent(targetVillageId)}`, {
           credentials: 'include',
+          signal: controller.signal,
         });
         if (res.ok) {
           const json = await res.json();
-          if (isMounted && json.success) {
+          if (json.success && !controller.signal.aborted) {
             setHomeData(json);
+            lastFetchedIdRef.current = targetVillageId;
           }
         }
-      } catch (err) {
-        console.warn('Could not fetch home API feed, using context fallback:', err);
+      } catch (err: any) {
+        if (err?.name !== 'AbortError') {
+          console.warn('Could not fetch home API feed, using context fallback:', err);
+        }
       } finally {
-        if (isMounted) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchHomeFeed();
+
     return () => {
-      isMounted = false;
+      controller.abort();
     };
   }, [activeVillageId]);
 
