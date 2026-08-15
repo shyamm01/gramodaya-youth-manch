@@ -1,77 +1,62 @@
-import { NextResponse } from 'next/server';
-import { getSqlClient, normalizeMobile, hashPassword, logAuditAction } from '@/src/lib/authUtils';
-import { signJwtToken, setAuthCookie } from '@/src/lib/jwtAuth';
+import { NextResponse } from "next/server";
+import { getDb } from "@/src/db";
+import * as schema from "@/src/db/schema";
+import { desc, eq, like } from "drizzle-orm";
+import { validateRequestBody, memberCreateSchema } from "@/src/lib/validations";
+import { normalizeMobile, hashPassword, logAuditAction } from "@/src/lib/authUtils";
+import { signJwtToken } from "@/src/lib/jwtAuth";
 
 export async function GET() {
   try {
-    const sql = getSqlClient();
-    if (!sql) {
-      return NextResponse.json({ success: true, members: [] });
-    }
+    const db = getDb();
+    if (!db) return NextResponse.json({ success: true, members: [] });
 
-    // Auto-ensure schema columns if not yet applied
-    try {
-      await sql`
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS pincode TEXT DEFAULT '241125';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS state TEXT DEFAULT 'Uttar Pradesh';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS district TEXT DEFAULT 'Hardoi';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS block TEXT DEFAULT 'Hardoi';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS gram_panchayat TEXT DEFAULT 'Bahera';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS village_name TEXT DEFAULT 'Rasoolpur';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS post_office TEXT DEFAULT 'Bahera Rasoolpur';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS house_no TEXT;
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS street TEXT;
-      `;
-    } catch (migErr) {
-      // Ignored if permissions are restricted
-    }
+    const rows = await db.select().from(schema.members).orderBy(desc(schema.members.id));
 
-    const dbMembers = await sql`SELECT * FROM public.members ORDER BY id DESC;`;
-
-    const formatted = dbMembers.map((m: any) => ({
+    const formatted = rows.map((m) => ({
       id: String(m.id),
-      villageId: m.village_id ? String(m.village_id) : 'vil_rasoolpur',
+      villageId: m.villageId ? String(m.villageId) : "1",
       name: m.name,
       mobile: m.mobile,
-      email: m.email || '',
-      photoUrl: m.photo_url || '',
-      fatherName: m.father_name || '',
-      dob: m.dob || '',
-      gender: m.gender || '',
-      address: m.address || 'ग्राम रसूलपुर, ग्राम पंचायत बहेरा',
-      pincode: m.pincode || '241125',
-      state: m.state || 'Uttar Pradesh',
-      district: m.district || 'Hardoi',
-      block: m.block || 'Hardoi',
-      gramPanchayat: m.gram_panchayat || 'Bahera',
-      villageName: m.village_name || 'Rasoolpur',
-      postOffice: m.post_office || 'Bahera Rasoolpur',
-      houseNo: m.house_no || '',
-      street: m.street || '',
-      occupation: m.occupation || '',
-      designation: m.designation || '',
-      politicalBackground: m.political_background || '',
-      bloodGroup: m.blood_group || '',
-      status: m.status || 'active',
-      role: m.role || 'MEMBER',
-      systemRole: m.system_role || 'MEMBER',
-      organizationName: m.organization_name || 'ग्रामोदय यूथ मंच',
-      createdAt: m.created_at,
+      email: m.email || "",
+      status: m.status,
+      photoUrl: m.photoUrl || "",
+      organizationName: m.organizationName || "ग्रामोदय यूथ मंच",
+      fatherName: m.fatherName || "",
+      dob: m.dob || "",
+      gender: m.gender || "",
+      address: m.address || "ग्राम रसूलपुर, ग्राम पंचायत बहेरा",
+      pincode: m.pincode || "241125",
+      state: m.state || "Uttar Pradesh",
+      district: m.district || "Hardoi",
+      block: m.block || "Hardoi",
+      gramPanchayat: m.gramPanchayat || "Bahera",
+      villageName: m.villageName || "Rasoolpur",
+      postOffice: m.postOffice || "Bahera Rasoolpur",
+      houseNo: m.houseNo || "",
+      street: m.street || "",
+      occupation: m.occupation || "",
+      designation: m.designation || "",
+      politicalBackground: m.politicalBackground || "",
+      bloodGroup: m.bloodGroup || "",
+      role: m.role || "MEMBER",
+      systemRole: m.systemRole || "MEMBER",
+      createdAt: m.createdAt,
     }));
 
-    return NextResponse.json({
-      success: true,
-      members: formatted,
-      source: 'postgres',
-    });
-  } catch (error: any) {
-    console.error('Error fetching members from DB:', error);
-    return NextResponse.json({ error: 'Failed to fetch members' }, { status: 500 });
+    return NextResponse.json({ success: true, members: formatted });
+  } catch (err: any) {
+    console.error("Error fetching members:", err);
+    return NextResponse.json({ success: false, error: "Failed to fetch members" }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
   try {
+    const validation = await validateRequestBody(req, memberCreateSchema);
+    if (!validation.success) {
+      return validation.response;
+    }
     const {
       name,
       mobile,
@@ -96,34 +81,27 @@ export async function POST(req: Request) {
       designation,
       politicalBackground,
       bloodGroup,
-      status = 'active',
-      organizationName = 'ग्रामोदय यूथ मंच',
-    } = await req.json();
+      status = "active",
+      role = "MEMBER",
+      systemRole = "MEMBER",
+      organizationName = "ग्रामोदय यूथ मंच",
+    } = validation.data;
 
-    if (!name || !name.trim()) {
-      return NextResponse.json({ error: 'कृपया सदस्य का पूरा नाम दर्ज करें।' }, { status: 400 });
+    const db = getDb();
+    if (!db) {
+      return NextResponse.json({ success: false, error: "Database connection unavailable." }, { status: 500 });
     }
 
-    const cleanMobileDigits = normalizeMobile(mobile || '');
-    if (!cleanMobileDigits || cleanMobileDigits.length < 10) {
-      return NextResponse.json({ error: 'कृपया वैध 10-अंकीय मोबाइल नंबर दर्ज करें।' }, { status: 400 });
-    }
-
-    const sql = getSqlClient();
-    if (!sql) {
-      return NextResponse.json({ error: 'डेटाबेस कनेक्शन अनुपलब्ध है।' }, { status: 500 });
-    }
-
-    const formattedMobile = `+91 ${cleanMobileDigits.slice(0, 5)} ${cleanMobileDigits.slice(5)}`;
+    const cleanMobileDigits = normalizeMobile(mobile || "");
+    const formattedMobile = "+91 " + cleanMobileDigits.slice(0, 5) + " " + cleanMobileDigits.slice(5);
     const passwordHash = password ? hashPassword(password) : null;
 
     // Check duplicate in PostgreSQL
-    const existing = await sql`
-      SELECT id, name, mobile, email, status, role, system_role, village_id 
-      FROM public.members 
-      WHERE mobile LIKE ${`%${cleanMobileDigits}%`}
-      LIMIT 1;
-    `;
+    const existing = await db
+      .select()
+      .from(schema.members)
+      .where(like(schema.members.mobile, "%" + cleanMobileDigits + "%"))
+      .limit(1);
 
     if (existing && existing.length > 0) {
       const ex = existing[0];
@@ -131,16 +109,16 @@ export async function POST(req: Request) {
         id: String(ex.id),
         name: ex.name,
         mobile: ex.mobile,
-        email: ex.email,
-        role: ex.system_role || ex.role || 'MEMBER',
-        systemRole: ex.system_role || ex.role || 'MEMBER',
-        villageId: ex.village_id ? String(ex.village_id) : 'vil_rasoolpur',
-        isAdmin: false,
+        email: ex.email || undefined,
+        role: ex.systemRole || ex.role || "MEMBER",
+        systemRole: ex.systemRole || ex.role || "MEMBER",
+        villageId: ex.villageId ? String(ex.villageId) : "1",
+        isAdmin: ex.systemRole === "ADMIN" || ex.systemRole === "SUPER_ADMIN",
       });
 
       return NextResponse.json(
         {
-          error: `यह मोबाइल नंबर (${formattedMobile}) पहले से पंजीकृत है [स्थिति: ${ex.status === 'active' ? 'सक्रिय' : 'लंबित'}]।`,
+          error: "यह मोबाइल नंबर (" + formattedMobile + ") पहले से पंजीकृत है [स्थिति: " + (ex.status === "active" ? "सक्रिय" : "लंबित") + "]।",
           alreadyRegistered: true,
           member: ex,
           token,
@@ -149,140 +127,88 @@ export async function POST(req: Request) {
       );
     }
 
-    // Resolve village ID
-    let numericVillageId: number | null = null;
-    if (villageId && !isNaN(Number(villageId))) {
-      numericVillageId = Number(villageId);
-    } else {
-      const foundVillage = await sql`SELECT id FROM public.villages LIMIT 1;`;
-      if (foundVillage && foundVillage.length > 0) {
-        numericVillageId = foundVillage[0].id;
-      }
-    }
+    const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
 
-    const inserted = await sql`
-      INSERT INTO public.members (
-        village_id,
-        name,
-        mobile,
-        email,
-        password_hash,
-        status,
-        photo_url,
-        organization_name,
-        father_name,
-        dob,
-        gender,
-        address,
-        pincode,
-        state,
-        district,
-        block,
-        gram_panchayat,
-        village_name,
-        post_office,
-        house_no,
-        street,
-        occupation,
-        designation,
-        political_background,
-        blood_group,
-        role,
-        system_role,
-        created_at,
-        updated_at
-      ) VALUES (
-        ${numericVillageId},
-        ${name.trim()},
-        ${formattedMobile},
-        ${email ? email.trim() : null},
-        ${passwordHash},
-        ${status as any},
-        ${photoUrl || null},
-        ${organizationName},
-        ${fatherName ? fatherName.trim() : null},
-        ${dob ? dob.trim() : null},
-        ${gender ? gender.trim() : null},
-        ${address ? address.trim() : 'ग्राम रसूलपुर, ग्राम पंचायत बहेरा'},
-        ${pincode ? pincode.trim() : '222139'},
-        ${state ? state.trim() : 'Uttar Pradesh'},
-        ${district ? district.trim() : 'Jaunpur'},
-        ${block ? block.trim() : 'Shahganj'},
-        ${gramPanchayat ? gramPanchayat.trim() : 'Bahera'},
-        ${villageName ? villageName.trim() : 'Rasoolpur'},
-        ${postOffice ? postOffice.trim() : 'Rasulpur'},
-        ${houseNo ? houseNo.trim() : null},
-        ${street ? street.trim() : null},
-        ${occupation ? occupation.trim() : null},
-        ${designation ? designation.trim() : null},
-        ${politicalBackground ? politicalBackground.trim() : null},
-        ${bloodGroup ? bloodGroup.trim() : null},
-        'MEMBER',
-        'MEMBER',
-        NOW(),
-        NOW()
-      )
-      RETURNING *;
-    `;
+    const [inserted] = await db
+      .insert(schema.members)
+      .values({
+        villageId: numericVillageId,
+        name: name.trim(),
+        mobile: formattedMobile,
+        email: email ? email.trim() : null,
+        passwordHash,
+        status: status as any,
+        photoUrl: photoUrl || null,
+        organizationName: organizationName.trim(),
+        fatherName: fatherName ? fatherName.trim() : null,
+        dob: dob || null,
+        gender: gender || null,
+        address: address || "ग्राम रसूलपुर, ग्राम पंचायत बहेरा",
+        pincode: pincode || "241125",
+        state: state || "Uttar Pradesh",
+        district: district || "Hardoi",
+        block: block || "Hardoi",
+        gramPanchayat: gramPanchayat || "Bahera",
+        villageName: villageName || "Rasoolpur",
+        postOffice: postOffice || "Bahera Rasoolpur",
+        houseNo: houseNo || null,
+        street: street || null,
+        occupation: occupation || null,
+        designation: designation || null,
+        politicalBackground: politicalBackground || null,
+        bloodGroup: bloodGroup || null,
+        role: role as any,
+        systemRole: systemRole as any,
+      })
+      .returning();
 
-    const newMemberRecord = inserted[0];
-    const newMember = {
-      id: String(newMemberRecord.id),
-      villageId: newMemberRecord.village_id ? String(newMemberRecord.village_id) : 'vil_rasoolpur',
-      name: newMemberRecord.name,
-      mobile: newMemberRecord.mobile,
-      email: newMemberRecord.email || '',
-      photoUrl: newMemberRecord.photo_url || '',
-      fatherName: newMemberRecord.father_name || '',
-      dob: newMemberRecord.dob || '',
-      gender: newMemberRecord.gender || '',
-      address: newMemberRecord.address || '',
-      occupation: newMemberRecord.occupation || '',
-      designation: newMemberRecord.designation || '',
-      politicalBackground: newMemberRecord.political_background || '',
-      bloodGroup: newMemberRecord.blood_group || '',
-      status: newMemberRecord.status || 'active',
-      role: newMemberRecord.role || 'MEMBER',
-      systemRole: newMemberRecord.system_role || 'MEMBER',
-      organizationName: newMemberRecord.organization_name || 'ग्रामोदय यूथ मंच',
-      createdAt: newMemberRecord.created_at,
+    const formatted = {
+      id: String(inserted.id),
+      villageId: inserted.villageId ? String(inserted.villageId) : "1",
+      name: inserted.name,
+      mobile: inserted.mobile,
+      email: inserted.email || "",
+      photoUrl: inserted.photoUrl || "",
+      fatherName: inserted.fatherName || "",
+      dob: inserted.dob || "",
+      gender: inserted.gender || "",
+      address: inserted.address || "",
+      pincode: inserted.pincode || "241125",
+      state: inserted.state || "Uttar Pradesh",
+      district: inserted.district || "Hardoi",
+      block: inserted.block || "Hardoi",
+      gramPanchayat: inserted.gramPanchayat || "Bahera",
+      villageName: inserted.villageName || "Rasoolpur",
+      postOffice: inserted.postOffice || "Bahera Rasoolpur",
+      houseNo: inserted.houseNo || "",
+      street: inserted.street || "",
+      occupation: inserted.occupation || "",
+      designation: inserted.designation || "",
+      politicalBackground: inserted.politicalBackground || "",
+      bloodGroup: inserted.bloodGroup || "",
+      status: inserted.status,
+      role: inserted.role,
+      systemRole: inserted.systemRole,
+      organizationName: inserted.organizationName,
+      createdAt: inserted.createdAt,
     };
 
     const token = await signJwtToken({
-      id: newMember.id,
-      name: newMember.name,
-      mobile: newMember.mobile,
-      email: newMember.email,
-      role: 'MEMBER',
-      systemRole: 'MEMBER',
-      villageId: newMember.villageId,
+      id: formatted.id,
+      name: formatted.name,
+      mobile: formatted.mobile,
+      email: formatted.email,
+      role: formatted.systemRole,
+      systemRole: formatted.systemRole,
+      villageId: formatted.villageId,
       isAdmin: false,
     });
 
-    logAuditAction(
-      `Registered Member (${newMember.name}) [Role: MEMBER]`,
-      'Public Registration Portal',
-      newMember.mobile,
-      newMember.name
-    );
+    logAuditAction("New Member Registration: " + formatted.name, formatted.name, formatted.mobile, formatted.name);
 
-    const response = NextResponse.json(
-      {
-        success: true,
-        member: newMember,
-        token,
-        message: 'सदस्यता सफलतापूर्वक दर्ज हो गई है।',
-      },
-      { status: 201 }
-    );
-
-    setAuthCookie(response, token);
-    return response;
-  } catch (error: any) {
-    console.error('Error adding member to Postgres:', error);
-    return NextResponse.json(
-      { error: error.message || 'सदस्य जोड़ने में त्रुटि हुई।' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true, member: formatted, token });
+  } catch (err: any) {
+    console.error("Error creating member:", err);
+    return NextResponse.json({ success: false, error: err?.message || "Failed to register member" }, { status: 500 });
   }
 }

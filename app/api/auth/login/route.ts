@@ -1,10 +1,18 @@
+import { validateRequestBody, authLoginSchema } from '@/src/lib/validations';
 import { NextResponse } from 'next/server';
 import { getSqlClient, normalizeMobile, hashPassword, logAuditAction } from '@/src/lib/authUtils';
 import { signJwtToken, setAuthCookie } from '@/src/lib/jwtAuth';
 
 export async function POST(req: Request) {
   try {
-    const { identifier, emailOrMobile, mobile, email, password } = await req.json();
+    const validation = await validateRequestBody(req, authLoginSchema);
+    if (!validation.success) {
+      return validation.response;
+    }
+    const { mobile, password } = validation.data;
+    const identifier = mobile;
+    const emailOrMobile = mobile;
+    const email = mobile.includes("@") ? mobile : undefined;
     const rawInput = String(identifier || emailOrMobile || mobile || email || '').trim();
     const rawPassword = String(password || '');
 

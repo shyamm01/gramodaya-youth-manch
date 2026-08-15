@@ -1,3 +1,4 @@
+import { validateRequestBody, villageCreateSchema } from '@/src/lib/validations';
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore, logAuditAction } from '@/src/lib/serverStore';
 
@@ -12,7 +13,10 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const validation = await validateRequestBody(req, villageCreateSchema);
+    if (!validation.success) {
+      return validation.response;
+    }
     const {
       name,
       nameHindi,
@@ -32,7 +36,7 @@ export async function POST(req: Request) {
       taglineHindi,
       adminName,
       adminMobile,
-    } = body;
+    } = validation.data;
 
     if (!name || !nameHindi) {
       return NextResponse.json({ error: 'Village name in English and Hindi is required.' }, { status: 400 });

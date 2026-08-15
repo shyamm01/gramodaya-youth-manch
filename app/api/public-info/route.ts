@@ -1,115 +1,90 @@
-import { NextResponse } from 'next/server';
-import { getSqlClient, logAuditAction } from '@/src/lib/authUtils';
+import { NextResponse } from "next/server";
+import { getDb } from "@/src/db";
+import * as schema from "@/src/db/schema";
+import { desc } from "drizzle-orm";
+import { validateRequestBody, publicInfoCreateSchema } from "@/src/lib/validations";
+import { logAuditAction } from "@/src/lib/authUtils";
 
 export async function GET() {
   try {
-    const sql = getSqlClient();
-    if (!sql) return NextResponse.json({ success: true, publicInfos: [] });
+    const db = getDb();
+    if (!db) return NextResponse.json({ success: true, publicInfos: [] });
 
-    const rows = await sql`
-      SELECT 
-        id, 
-        village_id as "villageId",
-        title, 
-        description, 
-        category, 
-        submitter_name as "submitterName", 
-        submitter_mobile as "submitterMobile", 
-        status, 
-        created_at as "createdAt"
-      FROM public.public_infos 
-      ORDER BY id DESC;
-    `;
+    const rows = await db.select().from(schema.publicInfos).orderBy(desc(schema.publicInfos.id));
 
-    const formatted = rows.map((p: any) => ({
-      ...p,
+    const formatted = rows.map((p) => ({
       id: String(p.id),
-      villageId: p.villageId ? String(p.villageId) : 'vil_rasoolpur',
+      villageId: p.villageId ? String(p.villageId) : "1",
+      title: p.title,
+      description: p.description,
+      category: p.category,
+      submitterName: p.submitterName,
+      submitterMobile: p.submitterMobile,
+      status: p.status,
+      createdAt: p.createdAt,
     }));
 
     return NextResponse.json({ success: true, publicInfos: formatted });
   } catch (err: any) {
-    console.error('Error fetching public info:', err);
-    return NextResponse.json({ error: 'Failed to fetch public info' }, { status: 500 });
+    console.error("Error fetching public info:", err);
+    return NextResponse.json({ success: false, error: "Failed to fetch public info" }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
   try {
+    const validation = await validateRequestBody(req, publicInfoCreateSchema);
+    if (!validation.success) {
+      return validation.response;
+    }
     const {
       title,
       description,
-      category,
+      category = "General",
       submitterName,
       submitterMobile,
       villageId,
-      status = 'pending',
       adminName,
       adminMobile,
-    } = await req.json();
+    } = validation.data;
 
-    if (!title || !description || !submitterName || !submitterMobile) {
-      return NextResponse.json({ error: 'सभी आवश्यक विवरण भरें।' }, { status: 400 });
+    const db = getDb();
+    if (!db) {
+      return NextResponse.json({ success: false, error: "Database connection unavailable." }, { status: 500 });
     }
 
-    const sql = getSqlClient();
-    if (!sql) return NextResponse.json({ error: 'डेटाबेस अनुपलब्ध है।' }, { status: 500 });
+    const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
 
-    let numericVillageId: number | null = null;
-    if (villageId && !isNaN(Number(villageId))) {
-      numericVillageId = Number(villageId);
-    } else {
-      const found = await sql`SELECT id FROM public.villages LIMIT 1;`;
-      if (found && found.length > 0) numericVillageId = found[0].id;
-    }
+    const [inserted] = await db
+      .insert(schema.publicInfos)
+      .values({
+        villageId: numericVillageId,
+        title: title.trim(),
+        description: description.trim(),
+        category: category.trim(),
+        submitterName: submitterName.trim(),
+        submitterMobile: submitterMobile.trim(),
+        status: "approved",
+      })
+      .returning();
 
-    const inserted = await sql`
-      INSERT INTO public.public_infos (
-        village_id,
-        title,
-        description,
-        category,
-        submitter_name,
-        submitter_mobile,
-        status,
-        created_at,
-        updated_at
-      ) VALUES (
-        ${numericVillageId},
-        ${title.trim()},
-        ${description.trim()},
-        ${category ? category.trim() : 'General'},
-        ${submitterName.trim()},
-        ${submitterMobile.trim()},
-        ${(status || 'pending') as any},
-        NOW(),
-        NOW()
-      )
-      RETURNING *;
-    `;
-
-    const newInfo = {
-      id: String(inserted[0].id),
-      villageId: inserted[0].village_id ? String(inserted[0].village_id) : 'vil_rasoolpur',
-      title: inserted[0].title,
-      description: inserted[0].description,
-      category: inserted[0].category,
-      submitterName: inserted[0].submitter_name,
-      submitterMobile: inserted[0].submitter_mobile,
-      status: inserted[0].status,
-      createdAt: inserted[0].created_at,
+    const formatted = {
+      id: String(inserted.id),
+      villageId: inserted.villageId ? String(inserted.villageId) : "1",
+      title: inserted.title,
+      description: inserted.description,
+      category: inserted.category,
+      submitterName: inserted.submitterName,
+      submitterMobile: inserted.submitterMobile,
+      status: inserted.status,
+      createdAt: inserted.createdAt,
     };
 
-    logAuditAction(
-      `Submitted Public Information (${newInfo.title})`,
-      adminName || submitterName || 'Public Portal',
-      adminMobile || submitterMobile,
-      newInfo.title
-    );
+    logAuditAction("Created Public Info: " + formatted.title, submitterName, submitterMobile, formatted.title);
 
-    return NextResponse.json({ success: true, publicInfo: newInfo }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error submitting public info:', error);
-    return NextResponse.json({ error: error.message || 'त्रुटि हुई।' }, { status: 500 });
+    return NextResponse.json({ success: true, publicInfo: formatted });
+  } catch (err: any) {
+    console.error("Error creating public info:", err);
+    return NextResponse.json({ success: false, error: err?.message || "Failed to create public info" }, { status: 500 });
   }
 }
