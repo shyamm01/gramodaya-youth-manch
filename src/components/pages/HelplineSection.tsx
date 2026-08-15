@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { PhoneCall, Phone, MessageSquare, ShieldCheck } from 'lucide-react';
 import {
@@ -13,7 +13,43 @@ import {
 import { WhatsAppIcon } from '../common';
 
 export const HelplineSection: React.FC = () => {
-  const { admins, villageSettings, t, lang } = useApp();
+  const { admins: contextAdmins, villageSettings, t, lang } = useApp();
+  const [fetchedAdmins, setFetchedAdmins] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const inFlightHelplinePromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/helpline (deduplicated)
+  const fetchHelpline = React.useCallback(async () => {
+    if (inFlightHelplinePromiseRef.current) {
+      return inFlightHelplinePromiseRef.current;
+    }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/helpline', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.helplineContacts)) {
+            setFetchedAdmins(data.helplineContacts);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/helpline:', e);
+      } finally {
+        setLoading(false);
+        inFlightHelplinePromiseRef.current = null;
+      }
+    })();
+    inFlightHelplinePromiseRef.current = promise;
+    return promise;
+  }, []);
+
+  React.useEffect(() => {
+    fetchHelpline();
+  }, [fetchHelpline]);
+
+  const admins = fetchedAdmins || contextAdmins;
 
   return (
     <div className="py-6 px-4 sm:px-6 max-w-7xl mx-auto transition-colors duration-200">

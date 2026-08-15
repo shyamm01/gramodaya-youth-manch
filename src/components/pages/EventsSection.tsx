@@ -12,12 +12,15 @@ import {
   Textarea,
   Dialog,
   DatePicker,
+  ImageUploader,
 } from '../ui';
 import { WhatsAppIcon } from '../common';
 
 export const EventsSection: React.FC = () => {
-  const { events, createEvent, updateEvent, updateEventStatus, deleteEvent, authSession, t } = useApp();
+  const { events: contextEvents, createEvent, updateEvent, updateEventStatus, deleteEvent, authSession, t } = useApp();
 
+  const [fetchedEvents, setFetchedEvents] = useState<EventItem[] | null>(null);
+  const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
@@ -30,6 +33,40 @@ export const EventsSection: React.FC = () => {
   const [status, setStatus] = useState<EventStatus>('DRAFT');
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const inFlightEventsPromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/events (deduplicated)
+  const fetchEvents = React.useCallback(async () => {
+    if (inFlightEventsPromiseRef.current) {
+      return inFlightEventsPromiseRef.current;
+    }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/events', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.events)) {
+            setFetchedEvents(data.events);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/events:', e);
+      } finally {
+        setLoading(false);
+        inFlightEventsPromiseRef.current = null;
+      }
+    })();
+    inFlightEventsPromiseRef.current = promise;
+    return promise;
+  }, []);
+
+  React.useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
+
+  const events = fetchedEvents || contextEvents;
 
   const openCreateModal = () => {
     setEditingEventId(null);
@@ -359,13 +396,17 @@ export const EventsSection: React.FC = () => {
             />
           </div>
 
+          {/* Event Photo Upload with Drag & Drop & Supabase Storage */}
           <div>
-            <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">फोटो अपलोड करें</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="w-full text-xs text-[#8C8675] dark:text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-950 file:text-emerald-800 dark:file:text-emerald-300"
+            <ImageUploader
+              value={photoUrl}
+              onChange={setPhotoUrl}
+              onRemove={() => setPhotoUrl('')}
+              bucket="images"
+              folder="events"
+              label="फोटो अपलोड करें"
+              aspectRatio="video"
+              hint="इवेंट फ़ोटो यहाँ खींचें या क्लिक करें (Drag & Drop or Click)"
             />
           </div>
 

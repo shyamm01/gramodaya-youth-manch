@@ -10,12 +10,13 @@ import {
   Textarea,
   Dialog,
   DatePicker,
+  ImageUploader,
 } from '../ui';
 import { WhatsAppIcon } from '../common';
 
 export const SocialWorkSection: React.FC = () => {
   const {
-    socialWorks,
+    socialWorks: contextSocialWorks,
     submitSocialWork,
     authSession,
     isApprovedMember,
@@ -29,6 +30,8 @@ export const SocialWorkSection: React.FC = () => {
     villageSettings,
   } = useApp();
 
+  const [fetchedSocialWorks, setFetchedSocialWorks] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unapprovedAlert, setUnapprovedAlert] = useState(false);
   const [title, setTitle] = useState('');
@@ -39,6 +42,40 @@ export const SocialWorkSection: React.FC = () => {
   const [photoUrl, setPhotoUrl] = useState('');
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const inFlightSocialWorksPromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/social-work (deduplicated)
+  const fetchSocialWorks = React.useCallback(async () => {
+    if (inFlightSocialWorksPromiseRef.current) {
+      return inFlightSocialWorksPromiseRef.current;
+    }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/social-work', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.socialWorks)) {
+            setFetchedSocialWorks(data.socialWorks);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/social-work:', e);
+      } finally {
+        setLoading(false);
+        inFlightSocialWorksPromiseRef.current = null;
+      }
+    })();
+    inFlightSocialWorksPromiseRef.current = promise;
+    return promise;
+  }, []);
+
+  React.useEffect(() => {
+    fetchSocialWorks();
+  }, [fetchSocialWorks]);
+
+  const socialWorks = fetchedSocialWorks || contextSocialWorks;
 
   // Approved/Published social works visible to public
   const publicWorks = socialWorks.filter(
@@ -70,12 +107,13 @@ export const SocialWorkSection: React.FC = () => {
       setTitle('');
       setDescription('');
       setPhotoUrl('');
+      fetchSocialWorks();
       setTimeout(() => {
         setIsModalOpen(false);
         setMsg('');
       }, 2000);
     } else {
-      setMsg(lang === 'en' ? 'An error occurred. Please try again.' : 'त्रुटि हुई। कृपया पुनः प्रयास करें।');
+      setMsg(res.error || (lang === 'en' ? 'An error occurred. Please try again.' : 'त्रुटि हुई। कृपया पुनः प्रयास करें।'));
     }
   };
 
@@ -360,15 +398,17 @@ export const SocialWorkSection: React.FC = () => {
             />
           </div>
 
+          {/* Social Work Photo Upload with Drag & Drop & Supabase Storage */}
           <div>
-            <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
-              {t('problems.uploadPhotoLabel')}
-            </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageUpload}
-              className="w-full text-xs text-[#8C8675] dark:text-slate-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-950 file:text-emerald-800 dark:file:text-emerald-300 hover:file:bg-emerald-100"
+            <ImageUploader
+              value={photoUrl}
+              onChange={setPhotoUrl}
+              onRemove={() => setPhotoUrl('')}
+              bucket="images"
+              folder="social_work"
+              label={t('problems.uploadPhotoLabel')}
+              aspectRatio="video"
+              hint="फ़ोटो यहाँ खींचें या क्लिक करें (Drag & Drop or Click)"
             />
           </div>
 

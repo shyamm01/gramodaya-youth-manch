@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "user_permissions" (
 	"id" bigserial PRIMARY KEY NOT NULL,
-	"user_id" bigint NOT NULL,
+	"member_id" bigint NOT NULL,
 	"permission_code" text NOT NULL,
 	"scope_type" "role_scope" DEFAULT 'VILLAGE' NOT NULL,
 	"scope_id" bigint,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS "user_permissions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_user_permissions_user" ON "user_permissions" USING btree ("user_id");
+CREATE INDEX IF NOT EXISTS "idx_user_permissions_member_id" ON "user_permissions" USING btree ("member_id");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_user_permissions_code" ON "user_permissions" USING btree ("permission_code");
 --> statement-breakpoint
@@ -21,3 +21,8 @@ EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
 --> statement-breakpoint
+DO $$ BEGIN
+  ALTER TABLE "user_permissions" ADD CONSTRAINT "user_permissions_member_id_members_id_fk" FOREIGN KEY ("member_id") REFERENCES "public"."members"("id") ON DELETE cascade ON UPDATE no action;
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;

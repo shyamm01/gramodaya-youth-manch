@@ -5,6 +5,7 @@ export interface SupabaseRoom {
   id: string;
   name: string;
   type: 'group' | 'personal' | 'admin';
+  village_id?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -23,11 +24,15 @@ export interface SupabaseRoomMember {
 export interface SupabaseMessage {
   id: string;
   room_id: string;
+  village_id?: string;
   sender_mobile: string;
   sender_name: string;
   sender_photo?: string;
   sender_member_id?: string;
   text: string;
+  photo_url?: string;
+  audio_url?: string;
+  reactions?: Record<string, string[]>; // { "👍": ["9876543210"], "❤️": ["9999999999"] }
   created_at: string;
   is_read?: boolean;
   is_deleted?: boolean;
@@ -49,63 +54,94 @@ export interface ChatRoomListItem {
   lastSeen?: string;
 }
 
-const COMMON_GROUP_NAME = 'ग्रामोदय यूथ मंच — Group Chat';
+// Cache to prevent repeated PGRST205 calls if table is missing in Supabase schema cache
+let isChatMessagesTableAvailable = false;
+let isChatRoomsTableAvailable = false;
 
-// 1. Storage Helper: Upload to Supabase 'member-photos' Bucket
+// ── 0. Web Audio API Chime Synthesizer ──
+export function playChatChime() {
+  if (typeof window === 'undefined') return;
+  try {
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+
+    const now = ctx.currentTime;
+    const osc1 = ctx.createOscillator();
+    const osc2 = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(739.99, now); // F#5
+    osc1.frequency.exponentialRampToValueAtTime(932.33, now + 0.08); // A#5
+
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(739.99, now);
+    osc2.frequency.exponentialRampToValueAtTime(932.33, now + 0.08);
+
+    gainNode.gain.setValueAtTime(0.12, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+    osc1.connect(gainNode);
+    osc2.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + 0.35);
+    osc2.stop(now + 0.35);
+  } catch (e) {
+    // Non-blocking
+  }
+}
+
+// 1. Storage Helper: Upload to Supabase Storage (with fallback)
 export async function uploadToMemberPhotosBucket(
   fileOrBase64: string | File,
   memberId: string
 ): Promise<{ success: boolean; publicUrl?: string; error?: string }> {
   try {
-    const bucketName = 'member-photos';
-
-    // Convert Base64 data URL to Blob if necessary
-    let fileBody: Blob | File;
-    let fileName = `member_${memberId}_${Date.now()}.jpg`;
-
     if (typeof fileOrBase64 === 'string') {
-      if (fileOrBase64.startsWith('data:')) {
-        const arr = fileOrBase64.split(',');
-        const mimeMatch = arr[0].match(/:(.*?);/);
-        const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        while (n--) {
-          u8arr[n] = bstr.charCodeAt(n);
+      const res = await fetch('/api/upload/supabase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base64: fileOrBase64,
+          bucket: 'gramodaya-youth-munch',
+          folder: 'chat_attachments',
+          filename: `chat_${memberId}_${Date.now()}.jpg`,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          return { success: true, publicUrl: data.url };
         }
-        fileBody = new Blob([u8arr], { type: mime });
-      } else {
-        // Already a URL
-        return { success: true, publicUrl: fileOrBase64 };
       }
     } else {
-      fileBody = fileOrBase64;
-      fileName = `${memberId}_${Date.now()}_${fileOrBase64.name}`;
-    }
+      const formData = new FormData();
+      formData.append('file', fileOrBase64);
+      formData.append('bucket', 'gramodaya-youth-munch');
+      formData.append('folder', 'chat_attachments');
+      formData.append('filename', `chat_${memberId}_${Date.now()}_${fileOrBase64.name}`);
 
-    // Try uploading to Supabase Storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from(bucketName)
-      .upload(fileName, fileBody, {
-        cacheControl: '3600',
-        upsert: true,
+      const res = await fetch('/api/upload/supabase', {
+        method: 'POST',
+        body: formData,
       });
-
-    if (uploadError) {
-      console.warn('Supabase storage upload error, fallback to publicUrl:', uploadError.message);
-      // Fallback: If bucket is not accessible or created, return base64 / data string as publicUrl
-      if (typeof fileOrBase64 === 'string') {
-        return { success: true, publicUrl: fileOrBase64 };
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          return { success: true, publicUrl: data.url };
+        }
       }
-      return { success: false, error: uploadError.message };
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(uploadData.path);
-    return { success: true, publicUrl: urlData.publicUrl };
+    if (typeof fileOrBase64 === 'string') {
+      return { success: true, publicUrl: fileOrBase64 };
+    }
+    return { success: false, error: 'Upload failed' };
   } catch (err: any) {
-    console.error('Failed to upload photo to Supabase storage:', err);
     if (typeof fileOrBase64 === 'string') {
       return { success: true, publicUrl: fileOrBase64 };
     }
@@ -113,259 +149,339 @@ export async function uploadToMemberPhotosBucket(
   }
 }
 
-// 2. Fetch or Create Common Group Room
-export async function getOrCreateGroupRoom(): Promise<SupabaseRoom | null> {
+// 2. Fetch or Create Village Forum Group Room (Scoped by villageId)
+export async function getOrCreateGroupRoom(villageId: string = '1', villageName?: string): Promise<SupabaseRoom> {
+  const roomId = `room_village_${villageId}`;
+  const roomName = villageName ? `${villageName} — Village Forum` : 'ग्रामोदय समूह मंच';
+
+  const defaultRoom: SupabaseRoom = {
+    id: roomId,
+    name: roomName,
+    type: 'group',
+    village_id: villageId,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  if (!isChatRoomsTableAvailable) {
+    return defaultRoom;
+  }
+
   try {
     const { data: rooms, error } = await supabase
       .from('chat_rooms')
       .select('*')
-      .eq('type', 'group')
-      .eq('name', COMMON_GROUP_NAME)
+      .eq('id', roomId)
       .limit(1);
 
     if (error) {
-      console.warn('Supabase query chat_rooms group error:', error.message);
-      return {
-        id: 'common_group_room',
-        name: COMMON_GROUP_NAME,
-        type: 'group',
-      };
+      isChatRoomsTableAvailable = false;
+      return defaultRoom;
     }
 
     if (rooms && rooms.length > 0) {
       return rooms[0];
     }
 
-    // Create room
-    const newRoom = {
-      id: 'common_group_room',
-      name: COMMON_GROUP_NAME,
-      type: 'group' as const,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
     const { data: created, error: createErr } = await supabase
       .from('chat_rooms')
-      .insert([newRoom])
+      .insert([defaultRoom])
       .select()
       .single();
 
     if (createErr) {
-      console.warn('Failed to insert group room in Supabase:', createErr.message);
-      return newRoom;
+      isChatRoomsTableAvailable = false;
+      return defaultRoom;
     }
 
     return created;
   } catch (e) {
-    console.error('getOrCreateGroupRoom exception:', e);
-    return {
-      id: 'common_group_room',
-      name: COMMON_GROUP_NAME,
-      type: 'group',
-    };
+    isChatRoomsTableAvailable = false;
+    return defaultRoom;
   }
 }
 
-// 3. Fetch or Create Personal / Admin Room (1-to-1)
-export async function getOrCreatePersonalRoom(
+// 3. Fetch or Create Admin Helpdesk Room (Scoped by villageId & citizen mobile)
+export async function getOrCreateAdminHelpdeskRoom(
   userMobile: string,
-  partnerMobile: string,
-  userName: string,
-  partnerName: string,
-  type: 'personal' | 'admin' = 'personal'
-): Promise<SupabaseRoom | null> {
+  villageId: string = '1',
+  userName: string = 'Member',
+  villageName?: string
+): Promise<SupabaseRoom> {
+  const uDigits = userMobile.replace(/\D/g, '').slice(-10);
+  const roomId = `room_admin_${villageId}_${uDigits}`;
+  const roomName = `${userName} — ${villageName || 'ग्राम'} एडमिन हेल्प`;
+
+  const defaultRoom: SupabaseRoom = {
+    id: roomId,
+    name: roomName,
+    type: 'admin',
+    village_id: villageId,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  if (!isChatRoomsTableAvailable) {
+    return defaultRoom;
+  }
+
   try {
-    // Standardize digits
-    const uDigits = userMobile.replace(/\D/g, '').slice(-10);
-    const pDigits = partnerMobile.replace(/\D/g, '').slice(-10);
-
-    const roomId = `room_pv_${[uDigits, pDigits].sort().join('_')}`;
-
-    // Check if room exists
-    const { data: existingRoom } = await supabase
+    const { data: existingRoom, error } = await supabase
       .from('chat_rooms')
       .select('*')
       .eq('id', roomId)
       .maybeSingle();
 
+    if (error) {
+      isChatRoomsTableAvailable = false;
+      return defaultRoom;
+    }
+
     if (existingRoom) {
       return existingRoom;
     }
 
-    // Create room
-    const newRoom: SupabaseRoom = {
-      id: roomId,
-      name: `${userName} & ${partnerName}`,
-      type,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error: roomErr } = await supabase.from('chat_rooms').upsert([newRoom]);
-    if (roomErr) console.warn('Supabase room create warning:', roomErr.message);
-
-    // Add room members
-    const roomMembers = [
-      {
-        id: `cm_${roomId}_${uDigits}`,
-        room_id: roomId,
-        member_id: uDigits,
-        mobile: userMobile,
-        name: userName,
-        role: 'member' as const,
-        joined_at: new Date().toISOString(),
-      },
-      {
-        id: `cm_${roomId}_${pDigits}`,
-        room_id: roomId,
-        member_id: pDigits,
-        mobile: partnerMobile,
-        name: partnerName,
-        role: type === 'admin' ? ('admin' as const) : ('member' as const),
-        joined_at: new Date().toISOString(),
-      },
-    ];
-
-    await supabase.from('chat_members').upsert(roomMembers);
-
-    return newRoom;
+    await supabase.from('chat_rooms').upsert([defaultRoom]);
+    return defaultRoom;
   } catch (e) {
-    console.error('getOrCreatePersonalRoom error:', e);
-    const uDigits = userMobile.replace(/\D/g, '').slice(-10);
-    const pDigits = partnerMobile.replace(/\D/g, '').slice(-10);
-    return {
-      id: `room_pv_${[uDigits, pDigits].sort().join('_')}`,
-      name: `${userName} & ${partnerName}`,
-      type,
-    };
+    isChatRoomsTableAvailable = false;
+    return defaultRoom;
   }
 }
 
-// 4. Send Message to Supabase Room
+// 4. Fetch or Create Personal Room (1-to-1)
+export async function getOrCreatePersonalRoom(
+  userMobile: string,
+  partnerMobile: string,
+  userName: string,
+  partnerName: string
+): Promise<SupabaseRoom> {
+  const uDigits = userMobile.replace(/\D/g, '').slice(-10);
+  const pDigits = partnerMobile.replace(/\D/g, '').slice(-10);
+  const roomId = `room_pv_${[uDigits, pDigits].sort().join('_')}`;
+
+  const defaultRoom: SupabaseRoom = {
+    id: roomId,
+    name: `${userName} & ${partnerName}`,
+    type: 'personal',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  if (!isChatRoomsTableAvailable) {
+    return defaultRoom;
+  }
+
+  try {
+    const { data: existingRoom, error } = await supabase
+      .from('chat_rooms')
+      .select('*')
+      .eq('id', roomId)
+      .maybeSingle();
+
+    if (error) {
+      isChatRoomsTableAvailable = false;
+      return defaultRoom;
+    }
+
+    if (existingRoom) {
+      return existingRoom;
+    }
+
+    await supabase.from('chat_rooms').upsert([defaultRoom]);
+    return defaultRoom;
+  } catch (e) {
+    isChatRoomsTableAvailable = false;
+    return defaultRoom;
+  }
+}
+
+// 5. Send Message to Supabase Room
 export async function sendRoomMessage(
   roomId: string,
   senderMobile: string,
   senderName: string,
   senderPhoto: string,
   text: string,
-  senderMemberId?: string
-): Promise<{ success: boolean; message?: SupabaseMessage; error?: string }> {
-  if (!text || !text.trim()) {
-    return { success: false, error: 'Message content cannot be empty.' };
-  }
-
+  senderMemberId?: string,
+  photoUrl?: string,
+  audioUrl?: string,
+  villageId?: string
+): Promise<{ success: boolean; message: SupabaseMessage; error?: string }> {
   const newMsg: SupabaseMessage = {
     id: `msg_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
     room_id: roomId,
+    village_id: villageId,
     sender_mobile: senderMobile,
     sender_name: senderName,
     sender_photo: senderPhoto || '',
     sender_member_id: senderMemberId || '',
     text: text.trim(),
+    photo_url: photoUrl || undefined,
+    audio_url: audioUrl || undefined,
+    reactions: {},
     created_at: new Date().toISOString(),
     is_read: false,
     is_deleted: false,
   };
 
-  try {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .insert([newMsg])
-      .select()
-      .single();
+  if (!text && !photoUrl && !audioUrl) {
+    return { success: false, message: newMsg, error: 'Message content cannot be empty.' };
+  }
 
-    if (error) {
-      console.warn('Supabase chat_messages insert warning:', error.message);
-      // Fallback: Return construct so UI updates locally
+  if (isChatMessagesTableAvailable) {
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert([newMsg])
+        .select()
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST205' || error.message?.includes('schema cache')) {
+          isChatMessagesTableAvailable = false;
+        }
+        return { success: true, message: newMsg };
+      }
+
+      return { success: true, message: data || newMsg };
+    } catch (e: any) {
+      isChatMessagesTableAvailable = false;
       return { success: true, message: newMsg };
     }
-
-    // Update room updated_at
-    await supabase
-      .from('chat_rooms')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', roomId);
-
-    return { success: true, message: data || newMsg };
-  } catch (e: any) {
-    console.error('sendRoomMessage error:', e);
-    return { success: true, message: newMsg };
   }
+
+  return { success: true, message: newMsg };
 }
 
-// 5. Fetch Messages for Room
-export async function fetchRoomMessages(roomId: string): Promise<SupabaseMessage[]> {
-  try {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('room_id', roomId)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: true });
+// 6. Fetch Messages for Room (Scoped by villageId for Village Forum)
+export async function fetchRoomMessages(
+  roomId: string,
+  userMobile?: string,
+  villageId?: string
+): Promise<SupabaseMessage[]> {
+  // 1. If Supabase table is marked available, try Supabase
+  if (isChatMessagesTableAvailable) {
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('room_id', roomId)
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: true });
 
-    if (error) {
-      console.warn('fetchRoomMessages error:', error.message);
-      return [];
+      if (!error && Array.isArray(data)) {
+        return data;
+      }
+      if (error && (error.code === 'PGRST205' || error.message?.includes('schema cache'))) {
+        isChatMessagesTableAvailable = false;
+      }
+    } catch {
+      isChatMessagesTableAvailable = false;
     }
-
-    return data || [];
-  } catch (e) {
-    console.error('fetchRoomMessages exception:', e);
-    return [];
   }
+
+  // 2. Fetch from Next.js REST API
+  // If Village Forum room (room_village_X or common_group_room)
+  if (roomId.startsWith('room_village_') || roomId === 'common_group_room') {
+    try {
+      const vId = villageId || (roomId.startsWith('room_village_') ? roomId.replace('room_village_', '') : '1');
+      const res = await fetch(`/api/group-chat?villageId=${encodeURIComponent(vId)}`, { credentials: 'include' });
+      if (res.ok) {
+        const apiData = await res.json();
+        if (apiData.success && Array.isArray(apiData.groupMessages)) {
+          return apiData.groupMessages.map((m: any) => ({
+            id: String(m.id),
+            room_id: roomId,
+            village_id: m.villageId || vId,
+            sender_mobile: m.senderMobile || '',
+            sender_name: m.senderName || 'Member',
+            sender_photo: m.senderPhoto || '',
+            sender_member_id: m.senderId || '',
+            text: m.text || '',
+            photo_url: m.photoUrl || undefined,
+            reactions: {},
+            created_at: m.createdAt || new Date().toISOString(),
+            is_read: true,
+            is_deleted: false,
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('API group chat fetch note:', err);
+    }
+  } else if (userMobile) {
+    try {
+      const res = await fetch(`/api/messages?userMobile=${encodeURIComponent(userMobile)}`, { credentials: 'include' });
+      if (res.ok) {
+        const apiData = await res.json();
+        if (apiData.success && Array.isArray(apiData.messages)) {
+          return apiData.messages.map((m: any) => ({
+            id: String(m.id),
+            room_id: roomId,
+            sender_mobile: m.senderMobile || '',
+            sender_name: m.senderName || 'Member',
+            sender_photo: m.senderPhoto || '',
+            sender_member_id: '',
+            text: m.text || '',
+            photo_url: m.photoUrl || undefined,
+            reactions: {},
+            created_at: m.createdAt || new Date().toISOString(),
+            is_read: m.read || false,
+            is_deleted: false,
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn('API direct messages fetch note:', err);
+    }
+  }
+
+  return [];
 }
 
-// 6. Delete Message (Sender or Admin)
+// 7. Delete Message (Sender or Admin) with multi-tier persistence
 export async function deleteChatMessage(
   messageId: string,
   userMobile: string,
-  isAdmin: boolean = false
+  isAdmin: boolean = false,
+  roomId?: string
 ): Promise<{ success: boolean; error?: string }> {
-  try {
-    if (isAdmin) {
-      const { error } = await supabase.from('chat_messages').delete().eq('id', messageId);
-      if (error) {
-        // Soft delete fallback
-        await supabase
-          .from('chat_messages')
-          .update({ is_deleted: true, text: '🚫 यह संदेश एडमिन द्वारा हटा दिया गया है।' })
-          .eq('id', messageId);
-      }
-      return { success: true };
+  if (isChatMessagesTableAvailable) {
+    try {
+      await supabase.from('chat_messages').delete().eq('id', messageId);
+    } catch (e: any) {
+      console.warn('Supabase delete note:', e);
     }
-
-    // Verify sender
-    const { data: msg } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('id', messageId)
-      .single();
-
-    if (msg) {
-      const uDigits = userMobile.replace(/\D/g, '').slice(-10);
-      const sDigits = (msg.sender_mobile || '').replace(/\D/g, '').slice(-10);
-      if (uDigits !== sDigits) {
-        return { success: false, error: 'You can only delete your own messages.' };
-      }
-    }
-
-    const { error } = await supabase.from('chat_messages').delete().eq('id', messageId);
-    if (error) {
-      await supabase
-        .from('chat_messages')
-        .update({ is_deleted: true, text: '🚫 संदेश हटाया गया' })
-        .eq('id', messageId);
-    }
-
-    return { success: true };
-  } catch (e: any) {
-    return { success: false, error: e?.message || 'Delete message failed' };
   }
+
+  try {
+    if (roomId && (roomId.startsWith('room_village_') || roomId === 'common_group_room')) {
+      await fetch(`/api/group-chat/${messageId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+    } else {
+      await fetch(
+        `/api/messages?id=${encodeURIComponent(messageId)}&userMobile=${encodeURIComponent(
+          userMobile
+        )}&isAdmin=${isAdmin}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+        }
+      );
+    }
+  } catch (err) {
+    console.warn('API delete note:', err);
+  }
+
+  return { success: true };
 }
 
-// 7. Mark Messages as Read
+// 8. Mark Messages as Read
 export async function markRoomMessagesAsRead(roomId: string, userMobile: string) {
+  if (!isChatMessagesTableAvailable) return;
   try {
     const uDigits = userMobile.replace(/\D/g, '').slice(-10);
     const { data: unread } = await supabase
@@ -383,71 +499,7 @@ export async function markRoomMessagesAsRead(roomId: string, userMobile: string)
         await supabase.from('chat_messages').update({ is_read: true }).in('id', idsToMark);
       }
     }
-  } catch (e) {
-    console.error('markRoomMessagesAsRead error:', e);
+  } catch {
+    // Non-blocking
   }
 }
-
-// 8. SQL Schema Blueprint for Reference & Automatic Check
-export const SUPABASE_SQL_SCHEMA = `
--- PHASE 3 SUPABASE CHAT TABLES & RLS POLICIES
-
--- 1. chat_rooms
-CREATE TABLE IF NOT EXISTS public.chat_rooms (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('group', 'personal', 'admin')),
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 2. chat_members
-CREATE TABLE IF NOT EXISTS public.chat_members (
-  id TEXT PRIMARY KEY,
-  room_id TEXT NOT NULL REFERENCES public.chat_rooms(id) ON DELETE CASCADE,
-  member_id TEXT NOT NULL,
-  mobile TEXT NOT NULL,
-  name TEXT NOT NULL,
-  role TEXT DEFAULT 'member',
-  joined_at TIMESTAMPTZ DEFAULT NOW(),
-  last_read_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 3. chat_messages
-CREATE TABLE IF NOT EXISTS public.chat_messages (
-  id TEXT PRIMARY KEY,
-  room_id TEXT NOT NULL REFERENCES public.chat_rooms(id) ON DELETE CASCADE,
-  sender_mobile TEXT NOT NULL,
-  sender_name TEXT NOT NULL,
-  sender_photo TEXT,
-  sender_member_id TEXT,
-  text TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  is_read BOOLEAN DEFAULT FALSE,
-  is_deleted BOOLEAN DEFAULT FALSE
-);
-
--- ENABLE ROW LEVEL SECURITY (RLS)
-ALTER TABLE public.chat_rooms ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.chat_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
-
--- POLICIES
--- Allow public select/insert for active chat rooms
-CREATE POLICY "Allow public read chat_rooms" ON public.chat_rooms FOR SELECT USING (true);
-CREATE POLICY "Allow public insert chat_rooms" ON public.chat_rooms FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public update chat_rooms" ON public.chat_rooms FOR UPDATE USING (true);
-
--- Allow public select/insert chat_members
-CREATE POLICY "Allow public read chat_members" ON public.chat_members FOR SELECT USING (true);
-CREATE POLICY "Allow public insert chat_members" ON public.chat_members FOR INSERT WITH CHECK (true);
-
--- Allow public select/insert/delete chat_messages
-CREATE POLICY "Allow public read chat_messages" ON public.chat_messages FOR SELECT USING (true);
-CREATE POLICY "Allow public insert chat_messages" ON public.chat_messages FOR INSERT WITH CHECK (true);
-CREATE POLICY "Allow public delete chat_messages" ON public.chat_messages FOR DELETE USING (true);
-CREATE POLICY "Allow public update chat_messages" ON public.chat_messages FOR UPDATE USING (true);
-
--- Storage bucket member-photos policy
-INSERT INTO storage.buckets (id, name, public) VALUES ('member-photos', 'member-photos', true) ON CONFLICT (id) DO NOTHING;
-`;

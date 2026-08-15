@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore, logAuditAction } from '@/src/lib/serverStore';
+import { requireAuth } from '@/src/lib/jwtAuth';
 
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req, 'village:manage', 'ADMIN');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const { id } = await params;
     const body = await req.json();
     const store = loadStore();
@@ -26,8 +31,8 @@ export async function PUT(
 
     logAuditAction(
       `Updated Village Unit: ${updated.nameHindi || updated.name}`,
-      body.adminName || 'Admin',
-      body.adminMobile || '',
+      body.adminName || currentUser.name || 'Admin',
+      body.adminMobile || currentUser.mobile || '',
       updated.name
     );
 
@@ -49,6 +54,10 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req, 'village:manage', 'SUPER_ADMIN');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
     const store = loadStore();
@@ -60,8 +69,8 @@ export async function DELETE(
     if (village) {
       logAuditAction(
         `Deleted Village Unit: ${village.nameHindi || village.name}`,
-        body.adminName || 'Super Admin',
-        body.adminMobile || '',
+        body.adminName || currentUser.name || 'Admin',
+        body.adminMobile || currentUser.mobile || '',
         village.name
       );
     }

@@ -9,11 +9,12 @@ import {
   Input,
   Dialog,
   Badge,
+  ImageUploader,
 } from '../ui';
 
 export const GallerySection: React.FC = () => {
   const {
-    gallery,
+    gallery: contextGallery,
     uploadGalleryPhoto,
     approveGalleryPhoto,
     editGalleryCaption,
@@ -24,6 +25,8 @@ export const GallerySection: React.FC = () => {
     t,
   } = useApp();
 
+  const [fetchedGallery, setFetchedGallery] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unapprovedAlert, setUnapprovedAlert] = useState(false);
   const [editingCaptionId, setEditingCaptionId] = useState<string | null>(null);
@@ -32,6 +35,40 @@ export const GallerySection: React.FC = () => {
   const [photoUrl, setPhotoUrl] = useState('');
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const inFlightGalleryPromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/gallery (deduplicated)
+  const fetchGallery = React.useCallback(async () => {
+    if (inFlightGalleryPromiseRef.current) {
+      return inFlightGalleryPromiseRef.current;
+    }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/gallery', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.gallery)) {
+            setFetchedGallery(data.gallery);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/gallery:', e);
+      } finally {
+        setLoading(false);
+        inFlightGalleryPromiseRef.current = null;
+      }
+    })();
+    inFlightGalleryPromiseRef.current = promise;
+    return promise;
+  }, []);
+
+  React.useEffect(() => {
+    fetchGallery();
+  }, [fetchGallery]);
+
+  const gallery = fetchedGallery || contextGallery;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +88,7 @@ export const GallerySection: React.FC = () => {
       }
       setCaption('');
       setPhotoUrl('');
+      fetchGallery();
       setTimeout(() => {
         setIsModalOpen(false);
         setMsg('');
@@ -274,22 +312,19 @@ export const GallerySection: React.FC = () => {
             />
           </div>
 
+          {/* Gallery Photo Upload with Supabase Storage and Drag & Drop */}
           <div>
-            <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">फोटो चुनें *</label>
-            <input
-              type="file"
-              required
-              accept="image/*"
-              onChange={handleImageSelect}
-              className="w-full text-xs text-[#8C8675] dark:text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 dark:file:bg-emerald-950 file:text-emerald-800 dark:file:text-emerald-300"
+            <ImageUploader
+              value={photoUrl}
+              onChange={setPhotoUrl}
+              onRemove={() => setPhotoUrl('')}
+              bucket="images"
+              folder="gallery"
+              label="फोटो चुनें *"
+              aspectRatio="video"
+              hint="गैलरी फ़ोटो यहाँ खींचें या क्लिक करें (Drag & Drop or Click)"
             />
           </div>
-
-          {photoUrl && (
-            <div className="h-40 rounded-xl overflow-hidden border border-[#E0DCCF] dark:border-slate-800 bg-[#F7F5F0] dark:bg-slate-900">
-              <img src={photoUrl} alt="Preview" className="w-full h-full object-cover" />
-            </div>
-          )}
 
           {msg && (
             <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-xs font-semibold rounded-xl">

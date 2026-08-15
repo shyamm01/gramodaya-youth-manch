@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Users, ShieldAlert, Phone, MessageSquare } from 'lucide-react';
 import {
@@ -13,7 +13,43 @@ import {
 import { WhatsAppIcon } from '../common';
 
 export const EldersSection: React.FC = () => {
-  const { elders, villageSettings, t, lang } = useApp();
+  const { elders: contextElders, villageSettings, t, lang } = useApp();
+  const [fetchedElders, setFetchedElders] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const inFlightEldersPromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/elders (deduplicated)
+  const fetchElders = React.useCallback(async () => {
+    if (inFlightEldersPromiseRef.current) {
+      return inFlightEldersPromiseRef.current;
+    }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/elders', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.elders)) {
+            setFetchedElders(data.elders);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/elders:', e);
+      } finally {
+        setLoading(false);
+        inFlightEldersPromiseRef.current = null;
+      }
+    })();
+    inFlightEldersPromiseRef.current = promise;
+    return promise;
+  }, []);
+
+  React.useEffect(() => {
+    fetchElders();
+  }, [fetchElders]);
+
+  const elders = fetchedElders || contextElders;
 
   return (
     <div className="py-6 px-4 sm:px-6 max-w-7xl mx-auto transition-colors duration-200">

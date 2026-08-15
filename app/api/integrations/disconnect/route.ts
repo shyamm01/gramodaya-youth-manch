@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore, logAuditAction } from '@/src/lib/serverStore';
+import { requireAuth } from '@/src/lib/jwtAuth';
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireAuth(req, 'integrations:manage', 'SUPER_ADMIN');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const { id, adminName, adminMobile } = await req.json();
     const store = loadStore();
     const integration = store.apiIntegrations.find((i) => i.id === id);
@@ -18,8 +23,8 @@ export async function POST(req: Request) {
     saveStore(store);
     logAuditAction(
       `Disconnected ${integration.name}`,
-      adminName || 'Main Admin',
-      adminMobile || '',
+      adminName || currentUser.name || 'Main Admin',
+      adminMobile || currentUser.mobile || '',
       integration.name
     );
 

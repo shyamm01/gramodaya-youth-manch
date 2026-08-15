@@ -8,6 +8,7 @@ import {
   AdminMetricsCards,
   AdminActivityChart,
   AdminMemberTrendChart,
+  AdminHelpdeskSection,
 } from '../admin';
 
 import {
@@ -15,6 +16,7 @@ import {
   Users,
   AlertTriangle,
   HeartHandshake,
+  MessageSquare,
   Volume2,
   Calendar,
   Image as ImageIcon,
@@ -49,6 +51,7 @@ import { Badge } from '../ui/badge';
 import { DatePicker } from '../ui/DatePicker';
 import { AddressFormFields, AddressData } from '../common/AddressFormFields';
 import { Member, Complaint, SocialWork, EventItem, GalleryItem, Elder, Village, Announcement } from '../../types';
+import { MemberPermissionsModal } from '../modals/MemberPermissionsModal';
 
 
 interface AdminPanelProps {
@@ -103,6 +106,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     stats,
     isSuperAdmin,
     authSession,
+    refreshData,
     setIsAdminLoginModalOpen,
     approveMember,
     updateMember,
@@ -202,6 +206,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
 
 
+  const [permissionsMember, setPermissionsMember] = useState<Member | null>(null);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
   const [editMemName, setEditMemName] = useState('');
   const [editMemMobile, setEditMemMobile] = useState('');
@@ -851,7 +856,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               </table>
             </div>
           </div>
+
+          {/* Admin Helpdesk Inbox Callout Banner */}
+          <div className="bg-gradient-to-r from-emerald-900 via-teal-950 to-slate-900 border border-emerald-500/30 rounded-2xl p-5 sm:p-6 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 flex items-center justify-center flex-shrink-0">
+                <MessageSquare className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-white">
+                  Admin Helpdesk & Citizen Inquiries
+                </h4>
+                <p className="text-xs text-emerald-200/80 mt-0.5">
+                  Citizen messages sent from the live chat Helpdesk tab appear here in real-time.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => handleTabChange('helpdesk')}
+              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition shadow-lg flex items-center justify-center gap-2 flex-shrink-0 cursor-pointer"
+            >
+              <span>Open Helpdesk Inbox</span>
+              <Eye className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          TAB: ADMIN HELPDESK & CITIZEN INQUIRIES
+      ───────────────────────────────────────────────────────────── */}
+      {activeTab === 'helpdesk' && (
+        <AdminHelpdeskSection />
       )}
 
       {/* ─────────────────────────────────────────────────────────────
@@ -1013,6 +1049,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               Approve
                             </button>
                           )}
+                          <button
+                            onClick={() => setPermissionsMember(mem)}
+                            className="p-1.5 text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition cursor-pointer"
+                            title="अनुमतियां प्रबंधित करें (Manage Permissions)"
+                          >
+                            <Shield className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => {
                               setEditingMember(mem);
@@ -1974,6 +2017,65 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </form>
           </div>
 
+          {/* Supabase Storage Integration Card */}
+          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-6 space-y-4 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
+                  <Database className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                    Supabase Storage Engine
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-zinc-400">
+                    Direct cloud bucket storage for member profiles, chat media, and village galleries
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={async () => {
+                  try {
+                    const testSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="#059669"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#FFFFFF" font-size="11" font-family="sans-serif">Supabase OK</text></svg>`;
+                    const base64 = `data:image/svg+xml;base64,${btoa(testSvg)}`;
+                    const res = await fetch('/api/upload/supabase', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        base64,
+                        bucket: 'member-photos',
+                        folder: 'system_test',
+                        filename: `test_${Date.now()}.svg`,
+                      }),
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      alert(`✅ Supabase Storage is working!\n\nPublic URL: ${data.url}`);
+                    } else {
+                      alert(`Supabase Storage response: ${data.error || 'Upload completed'}`);
+                    }
+                  } catch (err: any) {
+                    alert(`Supabase Storage test error: ${err.message}`);
+                  }
+                }}
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow cursor-pointer self-start sm:self-auto"
+              >
+                Test Supabase Upload
+              </button>
+            </div>
+
+            <div className="p-4 bg-slate-50 dark:bg-[#18181c] rounded-xl border border-slate-200 dark:border-[#27272a] text-xs space-y-1.5 font-mono">
+              <p className="text-slate-600 dark:text-slate-400 font-sans font-bold">
+                Active Supabase Storage Buckets:
+              </p>
+              <div className="text-[11px] space-y-1 text-slate-700 dark:text-slate-300">
+                <p>• <code className="text-emerald-600 dark:text-emerald-400 font-bold">member-photos</code> — Citizen & leadership profile photos</p>
+                <p>• <code className="text-emerald-600 dark:text-emerald-400 font-bold">images</code> — Village galleries, events, social works & chat media</p>
+              </div>
+            </div>
+          </div>
+
           {/* Database Reset */}
           <div className="bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/40 rounded-2xl p-6 space-y-4">
             <div className="flex items-center gap-2.5 text-rose-700 dark:text-rose-400 font-bold text-sm">
@@ -2890,6 +2992,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
       )}
+      {/* Member Permissions Manager Modal */}
+      <MemberPermissionsModal
+        isOpen={Boolean(permissionsMember)}
+        member={permissionsMember}
+        onClose={() => setPermissionsMember(null)}
+        onSuccess={() => {
+          refreshData();
+        }}
+      />
     </AdminLayout>
   );
 };

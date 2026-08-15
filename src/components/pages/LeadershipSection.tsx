@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Phone, MessageSquare, ShieldCheck, UserCheck, Camera } from 'lucide-react';
 import {
@@ -14,11 +14,69 @@ import {
 import { WhatsAppIcon } from '../common';
 
 export const LeadershipSection: React.FC = () => {
-  const { admins, villageSettings, authSession, uploadPhoto, setIsAdminLoginModalOpen, t, lang } = useApp();
+  const { admins: contextAdmins, villageSettings, authSession, uploadPhoto, setIsAdminLoginModalOpen, t, lang } = useApp();
+  const [fetchedAdmins, setFetchedAdmins] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handlePhotoUpload = (adminId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+  const inFlightLeadershipPromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/leadership (deduplicated)
+  const fetchLeadership = React.useCallback(async () => {
+    if (inFlightLeadershipPromiseRef.current) {
+      return inFlightLeadershipPromiseRef.current;
+    }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/leadership', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.leaders)) {
+            setFetchedAdmins(data.leaders);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/leadership:', e);
+      } finally {
+        setLoading(false);
+        inFlightLeadershipPromiseRef.current = null;
+      }
+    })();
+    inFlightLeadershipPromiseRef.current = promise;
+    return promise;
+  }, []);
+
+  React.useEffect(() => {
+    fetchLeadership();
+  }, [fetchLeadership]);
+
+  const admins = fetchedAdmins || contextAdmins;
+
+  const handlePhotoUpload = async (adminId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('bucket', 'gramodaya-youth-munch');
+        formData.append('folder', 'leadership');
+        formData.append('filename', `admin_${adminId}_${Date.now()}.jpg`);
+
+        const res = await fetch('/api/upload/supabase', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.url) {
+            uploadPhoto('admin', adminId, data.url);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase storage upload error:', err);
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === 'string') {

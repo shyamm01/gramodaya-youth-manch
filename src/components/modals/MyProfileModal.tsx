@@ -22,7 +22,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { DigitalIdCard } from '../features/DigitalIdCard';
-import { DatePicker, Button, Input } from '../ui';
+import { DatePicker, Button, Input, ImageCropperModal } from '../ui';
 
 export const MyProfileModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const {
@@ -75,6 +75,11 @@ export const MyProfileModal: React.FC<{ isOpen: boolean; onClose: () => void }> 
   const [photoUrl, setPhotoUrl] = useState('');
   const [saveMsg, setSaveMsg] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Photo Cropping State (Declared unconditionally at top of component)
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
+  const [pendingCropSrc, setPendingCropSrc] = useState<string | null>(null);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
   useEffect(() => {
     if (currentMember) {
@@ -143,16 +148,62 @@ export const MyProfileModal: React.FC<{ isOpen: boolean; onClose: () => void }> 
     }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setPhotoUrl(result);
-        uploadPhoto('member', currentMember.id, result);
+      reader.onload = () => {
+        setPendingCropSrc(reader.result as string);
+        setIsCropperOpen(true);
       };
       reader.readAsDataURL(file);
+    }
+    if (e.target) e.target.value = '';
+  };
+
+  const handleCropComplete = async (croppedDataUrl: string) => {
+    try {
+      setIsUploadingPhoto(true);
+      const { optimizeImage, STRICT_UNDER_100KB_LIMIT } = await import('@/src/lib/imageOptimizer');
+      const optResult = await optimizeImage(croppedDataUrl, {
+        maxWidth: 800,
+        maxHeight: 800,
+        quality: 0.75,
+        outputFormat: 'image/webp',
+        maxSizeBytes: STRICT_UNDER_100KB_LIMIT,
+      });
+
+      const res = await fetch('/api/upload/supabase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base64: optResult.dataUrl,
+          bucket: 'gramodaya-youth-munch',
+          folder: 'profiles',
+          filename: `member_${currentMember.id}_${Date.now()}.webp`,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          setPhotoUrl(data.url);
+          await uploadPhoto('member', currentMember.id, data.url);
+          setSaveMsg(lang === 'en' ? 'Profile photo updated successfully!' : 'प्रोफाइल फोटो सफलतापूर्वक अपडेट हो गई!');
+          setTimeout(() => setSaveMsg(''), 3500);
+          return;
+        }
+      }
+
+      // Fallback
+      setPhotoUrl(optResult.dataUrl);
+      await uploadPhoto('member', currentMember.id, optResult.dataUrl);
+    } catch (err) {
+      console.warn('Profile photo upload error:', err);
+    } finally {
+      setIsUploadingPhoto(false);
+      setPendingCropSrc(null);
+      setIsCropperOpen(false);
     }
   };
 
@@ -219,7 +270,7 @@ export const MyProfileModal: React.FC<{ isOpen: boolean; onClose: () => void }> 
                 title={lang === 'en' ? 'Upload Photo' : 'फ़ोटो बदलें'}
               >
                 <Camera className="w-3.5 h-3.5" />
-                <input type="file" accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+                <input type="file" accept="image/*" onChange={handlePhotoSelect} className="hidden" />
               </label>
             </div>
 
@@ -511,6 +562,18 @@ export const MyProfileModal: React.FC<{ isOpen: boolean; onClose: () => void }> 
 
         </div>
       </div>
+
+      {/* Profile Photo Crop & Framing Modal */}
+      <ImageCropperModal
+        isOpen={isCropperOpen}
+        imageSrc={pendingCropSrc}
+        aspectRatio="square"
+        onClose={() => {
+          setIsCropperOpen(false);
+          setPendingCropSrc(null);
+        }}
+        onCropComplete={handleCropComplete}
+      />
     </div>
   );
 };

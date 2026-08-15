@@ -121,9 +121,31 @@ export const DigitalIdCard: React.FC<DigitalIdCardProps> = ({ member, onClose })
     );
   }, [member, formattedMemberId, dob, address, joinDate]);
 
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('bucket', 'gramodaya-youth-munch');
+        formData.append('folder', 'profiles');
+        formData.append('filename', `member_${member.id}_${Date.now()}.jpg`);
+
+        const res = await fetch('/api/upload/supabase', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.url) {
+            setPreviewPhoto(data.url);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase storage upload error:', err);
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         if (typeof reader.result === 'string') {

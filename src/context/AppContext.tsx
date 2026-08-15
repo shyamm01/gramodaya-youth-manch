@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 import {
@@ -89,7 +89,7 @@ interface AppContextType {
   memberLogin: (mobile: string, otpOrPassword?: string) => Promise<{ success: boolean; member?: Member; error?: string }>;
   memberLogout: () => void;
   isLoading: boolean;
-  refreshData: () => Promise<void>;
+  refreshData: (force?: boolean) => Promise<void>;
   sendAdminOtp: (mobile: string) => Promise<{ success: boolean; message?: string; otp?: string; error?: string }>;
   verifyAdminOtp: (
     mobile: string,
@@ -203,6 +203,7 @@ interface AppContextType {
   editComplaint: (id: string, updates: Partial<Complaint>) => Promise<{ success: boolean; error?: string }>;
   editSocialWork: (id: string, updates: Partial<SocialWork>) => Promise<{ success: boolean; error?: string }>;
   editPublicInfo: (id: string, updates: Partial<PublicInfo>) => Promise<{ success: boolean; error?: string }>;
+  fetchMembers: () => Promise<Member[]>;
   changeMemberRole: (id: string, role: 'SUPER_ADMIN' | 'ADMIN' | 'MEMBER', villageId?: string) => Promise<{ success: boolean; error?: string }>;
   isSuperAdmin: boolean;
   isApprovedMember: boolean;
@@ -225,6 +226,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentMemberMobile, setCurrentMemberMobileState] = useState<string | null>(null);
   const isFetchingAuthMeRef = useRef(false);
   const isFetchingDataRef = useRef(false);
+  const lastDataFetchTimeRef = useRef<number>(0);
 
   const setLang = (newLang: string) => {
     setLangState(newLang);
@@ -239,7 +241,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [villageSettings, setVillageSettings] = useState<VillageSettings>(OFFICIAL_VILLAGE);
   const [villages, setVillages] = useState<Village[]>(INITIAL_VILLAGES);
-  const [activeVillageId, setActiveVillageId] = useState<string>("vil_rasoolpur");
+  const [activeVillageId, setActiveVillageId] = useState<string>("1");
   const [userPermissions, setUserPermissions] = useState<UserPermission[]>([]);
   const [admins, setAdmins] = useState<Admin[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -570,91 +572,95 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const refreshData = async (retryCount = 1) => {
-    if (isFetchingDataRef.current) return;
-    isFetchingDataRef.current = true;
-
-    try {
-      const headers: Record<string, string> = {};
+  const authenticatedFetch = useCallback(
+    async (url: string, init: RequestInit = {}) => {
+      const token =
+        (typeof window !== 'undefined' ? localStorage.getItem('gym_token') : null) ||
+        authSession.token;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...((init.headers as Record<string, string>) || {}),
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
       if (currentMemberMobile) {
         headers['x-member-mobile'] = currentMemberMobile;
       }
       if (authSession.isAdminLoggedIn) {
         headers['x-admin-token'] = 'admin_active';
       }
-      const token = (typeof window !== 'undefined' ? localStorage.getItem('gym_token') : null) || authSession.token;
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
+
+      return fetch(url, {
+        ...init,
+        headers,
+        credentials: 'include',
+      });
+    },
+    [authSession.isAdminLoggedIn, authSession.token, currentMemberMobile]
+  );
+
+  const refreshData = async (force = false, retryCount = 0) => {
+    const now = Date.now();
+    if (!force && lastDataFetchTimeRef.current > 0 && now - lastDataFetchTimeRef.current < 120000) {
+      return;
+    }
+
+    if (isFetchingDataRef.current) return;
+    isFetchingDataRef.current = true;
+
+    try {
+      const [authRes, villagesRes] = await Promise.all([
+        authenticatedFetch('/api/auth/me').catch(() => null),
+        authenticatedFetch('/api/villages').catch(() => null),
+      ]);
+
+      if (authRes && authRes.ok) {
+        const authData = await authRes.json();
+        if (authData?.user) {
+          const user = authData.user;
+          const isAdm = Boolean(
+            authData.isAdmin ||
+            user.isAdmin ||
+            user.systemRole === 'SUPER_ADMIN' ||
+            user.systemRole === 'ADMIN'
+          );
+          setAuthSession((prev) => ({
+            ...prev,
+            isAdminLoggedIn: isAdm,
+            isMemberLoggedIn: true,
+            role: user.role,
+            systemRole: user.systemRole,
+            adminMobile: isAdm ? user.mobile : prev.adminMobile,
+            adminName: isAdm ? user.name : prev.adminName,
+            adminId: isAdm ? user.id : prev.adminId,
+            adminVillageId: user.villageId,
+            currentMemberMobile: user.mobile,
+            currentMember: user,
+            email: user.email,
+            permissions: user.permissions || [],
+          }));
+          if (user.permissions) setUserPermissions(user.permissions);
+        }
       }
 
-      const res = await fetch('/api/data', { headers, credentials: 'include' });
-      if (res.ok) {
-        const text = await res.text();
-        let data: any = null;
-        try {
-          data = JSON.parse(text);
-        } catch {
-          data = null;
+      if (villagesRes && villagesRes.ok) {
+        const vData = await villagesRes.json();
+        if (vData?.villages && Array.isArray(vData.villages)) {
+          setVillages(vData.villages);
+          store.dispatch(reduxSetVillagesList(vData.villages));
+          const currentV =
+            vData.villages.find((v: any) => v.id === activeVillageId) || vData.villages[0];
+          if (currentV) {
+            setVillageSettings(currentV);
+            store.dispatch(reduxUpdateVillageSettings(currentV));
+          }
         }
-        if (data) {
-          if (data.villageSettings) {
-            setVillageSettings(data.villageSettings);
-            store.dispatch(reduxUpdateVillageSettings(data.villageSettings));
-          }
-          if (data.villages) {
-            setVillages(data.villages);
-            store.dispatch(reduxSetVillagesList(data.villages));
-          }
-          if (data.userPermissions) setUserPermissions(data.userPermissions);
-          if (data.admins) setAdmins(data.admins);
-          if (data.members) {
-            setMembers(data.members);
-            store.dispatch(reduxSetMembers(data.members));
-          }
-          if (data.complaints) {
-            setComplaints(data.complaints);
-            store.dispatch(reduxSetComplaints(data.complaints));
-          }
-          if (data.socialWorks) {
-            setSocialWorks(data.socialWorks);
-            store.dispatch(reduxSetSocialWorks(data.socialWorks));
-          }
-          if (data.publicInfos) {
-            setPublicInfos(data.publicInfos);
-            store.dispatch(reduxSetPublicInfos(data.publicInfos));
-          }
-          if (data.announcements) {
-            setAnnouncements(data.announcements);
-            store.dispatch(reduxSetAnnouncements(data.announcements));
-          }
-          if (data.events) {
-            setEvents(data.events);
-            store.dispatch(reduxSetEvents(data.events));
-          }
-          if (data.gallery) {
-            setGallery(data.gallery);
-            store.dispatch(reduxSetGallery(data.gallery));
-          }
-          if (data.elders) {
-            setElders(data.elders);
-            store.dispatch(reduxSetElders(data.elders));
-          }
-          if (data.auditLogs) setAuditLogs(data.auditLogs);
-          if (data.apiIntegrations) setIntegrations(data.apiIntegrations);
-        }
-      } else if (retryCount > 0) {
-        isFetchingDataRef.current = false;
-        setTimeout(() => refreshData(retryCount - 1), 1000);
-        return;
       }
+
+      lastDataFetchTimeRef.current = Date.now();
     } catch (e) {
-      if (retryCount > 0) {
-        isFetchingDataRef.current = false;
-        setTimeout(() => refreshData(retryCount - 1), 1000);
-        return;
-      } else {
-        console.warn('API sync fallback to local state:', e instanceof Error ? e.message : e);
-      }
+      console.warn('Bootstrap sync note:', e instanceof Error ? e.message : e);
     } finally {
       isFetchingDataRef.current = false;
       setIsLoading(false);
@@ -687,14 +693,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const currentMemberObj = useMemo(() => {
-    if (!authSession.currentMemberMobile) return null;
-    const cleanMob = authSession.currentMemberMobile.replace(/\D/g, '').slice(-10);
+    const effectiveMobile = authSession.currentMemberMobile || authSession.adminMobile || authSession.currentMember?.mobile;
+    if (!effectiveMobile) return authSession.currentMember || null;
+    const cleanMob = effectiveMobile.replace(/\D/g, '').slice(-10);
     return (
       members.find((m) => m.mobile && m.mobile.replace(/\D/g, '').slice(-10) === cleanMob) ||
       authSession.currentMember ||
       null
     );
-  }, [authSession.currentMemberMobile, authSession.currentMember, members]);
+  }, [authSession.currentMemberMobile, authSession.adminMobile, authSession.currentMember, members]);
+
+  // Synchronize activeVillageId directly from the logged-in user
+  useEffect(() => {
+    const userVillage =
+      currentMemberObj?.villageId ||
+      authSession.adminVillageId ||
+      authSession.currentMember?.villageId;
+    if (userVillage) {
+      setActiveVillageId(String(userVillage));
+    }
+  }, [currentMemberObj?.villageId, authSession.adminVillageId, authSession.currentMember?.villageId]);
 
   const isApprovedMember = useMemo(() => {
     if (authSession.isAdminLoggedIn || authSession.role === 'SUPER_ADMIN' || authSession.role === 'ADMIN') {
@@ -800,19 +818,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateVillageSettings = async (newSettings: Partial<VillageSettings>) => {
     try {
-      const res = await fetch('/api/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const targetId = activeVillageId || 'vil_rasoolpur';
+      const res = await authenticatedFetch(`/api/villages/${targetId}`, {
+        method: 'PUT',
         body: JSON.stringify({
-          action: 'update-settings',
-          data: newSettings,
+          ...newSettings,
           adminName: authSession.adminName,
           adminMobile: authSession.adminMobile,
         }),
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        if (data.villageSettings) setVillageSettings(data.villageSettings);
+        if (data.village) {
+          setVillageSettings(data.village);
+          store.dispatch(reduxUpdateVillageSettings(data.village));
+        }
         return { success: true };
       }
       return { success: false, error: data.error || 'सेटिंग्स अपडेट करने में विफल।' };
@@ -1927,6 +1947,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const membersFetchPromiseRef = useRef<Promise<Member[]> | null>(null);
+  const lastMembersFetchedAtRef = useRef<number>(0);
+
+  const fetchMembers = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (membersFetchPromiseRef.current) {
+      return membersFetchPromiseRef.current;
+    }
+    if (!force && now - lastMembersFetchedAtRef.current < 3000 && members.length > 0) {
+      return members;
+    }
+
+    const promise = (async () => {
+      try {
+        const res = await fetch('/api/members', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.members)) {
+            setMembers(data.members);
+            lastMembersFetchedAtRef.current = Date.now();
+            return data.members as Member[];
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/members:', e);
+      } finally {
+        membersFetchPromiseRef.current = null;
+      }
+      return [];
+    })();
+
+    membersFetchPromiseRef.current = promise;
+    return promise;
+  }, [members]);
+
+
+
   const fetchUserMessages = async (mobile: string): Promise<ChatMessage[]> => {
     if (!mobile) return [];
     try {
@@ -1991,6 +2048,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         checkPermission,
         admins,
         members,
+        fetchMembers,
         complaints,
         socialWorks,
         publicInfos,

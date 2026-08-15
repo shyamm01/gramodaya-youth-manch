@@ -1,128 +1,122 @@
-import { NextResponse } from 'next/server';
-import { getSqlClient, logAuditAction } from '@/src/lib/authUtils';
+import { NextResponse } from "next/server";
+import { getDb } from "@/src/db";
+import * as schema from "@/src/db/schema";
+import { desc } from "drizzle-orm";
+import { validateRequestBody, eventCreateSchema } from "@/src/lib/validations";
+import { logAuditAction } from "@/src/lib/authUtils";
+import { requireAuth } from "@/src/lib/jwtAuth";
+import { ensureSupabaseUrl } from "@/src/lib/supabaseStorage";
 
 export async function GET() {
   try {
-    const sql = getSqlClient();
-    if (!sql) return NextResponse.json({ success: true, events: [] });
+    const db = getDb();
+    if (!db) return NextResponse.json({ success: true, events: [] });
 
-    const rows = await sql`
-      SELECT 
-        id, 
-        village_id as "villageId",
-        title, 
-        title as name,
-        description, 
-        date, 
-        time, 
-        location, 
-        photo_url as "photoUrl", 
-        video_url as "videoUrl", 
-        status, 
-        created_at as "createdAt"
-      FROM public.events 
-      ORDER BY id DESC;
-    `;
+    const rows = await db.select().from(schema.events).orderBy(desc(schema.events.id));
 
-    const formatted = rows.map((e: any) => ({
-      ...e,
+    const formatted = rows.map((e) => ({
       id: String(e.id),
-      villageId: e.villageId ? String(e.villageId) : 'vil_rasoolpur',
+      villageId: e.villageId ? String(e.villageId) : "1",
+      title: e.title,
+      name: e.title,
+      description: e.description || "",
+      date: e.date,
+      time: e.time,
+      location: e.location,
+      photoUrl: e.photoUrl || "",
+      videoUrl: e.videoUrl || "",
+      status: e.status,
+      createdAt: e.createdAt,
     }));
 
     return NextResponse.json({ success: true, events: formatted });
   } catch (err: any) {
-    console.error('Error fetching events:', err);
-    return NextResponse.json({ error: 'Failed to fetch events' }, { status: 500 });
+    console.error("Error fetching events:", err);
+    return NextResponse.json({ success: false, error: "Failed to fetch events" }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
   try {
+    // 1. Enforce RBAC Permission for Event Creation
+    const auth = await requireAuth(req, 'events:manage');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
+    const validation = await validateRequestBody(req, eventCreateSchema);
+    if (!validation.success) {
+      return validation.response;
+    }
     const {
       title,
-      name,
-      description,
+      description = "",
       date,
-      time = '10:00 AM',
-      location = 'Rasoolpur Village',
+      time,
+      location,
       photoUrl,
       videoUrl,
+      status = "upcoming",
       villageId,
-      status = 'PUBLISHED',
       adminName,
       adminMobile,
-    } = await req.json();
+    } = validation.data;
 
-    const eventTitle = (title || name || '').trim();
-    if (!eventTitle || !date) {
-      return NextResponse.json({ error: 'कार्यक्रम का शीर्षक एवं दिनांक आवश्यक है।' }, { status: 400 });
+    const db = getDb();
+    if (!db) {
+      return NextResponse.json({ success: false, error: "Database connection unavailable." }, { status: 500 });
     }
 
-    const sql = getSqlClient();
-    if (!sql) return NextResponse.json({ error: 'डेटाबेस अनुपलब्ध है।' }, { status: 500 });
+    const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
 
-    let numericVillageId: number | null = null;
-    if (villageId && !isNaN(Number(villageId))) {
-      numericVillageId = Number(villageId);
-    } else {
-      const found = await sql`SELECT id FROM public.villages LIMIT 1;`;
-      if (found && found.length > 0) numericVillageId = found[0].id;
-    }
+    // Enforce Supabase public CDN URL for event banner
+    const finalPhotoUrl = await ensureSupabaseUrl(photoUrl, 'events', 'event');
 
-    const inserted = await sql`
-      INSERT INTO public.events (
-        village_id,
-        title,
-        description,
-        date,
-        time,
-        location,
-        photo_url,
-        video_url,
-        status,
-        created_at,
-        updated_at
-      ) VALUES (
-        ${numericVillageId},
-        ${eventTitle},
-        ${description ? description.trim() : null},
-        ${date},
-        ${time},
-        ${location},
-        ${photoUrl || null},
-        ${videoUrl || null},
-        ${status as any},
-        NOW(),
-        NOW()
-      )
-      RETURNING *;
-    `;
+    const validStatus = (
+      ['DRAFT', 'PENDING', 'PUBLISHED', 'COMPLETED', 'CANCELLED'].includes(status?.toUpperCase())
+        ? status.toUpperCase()
+        : 'PUBLISHED'
+    ) as 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'COMPLETED' | 'CANCELLED';
 
-    const newEvent = {
-      id: String(inserted[0].id),
-      villageId: inserted[0].village_id ? String(inserted[0].village_id) : 'vil_rasoolpur',
-      title: inserted[0].title,
-      name: inserted[0].title,
-      description: inserted[0].description,
-      date: inserted[0].date,
-      time: inserted[0].time,
-      location: inserted[0].location,
-      photoUrl: inserted[0].photo_url || '',
-      status: inserted[0].status,
-      createdAt: inserted[0].created_at,
+    const [inserted] = await db
+      .insert(schema.events)
+      .values({
+        villageId: numericVillageId,
+        title: title.trim(),
+        description: description.trim(),
+        date: date || new Date().toISOString().split("T")[0],
+        time: time ? time.trim() : null,
+        location: location ? location.trim() : null,
+        photoUrl: finalPhotoUrl || null,
+        videoUrl: videoUrl ? videoUrl.trim() : null,
+        status: validStatus,
+      })
+      .returning();
+
+    const formatted = {
+      id: String(inserted.id),
+      villageId: inserted.villageId ? String(inserted.villageId) : "1",
+      title: inserted.title,
+      name: inserted.title,
+      description: inserted.description || "",
+      date: inserted.date,
+      time: inserted.time,
+      location: inserted.location,
+      photoUrl: inserted.photoUrl || "",
+      videoUrl: inserted.videoUrl || "",
+      status: inserted.status,
+      createdAt: inserted.createdAt,
     };
 
     logAuditAction(
-      `Created Event (${newEvent.title})`,
-      adminName || 'Admin',
-      adminMobile,
-      newEvent.title
+      "Created Event: " + formatted.title,
+      adminName || currentUser.name || "Admin",
+      adminMobile || currentUser.mobile || "",
+      formatted.title
     );
 
-    return NextResponse.json({ success: true, event: newEvent }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating event:', error);
-    return NextResponse.json({ error: error.message || 'त्रुटि हुई।' }, { status: 500 });
+    return NextResponse.json({ success: true, event: formatted });
+  } catch (err: any) {
+    console.error("Error creating event:", err);
+    return NextResponse.json({ success: false, error: err?.message || "Failed to create event" }, { status: 500 });
   }
 }

@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore, logAuditAction } from '@/src/lib/serverStore';
+import { requireAuth } from '@/src/lib/jwtAuth';
 
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req, 'public_info:manage');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const { id } = await params;
     const body = await req.json();
     const store = loadStore();
@@ -26,8 +31,8 @@ export async function PUT(
 
     logAuditAction(
       `Updated Public Info (${updated.name || updated.information.slice(0, 20)})`,
-      body.updaterName || 'Member/Admin',
-      body.updaterMobile || '',
+      body.updaterName || currentUser.name || 'Admin',
+      body.updaterMobile || currentUser.mobile || '',
       updated.name || 'Public Info'
     );
 
@@ -49,9 +54,13 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireAuth(req, 'public_info:manage');
+    if (!auth.success) return auth.response;
+    const currentUser = auth.user;
+
     const { id } = await params;
     const body = await req.json().catch(() => ({}));
-    const { adminName, adminMobile, userMobile } = body;
+    const { adminName, adminMobile } = body;
 
     const store = loadStore();
     const item = store.publicInfos.find((i) => i.id === id);
@@ -64,8 +73,8 @@ export async function DELETE(
 
     logAuditAction(
       `Deleted Public Info (${item.name || item.information.slice(0, 20)})`,
-      adminName || 'Member/Admin',
-      adminMobile || userMobile || '',
+      adminName || currentUser.name || 'Admin',
+      adminMobile || currentUser.mobile || '',
       item.name || 'Public Info'
     );
 

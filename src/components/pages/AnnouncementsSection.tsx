@@ -19,8 +19,8 @@ import { WhatsAppIcon } from '../common';
 
 export const AnnouncementsSection: React.FC = () => {
   const {
-    announcements,
-    publicInfos,
+    announcements: contextAnnouncements,
+    publicInfos: contextPublicInfos,
     publishAnnouncement,
     deleteAnnouncement,
     submitPublicInfo,
@@ -30,9 +30,56 @@ export const AnnouncementsSection: React.FC = () => {
     t,
   } = useApp();
 
+  const [fetchedAnnouncements, setFetchedAnnouncements] = useState<any[] | null>(null);
+  const [fetchedPublicInfos, setFetchedPublicInfos] = useState<any[] | null>(null);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string>('announcements');
   const [isAnnModalOpen, setIsAnnModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+
+  const inFlightAnnouncementsPromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/announcements and GET /api/public-info (deduplicated)
+  const fetchAnnouncementsData = React.useCallback(async () => {
+    if (inFlightAnnouncementsPromiseRef.current) {
+      return inFlightAnnouncementsPromiseRef.current;
+    }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const [resAnn, resInfo] = await Promise.all([
+          fetch('/api/announcements', { credentials: 'include' }),
+          fetch('/api/public-info', { credentials: 'include' }),
+        ]);
+        if (resAnn.ok) {
+          const dAnn = await resAnn.json();
+          if (dAnn.success && Array.isArray(dAnn.announcements)) {
+            setFetchedAnnouncements(dAnn.announcements);
+          }
+        }
+        if (resInfo.ok) {
+          const dInfo = await resInfo.json();
+          if (dInfo.success && Array.isArray(dInfo.publicInfos)) {
+            setFetchedPublicInfos(dInfo.publicInfos);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch announcements/public-info:', e);
+      } finally {
+        setLoading(false);
+        inFlightAnnouncementsPromiseRef.current = null;
+      }
+    })();
+    inFlightAnnouncementsPromiseRef.current = promise;
+    return promise;
+  }, []);
+
+  React.useEffect(() => {
+    fetchAnnouncementsData();
+  }, [fetchAnnouncementsData]);
+
+  const announcements = fetchedAnnouncements || contextAnnouncements;
+  const publicInfos = fetchedPublicInfos || contextPublicInfos;
 
   // Announcement Form State
   const [annTitle, setAnnTitle] = useState('');
@@ -57,6 +104,7 @@ export const AnnouncementsSection: React.FC = () => {
       setAnnMsg('सूचना सफलतापूर्वक प्रकाशित हुई!');
       setAnnTitle('');
       setAnnContent('');
+      fetchAnnouncementsData();
       setTimeout(() => {
         setIsAnnModalOpen(false);
         setAnnMsg('');

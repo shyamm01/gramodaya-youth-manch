@@ -5,12 +5,12 @@ import { Input } from '@/src/components/ui/input';
 import {
   MapPin,
   Building2,
+  Home,
   Sparkles,
   Loader2,
   CheckCircle2,
   AlertCircle,
   ChevronDown,
-  Filter,
 } from 'lucide-react';
 
 export interface AddressData {
@@ -139,7 +139,6 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
   const filteredGps = useMemo(() => {
     let list = allGps;
 
-    // Filter by District if selected
     if (district && district.trim()) {
       const targetDist = district.trim().toLowerCase();
       const distMatches = list.filter((gp) => gp.district.toLowerCase() === targetDist);
@@ -148,7 +147,6 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
       }
     }
 
-    // Filter by Pincode if 6 digits
     if (pincode && pincode.trim().length === 6) {
       const targetPin = pincode.trim();
       const pinMatches = list.filter((gp) => gp.pincode === targetPin);
@@ -164,7 +162,6 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
   const filteredVillages = useMemo(() => {
     let list = effectiveVillages;
 
-    // Filter by Gram Panchayat if selected
     if (gramPanchayat && gramPanchayat.trim()) {
       const cleanGp = gramPanchayat.trim().toLowerCase();
       const gpMatches = list.filter((v) => {
@@ -175,7 +172,6 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
       if (gpMatches.length > 0) return gpMatches;
     }
 
-    // Filter by District if selected
     if (district && district.trim()) {
       const cleanDist = district.trim().toLowerCase();
       const distMatches = list.filter((v) => {
@@ -188,7 +184,6 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
       }
     }
 
-    // Filter by Pincode if 6 digits
     if (pincode && pincode.trim().length === 6) {
       const cleanPin = pincode.trim();
       const pinMatches = list.filter((v) => v.pincode === cleanPin);
@@ -247,11 +242,10 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
     [pincode, state, district, block, postOffice, gramPanchayat, village, selectedVillageId, houseNo, street, onChange]
   );
 
-  // 5. Handle District selection (Cascades to Gram Panchayats & Villages)
+  // 5. Handle District selection
   const handleDistrictChange = (selectedDist: string) => {
     setDistrict(selectedDist);
 
-    // Find default GP for this district
     const gpsInDist = allGps.filter((g) => g.district.toLowerCase() === selectedDist.toLowerCase());
     const defaultGp = gpsInDist[0];
 
@@ -274,7 +268,7 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
     });
   };
 
-  // 6. Handle Gram Panchayat selection (Auto-fills location defaults)
+  // 6. Handle Gram Panchayat selection
   const handleGramPanchayatSelect = (gpName: string) => {
     setGramPanchayat(gpName);
 
@@ -355,7 +349,7 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
     emitChange({ village: selectedName, villageId: vId });
   };
 
-  // 8. Handle Live Pincode Lookup & Dynamic Filter Cascade
+  // 8. Handle Live Pincode Lookup
   const handlePincodeChange = async (newPin: string) => {
     const cleanDigits = newPin.replace(/\D/g, '').slice(0, 6);
     setPincode(cleanDigits);
@@ -391,7 +385,6 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
 
         setPinStatus('success');
 
-        // Check if any registered GP matches this District/Pincode
         const matchingGp = allGps.find(
           (g) => g.pincode === cleanDigits || g.district.toLowerCase() === fetchedDistrict.toLowerCase()
         );
@@ -431,26 +424,26 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
 
   return (
     <div className={`space-y-3 ${className}`}>
-      {/* ── ROW 1: PINCODE & DISTRICT (PRIMARY CASCADING FILTERS) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-        {/* Pincode with Real-Time Lookup */}
-        <div className="space-y-1">
-          <div className="h-4 flex items-center justify-between">
-            <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
-              <MapPin className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-              <span>{lang === 'en' ? 'Pincode (Auto-Filters Location)' : 'पिनकोड (स्थान फिल्टर करेगा)'}</span>
+      {/* ── ROW 1: PINCODE & DISTRICT ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Pincode with Inline Status */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>{lang === 'en' ? 'Pincode' : 'पिनकोड'}</span>
               {required && <span className="text-rose-500">*</span>}
             </label>
             {isLoadingPin && (
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
-                <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                <span>{lang === 'en' ? 'Fetching...' : 'खोज रहे हैं...'}</span>
+              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>{lang === 'en' ? 'Looking up...' : 'खोज रहे हैं...'}</span>
               </span>
             )}
             {pinStatus === 'success' && !isLoadingPin && (
-              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 px-1.5 py-0.2 rounded-full">
-                <CheckCircle2 className="w-2.5 h-2.5" />
-                <span>Verified</span>
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 px-1.5 py-0.5 rounded-full">
+                <CheckCircle2 className="w-3 h-3" />
+                <span>{lang === 'en' ? 'Verified' : 'सत्यापित'}</span>
               </span>
             )}
           </div>
@@ -461,131 +454,114 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
             value={pincode}
             onChange={(e) => handlePincodeChange(e.target.value)}
             placeholder="e.g. 241125"
-            className={`h-9.5 text-xs font-mono font-bold tracking-wider rounded-xl transition-all ${
+            className={`h-9.5 text-xs font-mono font-bold tracking-wider rounded-lg transition-all ${
               pinStatus === 'success'
                 ? 'border-emerald-500/80 focus:ring-emerald-500 bg-emerald-500/[0.04] dark:bg-emerald-500/[0.08]'
                 : pinStatus === 'error'
                 ? 'border-rose-400 focus:ring-rose-400'
-                : 'bg-white dark:bg-[#18181b] border-slate-200 dark:border-[#27272a]'
+                : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800'
             }`}
           />
           {pinStatus === 'error' && pinErrorMsg && (
-            <p className="text-[10px] text-rose-500 flex items-center gap-1 mt-0.5 font-medium">
-              <AlertCircle className="w-2.5 h-2.5 flex-shrink-0" />
+            <p className="text-[10px] text-rose-500 flex items-center gap-1 font-medium">
+              <AlertCircle className="w-3 h-3 flex-shrink-0" />
               <span className="truncate">{pinErrorMsg}</span>
             </p>
           )}
         </div>
 
         {/* District Selector */}
-        <div className="space-y-1">
-          <div className="h-4 flex items-center justify-between">
-            <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 flex items-center gap-1">
-              <Building2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
-              <span>{lang === 'en' ? 'District' : 'जनपद / जिला'}</span>
-              {required && <span className="text-rose-500">*</span>}
-            </label>
-            {district && (
-              <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold">
-                {lang === 'en' ? 'Filters GP & Village' : 'GP व गांव फिल्टर'}
-              </span>
-            )}
-          </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
+            <Building2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>{lang === 'en' ? 'District' : 'जनपद / जिला'}</span>
+            {required && <span className="text-rose-500">*</span>}
+          </label>
           <div className="relative">
             <select
               value={district}
               onChange={(e) => handleDistrictChange(e.target.value)}
-              className="w-full h-9.5 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b] text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-emerald-500 cursor-pointer appearance-none"
+              className="w-full h-9.5 pl-3 pr-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-slate-100 outline-none focus:border-emerald-500 cursor-pointer appearance-none"
             >
-              <option value="">{lang === 'en' ? '-- Choose District --' : '-- जिला चुनें --'}</option>
+              <option value="">{lang === 'en' ? '-- Select District --' : '-- जिला चुनें --'}</option>
               {availableDistricts.map((d) => (
                 <option key={d} value={d}>
                   {d}
                 </option>
               ))}
             </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
       </div>
 
-      {/* ── ROW 2: GRAM PANCHAYAT & VILLAGE UNIT (FILTERED BY PINCODE & DISTRICT) ── */}
-      <div className="p-3 bg-emerald-500/[0.04] dark:bg-emerald-500/[0.06] rounded-2xl border border-emerald-500/20 space-y-2.5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300">
-            <Filter className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            <span>{lang === 'en' ? 'Gram Panchayat & Village Chapter' : 'ग्राम पंचायत एवं ग्राम शाखा'}</span>
+      {/* ── ROW 2: GRAM PANCHAYAT & VILLAGE CHAPTER ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Gram Panchayat */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
+            <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>{lang === 'en' ? 'Gram Panchayat' : 'ग्राम पंचायत'}</span>
+            <span className="text-rose-500">*</span>
+          </label>
+          <div className="relative">
+            <select
+              value={gramPanchayat}
+              onChange={(e) => handleGramPanchayatSelect(e.target.value)}
+              className="w-full h-9.5 pl-3 pr-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-slate-100 outline-none focus:border-emerald-500 cursor-pointer appearance-none"
+            >
+              <option value="">{lang === 'en' ? '-- Select Gram Panchayat --' : '-- ग्राम पंचायत चुनें --'}</option>
+              {filteredGps.map((gp) => (
+                <option key={gp.name} value={gp.name}>
+                  {gp.name} {gp.nameHindi ? `(${gp.nameHindi})` : ''} - {gp.district}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
-          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/70 dark:bg-emerald-950/70 px-2 py-0.5 rounded-full border border-emerald-300/40 dark:border-emerald-800/40">
-            {filteredGps.length} {lang === 'en' ? 'GPs Available' : 'पंचायतें उपलब्ध'}
-          </span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          {/* Select Gram Panchayat (Filtered by Pincode & District) */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 flex items-center justify-between">
-              <span>{lang === 'en' ? 'Gram Panchayat' : 'ग्राम पंचायत चुनें'} <span className="text-rose-500">*</span></span>
-            </label>
-            <div className="relative">
-              <select
-                value={gramPanchayat}
-                onChange={(e) => handleGramPanchayatSelect(e.target.value)}
-                className="w-full h-9.5 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b] text-xs font-bold text-slate-900 dark:text-white outline-none focus:border-emerald-500 cursor-pointer appearance-none"
-              >
-                <option value="">{lang === 'en' ? '-- Choose Gram Panchayat --' : '-- ग्राम पंचायत चुनें --'}</option>
-                {filteredGps.map((gp) => (
-                  <option key={gp.name} value={gp.name}>
-                    {gp.name} {gp.nameHindi ? `(${gp.nameHindi})` : ''} - {gp.district}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          </div>
-
-          {/* Select Village (Filtered by GP, Pincode & District) */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block">
-              {lang === 'en' ? 'Village / Chapter' : 'गांव / ग्राम शाखा'} <span className="text-rose-500">*</span>
-            </label>
-            <div className="relative">
-              <select
-                value={currentActiveVillageId}
-                onChange={(e) => {
-                  const chosenId = e.target.value;
-                  const chosenObj = effectiveVillages.find((v) => v.id === chosenId);
-                  if (chosenObj) {
-                    handleVillageSelect(chosenObj.name, chosenId);
-                  } else {
-                    handleVillageSelect(village, '');
-                  }
-                }}
-                className="w-full h-9.5 pl-3 pr-8 rounded-xl border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b] text-xs font-bold text-emerald-700 dark:text-emerald-400 outline-none focus:border-emerald-500 cursor-pointer appearance-none"
-              >
-                <option value="">{lang === 'en' ? '-- Choose Village Unit --' : '-- ग्राम इकाई चुनें --'}</option>
-                {filteredVillages.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.name} {v.nameHindi ? `(${v.nameHindi})` : ''} — {v.districtName || 'Hardoi'}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-zinc-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
+        {/* Village Chapter */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
+            <Home className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>{lang === 'en' ? 'Village / Chapter Unit' : 'गांव / ग्राम शाखा'}</span>
+            <span className="text-rose-500">*</span>
+          </label>
+          <div className="relative">
+            <select
+              value={currentActiveVillageId}
+              onChange={(e) => {
+                const chosenId = e.target.value;
+                const chosenObj = effectiveVillages.find((v) => v.id === chosenId);
+                if (chosenObj) {
+                  handleVillageSelect(chosenObj.name, chosenId);
+                } else {
+                  handleVillageSelect(village, '');
+                }
+              }}
+              className="w-full h-9.5 pl-3 pr-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-medium text-emerald-700 dark:text-emerald-400 outline-none focus:border-emerald-500 cursor-pointer appearance-none"
+            >
+              <option value="">{lang === 'en' ? '-- Select Village Unit --' : '-- ग्राम इकाई चुनें --'}</option>
+              {filteredVillages.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name} {v.nameHindi ? `(${v.nameHindi})` : ''} — {v.districtName || 'Hardoi'}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
         </div>
       </div>
 
-      {/* ── ROW 3: STATE & BLOCK ── */}
-      <div className="grid grid-cols-2 gap-2.5">
+      {/* ── ROW 3: STATE & BLOCK / TEHSIL ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* State */}
-        <div className="space-y-1">
-          <div className="h-4 flex items-center">
-            <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
-              {lang === 'en' ? 'State' : 'राज्य'}
-              {required && <span className="text-rose-500">*</span>}
-            </label>
-          </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block">
+            {lang === 'en' ? 'State' : 'राज्य'}
+            {required && <span className="text-rose-500">*</span>}
+          </label>
           <Input
             type="text"
             value={state}
@@ -594,17 +570,15 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
               emitChange({ state: e.target.value });
             }}
             placeholder={lang === 'en' ? 'Auto-filled' : 'स्वतः भरा जाएगा'}
-            className="h-9 text-xs font-bold rounded-xl bg-slate-50 dark:bg-[#18181b] border-slate-200 dark:border-[#27272a] text-slate-900 dark:text-white"
+            className="h-9.5 text-xs rounded-lg bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
           />
         </div>
 
         {/* Block / Tehsil */}
-        <div className="space-y-1">
-          <div className="h-4 flex items-center">
-            <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
-              {lang === 'en' ? 'Block / Tehsil' : 'ब्लॉक / तहसील'}
-            </label>
-          </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block">
+            {lang === 'en' ? 'Block / Tehsil' : 'ब्लॉक / तहसील'}
+          </label>
           <Input
             type="text"
             value={block}
@@ -613,35 +587,36 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
               emitChange({ block: e.target.value });
             }}
             placeholder="e.g. Hardoi"
-            className="h-9 text-xs rounded-xl bg-white dark:bg-[#18181b] border-slate-200 dark:border-[#27272a] text-slate-900 dark:text-white"
+            className="h-9.5 text-xs rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
           />
         </div>
       </div>
 
       {/* ── ROW 4: POST OFFICE & HOUSE / WARD / STREET ── */}
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Post Office */}
-        <div className="space-y-1">
-          <div className="h-4 flex items-center">
-            <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
-              {lang === 'en' ? 'Post Office' : 'डाकघर'}
-            </label>
-          </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block">
+            {lang === 'en' ? 'Post Office' : 'डाकघर'}
+          </label>
           {postOfficesList.length > 1 ? (
-            <select
-              value={postOffice}
-              onChange={(e) => {
-                setPostOffice(e.target.value);
-                emitChange({ postOffice: e.target.value });
-              }}
-              className="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-[#27272a] bg-white dark:bg-[#18181b] text-xs text-slate-900 dark:text-zinc-100 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-            >
-              {postOfficesList.map((po) => (
-                <option key={po} value={po}>
-                  {po}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={postOffice}
+                onChange={(e) => {
+                  setPostOffice(e.target.value);
+                  emitChange({ postOffice: e.target.value });
+                }}
+                className="w-full h-9.5 pl-3 pr-8 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs font-medium text-slate-900 dark:text-slate-100 outline-none focus:border-emerald-500 cursor-pointer appearance-none"
+              >
+                {postOfficesList.map((po) => (
+                  <option key={po} value={po}>
+                    {po}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           ) : (
             <Input
               type="text"
@@ -651,18 +626,16 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
                 emitChange({ postOffice: e.target.value });
               }}
               placeholder="e.g. Bahera Rasoolpur"
-              className="h-9 text-xs rounded-xl bg-white dark:bg-[#18181b] border-slate-200 dark:border-[#27272a] text-slate-900 dark:text-white"
+              className="h-9.5 text-xs rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
             />
           )}
         </div>
 
         {/* House / Ward / Street */}
-        <div className="space-y-1">
-          <div className="h-4 flex items-center">
-            <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300">
-              {lang === 'en' ? 'House / Ward / Street' : 'मकान / वार्ड / टोला'}
-            </label>
-          </div>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-slate-700 dark:text-slate-300 block">
+            {lang === 'en' ? 'House / Ward / Street' : 'मकान / वार्ड / टोला'}
+          </label>
           <Input
             type="text"
             value={houseNo || street}
@@ -672,7 +645,7 @@ export const AddressFormFields: React.FC<AddressFormFieldsProps> = ({
               emitChange({ houseNo: e.target.value, street: e.target.value });
             }}
             placeholder="e.g. Ward 4"
-            className="h-9 text-xs rounded-xl bg-white dark:bg-[#18181b] border-slate-200 dark:border-[#27272a] text-slate-900 dark:text-white"
+            className="h-9.5 text-xs rounded-lg bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100"
           />
         </div>
       </div>

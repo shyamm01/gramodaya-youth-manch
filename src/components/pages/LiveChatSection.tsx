@@ -1,15 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Member } from '../../types';
 import {
   getOrCreateGroupRoom,
+  getOrCreateAdminHelpdeskRoom,
   getOrCreatePersonalRoom,
   sendRoomMessage,
   fetchRoomMessages,
   deleteChatMessage,
   markRoomMessagesAsRead,
+  playChatChime,
   SupabaseMessage,
 } from '../../lib/supabaseChat';
 import { supabase } from '../../lib/supabase';
@@ -32,22 +34,17 @@ export const LiveChatSection: React.FC = () => {
     setSelectedIdCardMember,
     selectedChatPartner,
     setSelectedChatPartner,
-    fetchGroupChat,
     t,
     lang,
     villageSettings,
   } = useApp();
 
-  // Active polling only when Live Chat screen is mounted
-  useEffect(() => {
-    fetchGroupChat();
-    const interval = setInterval(() => {
-      fetchGroupChat();
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [fetchGroupChat]);
+  const currentVillageId = String(villageSettings.id || '1');
 
-  const activeMembers = members.filter((m) => m.status === 'active');
+  // Filter active members belonging to this village
+  const activeMembers = members.filter(
+    (m) => m.status === 'active' && (!m.villageId || String(m.villageId) === currentVillageId)
+  );
 
   // Identify logged in member / sender identity
   const [currentMobile, setCurrentMobile] = useState<string>(() => {
@@ -74,6 +71,11 @@ export const LiveChatSection: React.FC = () => {
     return typeof window !== 'undefined' ? localStorage.getItem('gym_chat_sender_photo') || '' : '';
   });
 
+  // Sound Chime Notification Toggle State
+  const [isSoundEnabled, setIsSoundEnabled] = useState<boolean>(() => {
+    return typeof window !== 'undefined' ? localStorage.getItem('gym_chat_sound') !== 'false' : true;
+  });
+
   // Search filter for contacts
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -90,6 +92,9 @@ export const LiveChatSection: React.FC = () => {
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [typingUser, setTypingUser] = useState<string | null>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const activeChannelRef = useRef<any>(null);
 
   // Online Presence state
   const [onlineUsers, setOnlineUsers] = useState<Record<string, boolean>>({});
@@ -103,6 +108,15 @@ export const LiveChatSection: React.FC = () => {
   const [showMobileChatView, setShowMobileChatView] = useState(() => {
     return !!selectedChatPartner;
   });
+
+  // Toggle Sound Setting
+  const handleToggleSound = () => {
+    setIsSoundEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem('gym_chat_sound', String(next));
+      return next;
+    });
+  };
 
   // Sync state if selectedChatPartner from context changes
   useEffect(() => {
@@ -132,28 +146,32 @@ export const LiveChatSection: React.FC = () => {
     }
   }, [currentMemberObj, currentMemberMobile, authSession]);
 
-  // Determine current active Room ID
+  // Determine current active Room ID (Village Scoped)
   const getActiveRoomId = () => {
     if (activeTab === 'group') {
-      return 'common_group_room';
+      return `room_village_${currentVillageId}`;
     }
     if (activeTab === 'admin') {
       const uDigits = (currentMobile || 'user').replace(/\D/g, '').slice(-10);
-      return `room_admin_${uDigits}`;
+      return `room_admin_${currentVillageId}_${uDigits}`;
     }
     if (activePartner && activePartner.mobile) {
       const uDigits = (currentMobile || 'user').replace(/\D/g, '').slice(-10);
       const pDigits = activePartner.mobile.replace(/\D/g, '').slice(-10);
       return `room_pv_${[uDigits, pDigits].sort().join('_')}`;
     }
-    return 'common_group_room';
+    return `room_village_${currentVillageId}`;
   };
 
   // Load Room Messages
   const loadRoomMessages = async () => {
     const roomId = getActiveRoomId();
-    const msgs = await fetchRoomMessages(roomId);
-    setMessages(msgs);
+    const msgs = await fetchRoomMessages(roomId, currentMobile, currentVillageId);
+    if (msgs && msgs.length > 0) {
+      setMessages(msgs);
+    } else {
+      setMessages([]);
+    }
     if (currentMobile) {
       markRoomMessagesAsRead(roomId, currentMobile);
     }
@@ -165,29 +183,61 @@ export const LiveChatSection: React.FC = () => {
 
     const roomId = getActiveRoomId();
 
-    // 1. Subscribe to Supabase Postgres Changes for chat_messages
+    // 1. Subscribe to Supabase Realtime Channel (Broadcast & Presence)
     const channel = supabase
-      .channel(`room_${roomId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'chat_messages',
-          filter: `room_id=eq.${roomId}`,
-        },
-        () => {
-          loadRoomMessages();
+      .channel(`room_${roomId}`, {
+        config: { broadcast: { self: false } },
+      })
+      .on('broadcast', { event: 'new_message' }, ({ payload }) => {
+        if (payload && payload.room_id === roomId) {
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === payload.id)) return prev;
+            return [...prev, payload];
+          });
+          if (isSoundEnabled) {
+            playChatChime();
+          }
         }
-      )
+      })
+      .on('broadcast', { event: 'reaction' }, ({ payload }) => {
+        if (payload && payload.messageId && payload.emoji && payload.userMobile) {
+          setMessages((prev) =>
+            prev.map((msg) => {
+              if (msg.id !== payload.messageId) return msg;
+              const reactions = { ...(msg.reactions || {}) };
+              const currentList = reactions[payload.emoji] || [];
+              if (!currentList.includes(payload.userMobile)) {
+                reactions[payload.emoji] = [...currentList, payload.userMobile];
+              }
+              return { ...msg, reactions };
+            })
+          );
+        }
+      })
+      .on('broadcast', { event: 'delete_message' }, ({ payload }) => {
+        if (payload && payload.id) {
+          setMessages((prev) => prev.filter((m) => m.id !== payload.id));
+        }
+      })
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        if (payload && payload.user) {
+          setTypingUser(payload.user);
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = setTimeout(() => {
+            setTypingUser(null);
+          }, 2500);
+        }
+      })
       .subscribe();
+
+    activeChannelRef.current = channel;
 
     // 2. Subscribe to Presence for Online Status
     const userKey = currentMobile
       ? currentMobile.replace(/\D/g, '').slice(-10)
       : `anon_${Math.random().toString(36).substring(7)}`;
 
-    const presenceChannel = supabase.channel('online-presence', {
+    const presenceChannel = supabase.channel(`online-presence-${currentVillageId}`, {
       config: { presence: { key: userKey } },
     });
 
@@ -206,21 +256,57 @@ export const LiveChatSection: React.FC = () => {
             onlineAt: new Date().toISOString(),
             name: senderName,
             mobile: currentMobile,
+            villageId: currentVillageId,
           });
         }
       });
 
-    // Polling fallback every 3.5 seconds
-    const interval = setInterval(() => {
-      loadRoomMessages();
-    }, 3500);
-
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(presenceChannel);
-      clearInterval(interval);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
-  }, [activeTab, activePartner, currentMobile]);
+  }, [activeTab, activePartner, currentMobile, currentVillageId, isSoundEnabled]);
+
+  // Handle Typing Broadcast
+  const handleUserTyping = () => {
+    if (activeChannelRef.current) {
+      activeChannelRef.current.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { user: senderName, mobile: currentMobile },
+      });
+    }
+  };
+
+  // Handle Emoji Reaction on Message
+  const handleReactToMessage = (msgId: string, emoji: string) => {
+    const myMobile = currentMobile || '+91 9999999999';
+
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id !== msgId) return msg;
+        const reactions = { ...(msg.reactions || {}) };
+        const currentList = reactions[emoji] || [];
+        if (!currentList.includes(myMobile)) {
+          reactions[emoji] = [...currentList, myMobile];
+        }
+        return { ...msg, reactions };
+      })
+    );
+
+    if (activeChannelRef.current) {
+      activeChannelRef.current.send({
+        type: 'broadcast',
+        event: 'reaction',
+        payload: {
+          messageId: msgId,
+          emoji,
+          userMobile: myMobile,
+        },
+      });
+    }
+  };
 
   // Handle Login as Member
   const handleMemberLogin = (e: React.FormEvent) => {
@@ -237,7 +323,11 @@ export const LiveChatSection: React.FC = () => {
     );
 
     if (!found) {
-      setLoginError(lang === 'en' ? 'Mobile number not found in active members list.' : 'यह नंबर सदस्य सूची में नहीं मिला। केवल स्वीकृत सदस्य संवाद कर सकते हैं।');
+      setLoginError(
+        lang === 'en'
+          ? `Mobile number not found in ${villageSettings.name || 'this village'} member directory.`
+          : `यह नंबर ग्राम ${villageSettings.nameHindi || villageSettings.name || ''} की सदस्य सूची में नहीं मिला। केवल स्वीकृत सदस्य ही संवाद कर सकते हैं।`
+      );
       return;
     }
 
@@ -249,9 +339,9 @@ export const LiveChatSection: React.FC = () => {
   };
 
   // Handle Send Message
-  const handleSendMessage = async (e?: React.FormEvent) => {
+  const handleSendMessage = async (e?: React.FormEvent, attachmentUrl?: string, audioUrl?: string) => {
     if (e) e.preventDefault();
-    if (!messageText.trim()) return;
+    if (!messageText.trim() && !attachmentUrl && !audioUrl) return;
 
     if (!isApprovedMember) {
       setErrorMsg(
@@ -283,29 +373,121 @@ export const LiveChatSection: React.FC = () => {
     );
     const memberIdCode = mIdx >= 0 ? `GYM-${String(mIdx + 1).padStart(6, '0')}` : 'GYM-MEM';
 
-    const textToSend = messageText.trim();
+    let textToSend = messageText.trim();
+    if (!textToSend && attachmentUrl) {
+      textToSend = lang === 'en' ? '📷 Photo attached' : '📷 फोटो';
+    }
+    if (!textToSend && audioUrl) {
+      textToSend = lang === 'en' ? '🎙️ Voice message' : '🎙️ ऑडियो संदेश';
+    }
     setMessageText('');
 
     if (activeTab === 'group') {
-      await getOrCreateGroupRoom();
+      await getOrCreateGroupRoom(currentVillageId, villageSettings.name);
     } else if (activeTab === 'admin') {
-      await getOrCreatePersonalRoom(myMobile, '+91 9876543210', myName, 'ग्रामोदय एडमिन', 'admin');
+      await getOrCreateAdminHelpdeskRoom(myMobile, currentVillageId, myName, villageSettings.name);
     } else if (activePartner) {
       await getOrCreatePersonalRoom(
         myMobile,
         activePartner.mobile,
         myName,
-        activePartner.name,
-        'personal'
+        activePartner.name
       );
     }
 
-    const res = await sendRoomMessage(roomId, myMobile, myName, myPhoto, textToSend, memberIdCode);
+    // 1. Send to Supabase Realtime Store
+    const res = await sendRoomMessage(
+      roomId,
+      myMobile,
+      myName,
+      myPhoto,
+      textToSend,
+      memberIdCode,
+      attachmentUrl,
+      audioUrl,
+      currentVillageId
+    );
+
+    // 2. Broadcast immediately over Supabase Realtime channel
+    if (res.message && activeChannelRef.current) {
+      const fullMsg = {
+        ...res.message,
+        photo_url: attachmentUrl || undefined,
+        audio_url: audioUrl || undefined,
+        village_id: currentVillageId,
+      };
+      activeChannelRef.current.send({
+        type: 'broadcast',
+        event: 'new_message',
+        payload: fullMsg,
+      });
+
+      // Update self messages list immediately
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === fullMsg.id)) return prev;
+        return [...prev, fullMsg];
+      });
+    }
+
+    // 3. Backup to DB asynchronously
+    if (activeTab === 'group') {
+      try {
+        await fetch('/api/group-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            senderName: myName,
+            senderMobile: myMobile,
+            senderPhoto: myPhoto,
+            text: textToSend,
+            villageId: currentVillageId,
+          }),
+        });
+      } catch (e) {
+        console.warn('Group chat backup note:', e);
+      }
+    } else if (activeTab === 'admin') {
+      try {
+        await fetch('/api/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            senderMobile: myMobile,
+            senderName: myName,
+            senderPhoto: myPhoto,
+            recipientMobile: 'ADMIN',
+            recipientName: villageSettings.orgNameHindi || 'ग्रामोदय एडमिन',
+            text: textToSend,
+            villageId: currentVillageId,
+            type: 'helpdesk',
+          }),
+        });
+      } catch (e) {
+        console.warn('Admin helpdesk backup note:', e);
+      }
+    } else if (activePartner) {
+      try {
+        await fetch('/api/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            senderMobile: myMobile,
+            senderName: myName,
+            senderPhoto: myPhoto,
+            recipientMobile: activePartner.mobile,
+            recipientName: activePartner.name,
+            text: textToSend,
+            villageId: currentVillageId,
+          }),
+        });
+      } catch (e) {
+        console.warn('Personal chat backup note:', e);
+      }
+    }
+
     setSending(false);
 
-    if (res.success) {
-      await loadRoomMessages();
-    } else {
+    if (!res.success) {
       setErrorMsg(res.error || (lang === 'en' ? 'Failed to send message.' : 'संदेश भेजने में विफल। नेटवर्क जांचें।'));
     }
   };
@@ -316,20 +498,32 @@ export const LiveChatSection: React.FC = () => {
 
   // Handle Delete Message
   const handleDeleteMessage = async (msgId: string) => {
+    const roomId = getActiveRoomId();
+
+    setMessages((prev) => prev.filter((m) => m.id !== msgId));
+
+    if (activeChannelRef.current) {
+      activeChannelRef.current.send({
+        type: 'broadcast',
+        event: 'delete_message',
+        payload: { id: msgId },
+      });
+    }
+
     const res = await deleteChatMessage(
       msgId,
       currentMobile || '',
-      authSession.isAdminLoggedIn
+      authSession.isAdminLoggedIn,
+      roomId
     );
 
-    if (res.success) {
-      await loadRoomMessages();
-    } else {
+    if (!res.success) {
       alert(res.error || (lang === 'en' ? 'Could not delete message.' : 'संदेश नहीं हटाया जा सका।'));
+      await loadRoomMessages();
     }
   };
 
-  // Search Filtered Members
+  // Search Filtered Members within this Village
   const filteredMembers = activeMembers.filter((m) => {
     if (currentMemberObj && m.id === currentMemberObj.id) return false;
     const term = searchTerm.toLowerCase().trim();
@@ -360,7 +554,7 @@ export const LiveChatSection: React.FC = () => {
       />
 
       {/* 2. MAIN CHAT CONTAINER */}
-      <div className="bg-white dark:bg-[#131B2E] rounded-3xl border border-[#E0DCCF] dark:border-slate-800 shadow-xl overflow-hidden min-h-[580px] max-h-[750px] flex flex-col md:flex-row transition-colors">
+      <div className="bg-white dark:bg-[#131B2E] rounded-3xl border border-slate-200/90 dark:border-slate-800/90 shadow-2xl overflow-hidden min-h-[600px] max-h-[780px] flex flex-col md:flex-row transition-all">
         {/* LEFT SIDEBAR */}
         <ChatSidebar
           senderName={senderName}
@@ -401,7 +595,7 @@ export const LiveChatSection: React.FC = () => {
 
         {/* RIGHT MAIN CHAT WINDOW */}
         <div
-          className={`flex-1 flex flex-col bg-[#F7F5F0] dark:bg-[#0B0F17] ${
+          className={`flex-1 flex flex-col bg-slate-50/60 dark:bg-[#0B0F17] ${
             !showMobileChatView ? 'hidden md:flex' : 'flex'
           }`}
         >
@@ -411,6 +605,8 @@ export const LiveChatSection: React.FC = () => {
             activePartner={activePartner}
             activeMembersCount={activeMembers.length}
             isOnline={activePartner ? !!onlineUsers[activePartner.mobile.replace(/\D/g, '').slice(-10)] : false}
+            isSoundEnabled={isSoundEnabled}
+            onToggleSound={handleToggleSound}
             onBackToContacts={() => setShowMobileChatView(false)}
             onSelectIdCard={setSelectedIdCardMember}
             lang={lang}
@@ -419,13 +615,15 @@ export const LiveChatSection: React.FC = () => {
             whatsappLabel={t('common.whatsapp')}
           />
 
-          {/* Messages Thread (contained scrolling without window jerking) */}
+          {/* Messages Thread */}
           <ChatMessageList
             messages={messages}
             currentMobile={currentMobile}
             isAdminLoggedIn={authSession.isAdminLoggedIn}
             activeTab={activeTab}
             onDeleteMessage={handleDeleteMessage}
+            onReactToMessage={handleReactToMessage}
+            typingUser={typingUser}
             lang={lang}
           />
 
@@ -438,6 +636,7 @@ export const LiveChatSection: React.FC = () => {
             onMessageChange={setMessageText}
             onSendMessage={handleSendMessage}
             onQuickSend={handleQuickSend}
+            onTyping={handleUserTyping}
             lang={lang}
           />
         </div>

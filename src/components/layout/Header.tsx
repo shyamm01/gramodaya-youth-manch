@@ -1,13 +1,13 @@
-'use client';
-import React, { useState, useRef, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
-import { usePathname } from 'next/navigation';
-import Link from 'next/link';
-import { GymLogo } from '../common/GymLogo';
-import { SupabaseSetupScreen } from '../features/SupabaseSetupScreen';
-import { supabaseUrl } from '../../lib/supabase';
-import { LanguageSelector } from '../common/LanguageSelector';
-import { ThemeToggle } from '../common/ThemeToggle';
+"use client";
+import React, { useState, useRef, useEffect } from "react";
+import { useApp } from "../../context/AppContext";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
+import { GymLogo } from "../common/GymLogo";
+import { SupabaseSetupScreen } from "../features/SupabaseSetupScreen";
+import { supabaseUrl } from "../../lib/supabase";
+import { LanguageSelector } from "../common/LanguageSelector";
+import { ThemeToggle } from "../common/ThemeToggle";
 import {
   Shield,
   Lock,
@@ -31,25 +31,25 @@ import {
   CreditCard,
   ChevronDown,
   Sparkles,
-} from 'lucide-react';
+} from "lucide-react";
 
 // Primary nav — visible in desktop header
 const PRIMARY_NAV = [
-  { href: '/', labelKey: 'nav.home', icon: Home },
-  { href: '/members', labelKey: 'nav.members', icon: Users },
-  { href: '/problems', labelKey: 'nav.problems', icon: AlertTriangle },
-  { href: '/social-work', labelKey: 'nav.socialWork', icon: Heart },
-  { href: '/events', labelKey: 'nav.events', icon: Calendar },
-  { href: '/live-chat', labelKey: 'nav.liveChat', icon: MessageCircle },
+  { href: "/", labelKey: "nav.home", icon: Home },
+  { href: "/members", labelKey: "nav.members", icon: Users },
+  { href: "/problems", labelKey: "nav.problems", icon: AlertTriangle },
+  { href: "/social-work", labelKey: "nav.socialWork", icon: Heart },
+  { href: "/events", labelKey: "nav.events", icon: Calendar },
+  { href: "/live-chat", labelKey: "nav.liveChat", icon: MessageCircle },
 ];
 
 // Secondary nav — shown in "More" dropdown / mobile menu
 const SECONDARY_NAV = [
-  { href: '/leadership', labelKey: 'nav.leadership', icon: Crown },
-  { href: '/announcements', labelKey: 'nav.announcements', icon: Bell },
-  { href: '/gallery', labelKey: 'nav.gallery', icon: Image },
-  { href: '/helpline', labelKey: 'nav.helpline', icon: Phone },
-  { href: '/about', labelKey: 'nav.about', icon: Info },
+  { href: "/leadership", labelKey: "nav.leadership", icon: Crown },
+  { href: "/announcements", labelKey: "nav.announcements", icon: Bell },
+  { href: "/gallery", labelKey: "nav.gallery", icon: Image },
+  { href: "/helpline", labelKey: "nav.helpline", icon: Phone },
+  { href: "/about", labelKey: "nav.about", icon: Info },
 ];
 
 export const Header: React.FC = () => {
@@ -74,45 +74,66 @@ export const Header: React.FC = () => {
   const [isSupabaseSetupOpen, setIsSupabaseSetupOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
-  const isSuperAdmin = authSession.systemRole === 'SUPER_ADMIN' || authSession.role === 'SUPER_ADMIN';
-  const isAdmin = Boolean(authSession.isAdminLoggedIn || authSession.role === 'ADMIN' || isSuperAdmin);
-  const isLoggedIn = Boolean(authSession.isAdminLoggedIn || authSession.isMemberLoggedIn || authSession.token || authSession.currentMember || isAdmin);
+  const isSuperAdmin =
+    authSession.systemRole === "SUPER_ADMIN" ||
+    authSession.role === "SUPER_ADMIN";
+  const isAdmin = Boolean(
+    authSession.isAdminLoggedIn || authSession.role === "ADMIN" || isSuperAdmin,
+  );
+  const isLoggedIn = Boolean(
+    authSession.isAdminLoggedIn ||
+    authSession.isMemberLoggedIn ||
+    authSession.token ||
+    authSession.currentMember ||
+    isAdmin,
+  );
 
   // Resolve current active member details
-  const effectiveMobile = currentMemberMobile || authSession.adminMobile || authSession.currentMember?.mobile;
+  const effectiveMobile =
+    currentMemberMobile ||
+    authSession.adminMobile ||
+    authSession.currentMember?.mobile;
   const currentMemberObj =
     authSession.currentMember ||
     members.find((m) => {
       if (!effectiveMobile) return false;
-      const cleanM = (m.mobile || '').replace(/\D/g, '').slice(-10);
-      const cleanCurr = effectiveMobile.replace(/\D/g, '').slice(-10);
-      return cleanM && cleanCurr && cleanCurr.length >= 10 && cleanM === cleanCurr;
+      const cleanM = (m.mobile || "").replace(/\D/g, "").slice(-10);
+      const cleanCurr = effectiveMobile.replace(/\D/g, "").slice(-10);
+      return (
+        cleanM && cleanCurr && cleanCurr.length >= 10 && cleanM === cleanCurr
+      );
     }) ||
     (isLoggedIn
       ? {
-          id: authSession.adminId || '1',
-          name: authSession.adminName || (isSuperAdmin ? 'Super Admin' : 'Admin'),
-          mobile: effectiveMobile || '',
-          email: authSession.email || '',
-          photoUrl: '',
-          role: (authSession.role as any) || 'ADMIN',
-          systemRole: (authSession.systemRole as any) || (isSuperAdmin ? 'SUPER_ADMIN' : 'ADMIN'),
+          id: authSession.adminId || "1",
+          name:
+            authSession.adminName || (isSuperAdmin ? "Super Admin" : "Admin"),
+          mobile: effectiveMobile || "",
+          email: authSession.email || "",
+          photoUrl: "",
+          role: (authSession.role as any) || "ADMIN",
+          systemRole:
+            (authSession.systemRole as any) ||
+            (isSuperAdmin ? "SUPER_ADMIN" : "ADMIN"),
         }
       : null);
 
   // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(event.target as Node)
+      ) {
         setProfileDropdownOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const isLinkActive = (href: string) => {
-    if (href === '/') return pathname === '/';
+    if (href === "/") return pathname === "/";
     return pathname.startsWith(href);
   };
 
@@ -144,16 +165,23 @@ export const Header: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
           {/* ── Logo + Name ── */}
-          <Link href="/" className="flex items-center gap-2.5 cursor-pointer group flex-shrink-0">
+          <Link
+            href="/"
+            className="flex items-center gap-2.5 cursor-pointer group flex-shrink-0"
+          >
             <div className="w-9 h-9 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center border-2 border-[#4B634D] dark:border-emerald-600 group-hover:scale-105 transition-transform">
               <GymLogo className="w-full h-full" />
             </div>
             <div className="hidden sm:block">
               <h1 className="text-sm sm:text-base font-black text-[#2C3327] dark:text-white tracking-tight leading-tight">
-                {lang === 'en' ? villageSettings.orgName : villageSettings.orgNameHindi}
+                {lang === "en"
+                  ? villageSettings.orgName
+                  : villageSettings.orgNameHindi}
               </h1>
               <p className="text-[10px] text-[#8C8675] dark:text-slate-500 font-semibold leading-none">
-                {lang === 'en' ? (villageSettings.slogan || villageSettings.tagline) : villageSettings.sloganHindi}
+                {lang === "en"
+                  ? villageSettings.slogan || villageSettings.tagline
+                  : villageSettings.sloganHindi}
               </p>
             </div>
           </Link>
@@ -169,8 +197,8 @@ export const Header: React.FC = () => {
                   href={item.href}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     active
-                      ? 'bg-[#1E3A2F] dark:bg-emerald-900/80 text-white dark:text-emerald-100'
-                      : 'text-[#2C3327] dark:text-slate-300 hover:bg-[#F0EDE4] dark:hover:bg-slate-800'
+                      ? "bg-[#1E3A2F] dark:bg-emerald-900/80 text-white dark:text-emerald-100"
+                      : "text-[#2C3327] dark:text-slate-300 hover:bg-[#F0EDE4] dark:hover:bg-slate-800"
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -185,9 +213,10 @@ export const Header: React.FC = () => {
                 onClick={() => setMoreDropdownOpen(!moreDropdownOpen)}
                 onBlur={() => setTimeout(() => setMoreDropdownOpen(false), 150)}
                 className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                  moreDropdownOpen || SECONDARY_NAV.some((n) => isLinkActive(n.href))
-                    ? 'bg-[#1E3A2F] dark:bg-emerald-900/80 text-white dark:text-emerald-100'
-                    : 'text-[#2C3327] dark:text-slate-300 hover:bg-[#F0EDE4] dark:hover:bg-slate-800'
+                  moreDropdownOpen ||
+                  SECONDARY_NAV.some((n) => isLinkActive(n.href))
+                    ? "bg-[#1E3A2F] dark:bg-emerald-900/80 text-white dark:text-emerald-100"
+                    : "text-[#2C3327] dark:text-slate-300 hover:bg-[#F0EDE4] dark:hover:bg-slate-800"
                 }`}
               >
                 <MoreHorizontal className="w-3.5 h-3.5" />
@@ -205,8 +234,8 @@ export const Header: React.FC = () => {
                         onClick={() => setMoreDropdownOpen(false)}
                         className={`flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold transition cursor-pointer ${
                           active
-                            ? 'bg-[#E8F2EC] dark:bg-emerald-950/60 text-[#1E3A2F] dark:text-emerald-200'
-                            : 'text-[#2C3327] dark:text-slate-300 hover:bg-[#F7F5F0] dark:hover:bg-slate-800'
+                            ? "bg-[#E8F2EC] dark:bg-emerald-950/60 text-[#1E3A2F] dark:text-emerald-200"
+                            : "text-[#2C3327] dark:text-slate-300 hover:bg-[#F7F5F0] dark:hover:bg-slate-800"
                         }`}
                       >
                         <Icon className="w-3.5 h-3.5 text-[#8C8675] dark:text-slate-500" />
@@ -224,7 +253,7 @@ export const Header: React.FC = () => {
             <LanguageSelector compact={true} />
             <ThemeToggle compact={true} />
 
-            {(!supabaseUrl || supabaseUrl.includes('example.supabase')) && (
+            {(!supabaseUrl || supabaseUrl.includes("example.supabase")) && (
               <button
                 onClick={() => setIsSupabaseSetupOpen(true)}
                 className="hidden sm:flex items-center gap-1 text-[#8C8675] dark:text-slate-400 hover:text-emerald-700 dark:hover:text-emerald-300 p-1.5 rounded-lg hover:bg-[#F0EDE4] dark:hover:bg-slate-800 transition cursor-pointer"
@@ -241,8 +270,8 @@ export const Header: React.FC = () => {
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                   className={`flex items-center gap-2 p-1 sm:px-2.5 sm:py-1 rounded-xl transition-all cursor-pointer border ${
                     profileDropdownOpen
-                      ? 'bg-emerald-50 dark:bg-slate-800 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-500/20'
-                      : 'bg-[#F7F5F0] dark:bg-slate-800/80 border-[#E0DCCF] dark:border-slate-700 hover:bg-emerald-50/70 dark:hover:bg-slate-800'
+                      ? "bg-emerald-50 dark:bg-slate-800 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-500/20"
+                      : "bg-[#F7F5F0] dark:bg-slate-800/80 border-[#E0DCCF] dark:border-slate-700 hover:bg-emerald-50/70 dark:hover:bg-slate-800"
                   }`}
                   aria-label="User Profile Menu"
                 >
@@ -255,12 +284,12 @@ export const Header: React.FC = () => {
                       />
                     ) : (
                       <div
-                        className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs text-white ${
+                        className={`w-5 h-5 rounded-lg flex items-center justify-center font-bold text-xs text-white ${
                           isSuperAdmin
-                            ? 'bg-gradient-to-tr from-amber-600 to-amber-500 shadow-xs'
+                            ? "bg-gradient-to-tr from-amber-600 to-amber-500 shadow-xs"
                             : isAdmin
-                            ? 'bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-xs'
-                            : 'bg-gradient-to-tr from-emerald-600 to-teal-500 shadow-xs'
+                              ? "bg-gradient-to-tr from-blue-600 to-indigo-500 shadow-xs"
+                              : "bg-gradient-to-tr from-emerald-600 to-teal-500 shadow-xs"
                         }`}
                       >
                         <User className="w-3.5 h-3.5" />
@@ -271,22 +300,23 @@ export const Header: React.FC = () => {
 
                   <div className="hidden md:flex flex-col items-start text-left leading-tight pr-0.5">
                     <span className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate max-w-[110px]">
-                      {currentMemberObj.name || (lang === 'en' ? 'Member' : 'सदस्य')}
+                      {currentMemberObj.name ||
+                        (lang === "en" ? "Member" : "सदस्य")}
                     </span>
                     <span
                       className={`text-[9px] font-semibold tracking-wider uppercase ${
                         isSuperAdmin
-                          ? 'text-amber-600 dark:text-amber-400'
+                          ? "text-amber-600 dark:text-amber-400"
                           : isAdmin
-                          ? 'text-blue-600 dark:text-blue-400'
-                          : 'text-emerald-600 dark:text-emerald-400'
+                            ? "text-blue-600 dark:text-blue-400"
+                            : "text-emerald-600 dark:text-emerald-400"
                       }`}
                     >
                       {isSuperAdmin
-                        ? 'Super Admin'
+                        ? "Super Admin"
                         : isAdmin
-                        ? 'Admin'
-                        : 'Member'}
+                          ? "Admin"
+                          : "Member"}
                     </span>
                   </div>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
@@ -301,10 +331,10 @@ export const Header: React.FC = () => {
                         <div
                           className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm text-white flex-shrink-0 ${
                             isSuperAdmin
-                              ? 'bg-gradient-to-tr from-amber-600 to-amber-500'
+                              ? "bg-gradient-to-tr from-amber-600 to-amber-500"
                               : isAdmin
-                              ? 'bg-gradient-to-tr from-blue-600 to-indigo-500'
-                              : 'bg-gradient-to-tr from-emerald-600 to-teal-500'
+                                ? "bg-gradient-to-tr from-blue-600 to-indigo-500"
+                                : "bg-gradient-to-tr from-emerald-600 to-teal-500"
                           }`}
                         >
                           {currentMemberObj.photoUrl ? (
@@ -327,13 +357,17 @@ export const Header: React.FC = () => {
                           <span
                             className={`inline-block text-[9px] font-bold px-1.5 py-0.2 rounded-md mt-0.5 ${
                               isSuperAdmin
-                                ? 'bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300'
+                                ? "bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300"
                                 : isAdmin
-                                ? 'bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300'
-                                : 'bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300'
+                                  ? "bg-blue-100 dark:bg-blue-950/80 text-blue-800 dark:text-blue-300"
+                                  : "bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300"
                             }`}
                           >
-                            {isSuperAdmin ? 'मुख्य प्रशासक (Super Admin)' : isAdmin ? 'ग्राम प्रशासक (Admin)' : 'सदस्य (Member)'}
+                            {isSuperAdmin
+                              ? "मुख्य प्रशासक (Super Admin)"
+                              : isAdmin
+                                ? "ग्राम प्रशासक (Admin)"
+                                : "सदस्य (Member)"}
                           </span>
                         </div>
                       </div>
@@ -346,7 +380,9 @@ export const Header: React.FC = () => {
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl transition cursor-pointer text-left"
                       >
                         <User className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                        <span>{lang === 'en' ? 'My Profile' : 'मेरी प्रोफाइल'}</span>
+                        <span>
+                          {lang === "en" ? "My Profile" : "मेरी प्रोफाइल"}
+                        </span>
                       </button>
 
                       <button
@@ -354,10 +390,12 @@ export const Header: React.FC = () => {
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl transition cursor-pointer text-left"
                       >
                         <CreditCard className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                        <span>{lang === 'en' ? 'Digital ID Card' : 'डिजिटल पहचान पत्र'}</span>
+                        <span>
+                          {lang === "en"
+                            ? "Digital ID Card"
+                            : "डिजिटल पहचान पत्र"}
+                        </span>
                       </button>
-
-
                     </div>
 
                     {/* Logout */}
@@ -367,7 +405,7 @@ export const Header: React.FC = () => {
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition cursor-pointer text-left"
                       >
                         <LogOut className="w-4 h-4" />
-                        <span>{t('common.logout')}</span>
+                        <span>{t("common.logout")}</span>
                       </button>
                     </div>
                   </div>
@@ -377,10 +415,10 @@ export const Header: React.FC = () => {
               <button
                 onClick={() => setIsAdminLoginModalOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white shadow-2xs active:scale-95"
-                title={lang === 'en' ? 'Portal Login' : 'पोर्टल लॉगिन'}
+                title={lang === "en" ? "Portal Login" : "पोर्टल लॉगिन"}
               >
                 <User className="w-3.5 h-3.5" />
-                <span>{lang === 'en' ? 'Login' : 'लॉगिन'}</span>
+                <span>{lang === "en" ? "Login" : "लॉगिन"}</span>
               </button>
             )}
 
@@ -390,7 +428,11 @@ export const Header: React.FC = () => {
               className="lg:hidden p-1.5 rounded-lg bg-[#F0EDE4] dark:bg-slate-800 text-[#2C3327] dark:text-slate-200 hover:bg-[#E2DDD2] dark:hover:bg-slate-700 transition cursor-pointer"
               aria-label="Toggle Menu"
             >
-              {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {mobileMenuOpen ? (
+                <X className="w-5 h-5" />
+              ) : (
+                <Menu className="w-5 h-5" />
+              )}
             </button>
           </div>
         </div>
@@ -408,8 +450,8 @@ export const Header: React.FC = () => {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
                     active
-                      ? 'bg-[#1E3A2F] dark:bg-emerald-900/80 text-white'
-                      : 'bg-[#F7F5F0] dark:bg-slate-800 text-[#2C3327] dark:text-slate-200 hover:bg-[#E2DDD2] dark:hover:bg-slate-700'
+                      ? "bg-[#1E3A2F] dark:bg-emerald-900/80 text-white"
+                      : "bg-[#F7F5F0] dark:bg-slate-800 text-[#2C3327] dark:text-slate-200 hover:bg-[#E2DDD2] dark:hover:bg-slate-700"
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />

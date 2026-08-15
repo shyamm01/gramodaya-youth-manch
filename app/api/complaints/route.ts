@@ -1,53 +1,53 @@
-import { NextResponse } from 'next/server';
-import { getSqlClient, logAuditAction, normalizeMobile } from '@/src/lib/authUtils';
+import { NextResponse } from "next/server";
+import { getDb } from "@/src/db";
+import * as schema from "@/src/db/schema";
+import { desc } from "drizzle-orm";
+import { validateRequestBody, complaintCreateSchema } from "@/src/lib/validations";
+import { logAuditAction } from "@/src/lib/authUtils";
 
 export async function GET() {
   try {
-    const sql = getSqlClient();
-    if (!sql) {
-      return NextResponse.json({ success: true, complaints: [] });
-    }
+    const db = getDb();
+    if (!db) return NextResponse.json({ success: true, complaints: [] });
 
-    const rows = await sql`
-      SELECT 
-        id, 
-        village_id as "villageId",
-        title, 
-        category, 
-        description, 
-        location, 
-        reporter_name as "reporterName", 
-        reporter_mobile as "reporterMobile", 
-        status, 
-        photo_url as "photoUrl", 
-        video_url as "videoUrl", 
-        is_demo as "isDemo",
-        resolved_at as "resolvedAt",
-        created_at as "createdAt"
-      FROM public.complaints 
-      ORDER BY id DESC;
-    `;
+    const rows = await db.select().from(schema.complaints).orderBy(desc(schema.complaints.id));
 
-    const formatted = rows.map((c: any) => ({
-      ...c,
+    const formatted = rows.map((c) => ({
       id: String(c.id),
-      villageId: c.villageId ? String(c.villageId) : 'vil_rasoolpur',
+      villageId: c.villageId ? String(c.villageId) : "1",
+      memberId: c.memberId ? String(c.memberId) : undefined,
+      title: c.title,
+      category: c.category,
+      description: c.description,
+      location: c.location,
+      reporterName: c.reporterName,
+      reporterMobile: c.reporterMobile,
+      status: c.status,
+      photoUrl: c.photoUrl || "",
+      videoUrl: c.videoUrl || "",
+      isDemo: c.isDemo || false,
+      resolvedAt: c.resolvedAt,
+      createdAt: c.createdAt,
     }));
 
     return NextResponse.json({ success: true, complaints: formatted });
   } catch (err: any) {
-    console.error('Error fetching complaints from DB:', err);
-    return NextResponse.json({ error: 'Failed to fetch complaints' }, { status: 500 });
+    console.error("Error fetching complaints:", err);
+    return NextResponse.json({ success: false, error: "Failed to fetch complaints" }, { status: 500 });
   }
 }
 
 export async function POST(req: Request) {
   try {
+    const validation = await validateRequestBody(req, complaintCreateSchema);
+    if (!validation.success) {
+      return validation.response;
+    }
     const {
       title,
       category,
       description,
-      location,
+      location = "Rasoolpur",
       reporterName,
       reporterMobile,
       photoUrl,
@@ -56,88 +56,78 @@ export async function POST(req: Request) {
       isDemo = false,
       adminName,
       adminMobile,
-    } = await req.json();
+    } = validation.data;
 
-    if (!title || !description || !reporterName || !reporterMobile) {
-      return NextResponse.json({ error: 'सभी आवश्यक विवरण भरें।' }, { status: 400 });
+    const db = getDb();
+    if (!db) {
+      return NextResponse.json({ success: false, error: "Database connection unavailable." }, { status: 500 });
     }
 
-    const sql = getSqlClient();
-    if (!sql) {
-      return NextResponse.json({ error: 'डेटाबेस कनेक्शन अनुपलब्ध है।' }, { status: 500 });
+    let resolvedVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : undefined;
+    let resolvedMemberId: number | undefined = undefined;
+
+    // Automatically resolve village_id and member_id from logged-in / reporting user
+    if (reporterMobile) {
+      const cleanMob = reporterMobile.replace(/\D/g, "").slice(-10);
+      const matchedMember = await db.query.members.findFirst({
+        where: (m, { sql }) => sql`RIGHT(REGEXP_REPLACE(${m.mobile}, '\\D', '', 'g'), 10) = ${cleanMob}`,
+      });
+      if (matchedMember) {
+        resolvedMemberId = matchedMember.id;
+        if (!resolvedVillageId && matchedMember.villageId) {
+          resolvedVillageId = matchedMember.villageId;
+        }
+      }
     }
 
-    // Resolve village ID
-    let numericVillageId: number | null = null;
-    if (villageId && !isNaN(Number(villageId))) {
-      numericVillageId = Number(villageId);
-    } else {
-      const found = await sql`SELECT id FROM public.villages LIMIT 1;`;
-      if (found && found.length > 0) numericVillageId = found[0].id;
-    }
+    const numericVillageId = resolvedVillageId || 1;
+    const { ensureSupabaseUrl } = await import("@/src/lib/supabaseStorage");
+    const cdnPhotoUrl = photoUrl ? await ensureSupabaseUrl(photoUrl, "grievances", "complaint") : null;
 
-    const inserted = await sql`
-      INSERT INTO public.complaints (
-        village_id,
-        title,
-        category,
-        description,
-        location,
-        reporter_name,
-        reporter_mobile,
-        status,
-        photo_url,
-        video_url,
-        is_demo,
-        created_at,
-        updated_at
-      ) VALUES (
-        ${numericVillageId},
-        ${title.trim()},
-        ${(category || 'Other') as any},
-        ${description.trim()},
-        ${location ? location.trim() : 'Rasoolpur'},
-        ${reporterName.trim()},
-        ${reporterMobile.trim()},
-        'NEW',
-        ${photoUrl || null},
-        ${videoUrl || null},
-        ${Boolean(isDemo)},
-        NOW(),
-        NOW()
-      )
-      RETURNING *;
-    `;
+    const [inserted] = await db
+      .insert(schema.complaints)
+      .values({
+        villageId: numericVillageId,
+        memberId: resolvedMemberId,
+        title: title.trim(),
+        category: (category as any) || "Other",
+        description: description.trim(),
+        location: location.trim(),
+        reporterName: reporterName.trim(),
+        reporterMobile: reporterMobile.trim(),
+        photoUrl: cdnPhotoUrl || photoUrl || null,
+        videoUrl: videoUrl || null,
+        status: "NEW",
+        isDemo: Boolean(isDemo),
+      })
+      .returning();
 
-    const newComplaint = {
-      id: String(inserted[0].id),
-      villageId: inserted[0].village_id ? String(inserted[0].village_id) : 'vil_rasoolpur',
-      title: inserted[0].title,
-      category: inserted[0].category,
-      description: inserted[0].description,
-      location: inserted[0].location,
-      reporterName: inserted[0].reporter_name,
-      reporterMobile: inserted[0].reporter_mobile,
-      status: inserted[0].status,
-      photoUrl: inserted[0].photo_url || '',
-      videoUrl: inserted[0].video_url || '',
-      isDemo: inserted[0].is_demo,
-      createdAt: inserted[0].created_at,
+    const formatted = {
+      id: String(inserted.id),
+      villageId: inserted.villageId ? String(inserted.villageId) : "1",
+      memberId: inserted.memberId ? String(inserted.memberId) : undefined,
+      title: inserted.title,
+      category: inserted.category,
+      description: inserted.description,
+      location: inserted.location,
+      reporterName: inserted.reporterName,
+      reporterMobile: inserted.reporterMobile,
+      status: inserted.status,
+      photoUrl: inserted.photoUrl || "",
+      videoUrl: inserted.videoUrl || "",
+      isDemo: inserted.isDemo,
+      createdAt: inserted.createdAt,
     };
 
-    logAuditAction(
-      `Submitted Complaint (${newComplaint.title})`,
-      adminName || reporterName || 'Public Portal',
-      adminMobile || reporterMobile,
-      newComplaint.title
+    await logAuditAction(
+      `शिकायत दर्ज की गई: ${inserted.title}`,
+      adminName || reporterName,
+      `Mobile: ${adminMobile || reporterMobile}`
     );
 
-    return NextResponse.json({ success: true, complaint: newComplaint }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating complaint in DB:', error);
-    return NextResponse.json(
-      { error: error.message || 'शिकायत दर्ज करने में त्रुटि हुई।' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: true, complaint: formatted });
+  } catch (err: any) {
+    console.error("Error creating complaint:", err);
+    return NextResponse.json({ success: false, error: err?.message || "Failed to create complaint" }, { status: 500 });
   }
 }
