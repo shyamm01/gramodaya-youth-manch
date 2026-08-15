@@ -61,6 +61,9 @@ export async function POST(req: Request) {
 
     const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
 
+    const { ensureSupabaseUrl } = await import("@/src/lib/supabaseStorage");
+    const cdnPhotoUrl = photoUrl ? await ensureSupabaseUrl(photoUrl, "events", "event") : null;
+
     const [inserted] = await db
       .insert(schema.events)
       .values({
@@ -70,7 +73,7 @@ export async function POST(req: Request) {
         date: date.trim(),
         time: time.trim(),
         location: location.trim(),
-        photoUrl: photoUrl || null,
+        photoUrl: cdnPhotoUrl || photoUrl || null,
         videoUrl: videoUrl || null,
         status: status as any,
       })

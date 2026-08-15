@@ -11,3 +11,4 @@ export * from './avatar';
 export * from './separator';
 export * from './DatePicker';
 export * from './ImageUploader';
+export * from './ImageCropperModal';

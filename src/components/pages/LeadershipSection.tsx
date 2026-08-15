@@ -56,15 +56,23 @@ export const LeadershipSection: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        const { uploadToSupabaseStorage } = await import('@/src/lib/supabaseStorage');
-        const res = await uploadToSupabaseStorage(file, {
-          bucket: 'member-photos',
-          folder: 'leadership',
-          filename: `admin_${adminId}_${Date.now()}.jpg`,
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('bucket', 'gramodaya-youth-munch');
+        formData.append('folder', 'leadership');
+        formData.append('filename', `admin_${adminId}_${Date.now()}.jpg`);
+
+        const res = await fetch('/api/upload/supabase', {
+          method: 'POST',
+          body: formData,
         });
-        if (res.success && res.publicUrl) {
-          uploadPhoto('admin', adminId, res.publicUrl);
-          return;
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.url) {
+            uploadPhoto('admin', adminId, data.url);
+            return;
+          }
         }
       } catch (err) {
         console.warn('Supabase storage upload error:', err);

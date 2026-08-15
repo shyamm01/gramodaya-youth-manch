@@ -146,6 +146,9 @@ export async function POST(req: Request) {
 
     const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
 
+    const { ensureSupabaseUrl } = await import("@/src/lib/supabaseStorage");
+    const cdnPhotoUrl = photoUrl ? await ensureSupabaseUrl(photoUrl, "profiles", "member") : null;
+
     const [inserted] = await db
       .insert(schema.members)
       .values({
@@ -155,7 +158,7 @@ export async function POST(req: Request) {
         email: email ? email.trim() : null,
         passwordHash,
         status: status as any,
-        photoUrl: photoUrl || null,
+        photoUrl: cdnPhotoUrl || photoUrl || null,
         fatherName: fatherName ? fatherName.trim() : null,
         dob: dob || null,
         gender: gender || null,

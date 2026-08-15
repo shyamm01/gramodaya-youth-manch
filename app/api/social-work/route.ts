@@ -78,6 +78,8 @@ export async function POST(req: Request) {
     }
 
     const numericVillageId = resolvedVillageId || 1;
+    const { ensureSupabaseUrl } = await import("@/src/lib/supabaseStorage");
+    const cdnPhotoUrl = photoUrl ? await ensureSupabaseUrl(photoUrl, "social_work", "social") : null;
 
     const [inserted] = await db
       .insert(schema.socialWorks)
@@ -90,7 +92,7 @@ export async function POST(req: Request) {
         submitterName: submitterName.trim(),
         submitterMobile: submitterMobile.trim(),
         date: date || new Date().toISOString().split("T")[0],
-        photoUrl: photoUrl || null,
+        photoUrl: cdnPhotoUrl || photoUrl || null,
         videoUrl: videoUrl || null,
         status: "pending",
       })

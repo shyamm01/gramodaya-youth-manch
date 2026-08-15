@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore } from '@/src/lib/serverStore';
-import { uploadToSupabaseStorage } from '@/src/lib/supabaseStorage';
+import { ensureSupabaseUrl } from '@/src/lib/supabaseStorage';
 import { getDb } from '@/src/db';
 import * as schema from '@/src/db/schema';
 import { eq } from 'drizzle-orm';
@@ -12,26 +12,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Missing targetType, targetId or photoUrl' }, { status: 400 });
     }
 
-    let finalPhotoUrl = photoUrl;
+    // 1. Resolve photo to Supabase Storage public CDN URL
+    const finalPhotoUrl = await ensureSupabaseUrl(photoUrl, 'profiles', `${targetType}_${targetId}`);
 
-    // 1. If photo is base64, upload to Supabase Storage
-    if (photoUrl.startsWith('data:')) {
-      try {
-        const supabaseRes = await uploadToSupabaseStorage(photoUrl, {
-          bucket: 'member-photos',
-          folder: 'profiles',
-          filename: `${targetType}_${targetId}_${Date.now()}.jpg`,
-        });
-
-        if (supabaseRes.success && supabaseRes.publicUrl) {
-          finalPhotoUrl = supabaseRes.publicUrl;
-        }
-      } catch (sbErr) {
-        console.warn('Supabase storage upload note in /api/upload-photo:', sbErr);
-      }
+    if (!finalPhotoUrl || finalPhotoUrl.startsWith('data:')) {
+      return NextResponse.json({
+        error: 'Failed to obtain public CDN URL from Supabase Storage. Binary data was not stored.',
+      }, { status: 500 });
     }
 
-    // 2. Update In-Memory / File Store
+    // 2. Update In-Memory / File Store with public CDN URL
     const store = loadStore();
     if (targetType === 'admin') {
       store.admins = store.admins.map((a) => (a.id === targetId ? { ...a, photoUrl: finalPhotoUrl } : a));
@@ -40,7 +30,7 @@ export async function POST(req: Request) {
     }
     saveStore(store);
 
-    // 3. Update PostgreSQL Database (Drizzle)
+    // 3. Update PostgreSQL Database (Drizzle) with public CDN URL
     try {
       const db = getDb();
       if (db) {

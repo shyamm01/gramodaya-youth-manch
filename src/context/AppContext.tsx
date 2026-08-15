@@ -89,7 +89,7 @@ interface AppContextType {
   memberLogin: (mobile: string, otpOrPassword?: string) => Promise<{ success: boolean; member?: Member; error?: string }>;
   memberLogout: () => void;
   isLoading: boolean;
-  refreshData: () => Promise<void>;
+  refreshData: (force?: boolean) => Promise<void>;
   sendAdminOtp: (mobile: string) => Promise<{ success: boolean; message?: string; otp?: string; error?: string }>;
   verifyAdminOtp: (
     mobile: string,
@@ -226,6 +226,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [currentMemberMobile, setCurrentMemberMobileState] = useState<string | null>(null);
   const isFetchingAuthMeRef = useRef(false);
   const isFetchingDataRef = useRef(false);
+  const lastDataFetchTimeRef = useRef<number>(0);
 
   const setLang = (newLang: string) => {
     setLangState(newLang);
@@ -571,7 +572,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const refreshData = async (retryCount = 1) => {
+  const refreshData = async (force = false, retryCount = 0) => {
+    // Cache guard: Don't spam /api/data on every minor action or re-render
+    const now = Date.now();
+    if (!force && lastDataFetchTimeRef.current > 0 && now - lastDataFetchTimeRef.current < 120000) {
+      return;
+    }
+
     if (isFetchingDataRef.current) return;
     isFetchingDataRef.current = true;
 
@@ -590,6 +597,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const res = await fetch('/api/data', { headers, credentials: 'include' });
       if (res.ok) {
+        lastDataFetchTimeRef.current = Date.now();
         const text = await res.text();
         let data: any = null;
         try {
@@ -626,19 +634,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }));
           }
         }
-      } else if (retryCount > 0) {
-        isFetchingDataRef.current = false;
-        setTimeout(() => refreshData(retryCount - 1), 1000);
-        return;
       }
     } catch (e) {
-      if (retryCount > 0) {
-        isFetchingDataRef.current = false;
-        setTimeout(() => refreshData(retryCount - 1), 1000);
-        return;
-      } else {
-        console.warn('API sync fallback to local state:', e instanceof Error ? e.message : e);
-      }
+      console.warn('API sync fallback note:', e instanceof Error ? e.message : e);
     } finally {
       isFetchingDataRef.current = false;
       setIsLoading(false);

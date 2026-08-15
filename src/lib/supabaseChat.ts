@@ -101,21 +101,46 @@ export async function uploadToMemberPhotosBucket(
   memberId: string
 ): Promise<{ success: boolean; publicUrl?: string; error?: string }> {
   try {
-    const { uploadToSupabaseStorage } = await import('./supabaseStorage');
-    const res = await uploadToSupabaseStorage(fileOrBase64, {
-      bucket: 'member-photos',
-      folder: 'chat_attachments',
-      filename: `chat_${memberId}_${Date.now()}.jpg`,
-    });
+    if (typeof fileOrBase64 === 'string') {
+      const res = await fetch('/api/upload/supabase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base64: fileOrBase64,
+          bucket: 'gramodaya-youth-munch',
+          folder: 'chat_attachments',
+          filename: `chat_${memberId}_${Date.now()}.jpg`,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          return { success: true, publicUrl: data.url };
+        }
+      }
+    } else {
+      const formData = new FormData();
+      formData.append('file', fileOrBase64);
+      formData.append('bucket', 'gramodaya-youth-munch');
+      formData.append('folder', 'chat_attachments');
+      formData.append('filename', `chat_${memberId}_${Date.now()}_${fileOrBase64.name}`);
 
-    if (res.success && res.publicUrl) {
-      return { success: true, publicUrl: res.publicUrl };
+      const res = await fetch('/api/upload/supabase', {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.url) {
+          return { success: true, publicUrl: data.url };
+        }
+      }
     }
 
     if (typeof fileOrBase64 === 'string') {
       return { success: true, publicUrl: fileOrBase64 };
     }
-    return { success: false, error: res.error || 'Upload failed' };
+    return { success: false, error: 'Upload failed' };
   } catch (err: any) {
     if (typeof fileOrBase64 === 'string') {
       return { success: true, publicUrl: fileOrBase64 };

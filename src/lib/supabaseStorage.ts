@@ -72,6 +72,44 @@ export function getSupabasePublicUrl(bucket: string, path: string): string {
 }
 
 /**
+ * Ensures that an image input is stored in Supabase Storage and returns ONLY the public HTTP(S) URL.
+ * If input is a Base64 data URL, it uploads to Supabase Storage and returns the public CDN URL.
+ * Raw binary base64 strings are NEVER returned for database persistence.
+ */
+export async function ensureSupabaseUrl(
+  inputUrlOrBase64?: string | null,
+  folder: string = 'uploads',
+  prefix: string = 'img'
+): Promise<string> {
+  if (!inputUrlOrBase64 || typeof inputUrlOrBase64 !== 'string') return '';
+  const trimmed = inputUrlOrBase64.trim();
+  if (!trimmed) return '';
+
+  // If already a remote CDN URL, return directly
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+
+  // If base64, upload to Supabase Storage
+  if (trimmed.startsWith('data:')) {
+    try {
+      const res = await uploadToSupabaseStorage(trimmed, {
+        bucket: 'gramodaya-youth-munch',
+        folder,
+        filename: `${prefix}_${Date.now()}.jpg`,
+      });
+      if (res.success && res.publicUrl && !res.publicUrl.startsWith('data:')) {
+        return res.publicUrl;
+      }
+    } catch (err) {
+      console.warn('ensureSupabaseUrl upload error:', err);
+    }
+  }
+
+  return '';
+}
+
+/**
  * Upload an image (File, Blob, or base64 string) to Supabase Storage via S3 or REST API.
  */
 export async function uploadToSupabaseStorage(

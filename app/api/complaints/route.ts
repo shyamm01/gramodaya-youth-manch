@@ -81,6 +81,8 @@ export async function POST(req: Request) {
     }
 
     const numericVillageId = resolvedVillageId || 1;
+    const { ensureSupabaseUrl } = await import("@/src/lib/supabaseStorage");
+    const cdnPhotoUrl = photoUrl ? await ensureSupabaseUrl(photoUrl, "grievances", "complaint") : null;
 
     const [inserted] = await db
       .insert(schema.complaints)
@@ -93,7 +95,7 @@ export async function POST(req: Request) {
         location: location.trim(),
         reporterName: reporterName.trim(),
         reporterMobile: reporterMobile.trim(),
-        photoUrl: photoUrl || null,
+        photoUrl: cdnPhotoUrl || photoUrl || null,
         videoUrl: videoUrl || null,
         status: "NEW",
         isDemo: Boolean(isDemo),

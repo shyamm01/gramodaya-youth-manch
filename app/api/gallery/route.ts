@@ -54,11 +54,14 @@ export async function POST(req: Request) {
 
     const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
 
+    const { ensureSupabaseUrl } = await import("@/src/lib/supabaseStorage");
+    const cdnPhotoUrl = await ensureSupabaseUrl(photoUrl, "gallery", "gallery");
+
     const [inserted] = await db
       .insert(schema.gallery)
       .values({
         villageId: numericVillageId,
-        photoUrl: photoUrl.trim(),
+        photoUrl: cdnPhotoUrl || photoUrl.trim(),
         caption: caption.trim(),
         uploadedBy: uploadedBy.trim(),
         uploadedByMobile: uploadedByMobile.trim(),
