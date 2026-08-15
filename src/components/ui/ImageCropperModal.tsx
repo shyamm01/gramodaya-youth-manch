@@ -18,6 +18,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Button } from './button';
+import { computeDisplayDimensions, renderCroppedImage } from '@/src/lib/canvasCropper';
 
 export interface ImageCropperModalProps {
   isOpen: boolean;
@@ -192,82 +193,19 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
 
     try {
       setIsProcessing(true);
-
-      const image = new Image();
-      if (imageSrc.startsWith('http://') || imageSrc.startsWith('https://')) {
-        image.crossOrigin = 'anonymous';
-      }
-
-      await new Promise<void>((resolve, reject) => {
-        image.onload = () => resolve();
-        image.onerror = (err) => reject(new Error('Failed to load image into canvas: ' + String(err)));
-        image.src = imageSrc;
+      const croppedDataUrl = await renderCroppedImage({
+        imageSrc,
+        selectedRatio,
+        zoom,
+        rotation,
+        isFlipped,
+        position,
+        containerWidth: containerRef.current?.clientWidth || containerDimensions.width || 300,
+        containerHeight: containerRef.current?.clientHeight || containerDimensions.height || 300,
+        naturalWidth: naturalSize.width || 800,
+        naturalHeight: naturalSize.height || 800,
       });
 
-      const natW = image.naturalWidth || naturalSize.width || 800;
-      const natH = image.naturalHeight || naturalSize.height || 800;
-
-      // Target canvas dimensions
-      let targetWidth = 800;
-      let targetHeight = 800;
-
-      if (selectedRatio === '16:9') {
-        targetWidth = 960;
-        targetHeight = 540;
-      } else if (selectedRatio === '4:3') {
-        targetWidth = 800;
-        targetHeight = 600;
-      } else if (selectedRatio === '3:4') {
-        targetWidth = 600;
-        targetHeight = 800;
-      } else if (selectedRatio === 'free') {
-        targetWidth = 800;
-        targetHeight = Math.round((800 * natH) / natW);
-      }
-
-      const canvas = document.createElement('canvas');
-      canvas.width = targetWidth;
-      canvas.height = targetHeight;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas context unavailable');
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(0, 0, targetWidth, targetHeight);
-
-      ctx.save();
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-
-      // Move coordinate space to exact center of canvas
-      ctx.translate(targetWidth / 2, targetHeight / 2);
-
-      // Apply rotation & mirror
-      ctx.rotate((rotation * Math.PI) / 180);
-      if (isFlipped) ctx.scale(-1, 1);
-
-      // Measure current on-screen frame box
-      const cWidth = containerRef.current?.clientWidth || containerDimensions.width || 300;
-      const cHeight = containerRef.current?.clientHeight || containerDimensions.height || 300;
-
-      // Calculate the EXACT base scale displayed on screen
-      const baseScale = Math.max(cWidth / natW, cHeight / natH);
-      const dispW = natW * baseScale;
-      const dispH = natH * baseScale;
-
-      // Scalar multiplier from on-screen pixels to canvas pixels
-      const S = targetWidth / cWidth;
-
-      const finalRenderW = dispW * zoom * S;
-      const finalRenderH = dispH * zoom * S;
-
-      // Projected offset
-      const drawX = (position.x * S) - finalRenderW / 2;
-      const drawY = (position.y * S) - finalRenderH / 2;
-
-      ctx.drawImage(image, drawX, drawY, finalRenderW, finalRenderH);
-      ctx.restore();
-
-      const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
       onCropComplete(croppedDataUrl);
       onClose();
     } catch (err) {
@@ -277,7 +215,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     } finally {
       setIsProcessing(false);
     }
-  }, [containerDimensions.height, containerDimensions.width, imageSrc, isFlipped, naturalSize.height, naturalSize.width, onClose, onCropComplete, position.x, position.y, rotation, selectedRatio, zoom]);
+  }, [containerDimensions.height, containerDimensions.width, imageSrc, isFlipped, naturalSize.height, naturalSize.width, onClose, onCropComplete, position, rotation, selectedRatio, zoom]);
 
   if (!isOpen || !imageSrc) return null;
 
@@ -291,13 +229,12 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
   }[selectedRatio];
 
   // Screen display scale calculation
-  const cWidth = containerDimensions.width || 300;
-  const cHeight = containerDimensions.height || 300;
-  const natW = naturalSize.width || 800;
-  const natH = naturalSize.height || 800;
-  const baseScale = Math.max(cWidth / natW, cHeight / natH);
-  const dispW = Math.round(natW * baseScale);
-  const dispH = Math.round(natH * baseScale);
+  const { dispW, dispH } = computeDisplayDimensions(
+    naturalSize.width,
+    naturalSize.height,
+    containerDimensions.width,
+    containerDimensions.height
+  );
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
