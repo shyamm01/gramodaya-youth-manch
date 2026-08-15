@@ -48,7 +48,8 @@ import {
 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { DatePicker } from '../ui/DatePicker';
-import { Member, Complaint, SocialWork, EventItem, GalleryItem, Elder, Village } from '../../types';
+import { Member, Complaint, SocialWork, EventItem, GalleryItem, Elder, Village, Announcement } from '../../types';
+
 
 interface AdminPanelProps {
   initialTab?: string;
@@ -106,24 +107,38 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     approveMember,
     updateMember,
     deleteMember,
+    changeMemberRole,
+    addMember,
+    submitComplaint,
+    editComplaint,
     updateComplaintStatus,
     deleteComplaint,
+    submitSocialWork,
+    editSocialWork,
     updateSocialWorkStatus,
     deleteSocialWork,
     publishAnnouncement,
+    updateAnnouncement,
     deleteAnnouncement,
     createEvent,
+    updateEvent,
+    updateEventStatus,
     deleteEvent,
     uploadGalleryPhoto,
+    approveGalleryPhoto,
+    editGalleryCaption,
     deleteGalleryItem,
     addElder,
+    editElder,
     deleteElder,
     addVillage,
+    updateVillage,
     deleteVillage,
     updateVillageSettings,
     resetDataStore,
+    exportDataJson,
+    importDataJson,
     uploadPhoto,
-    addMember,
   } = useApp();
 
   // Search & Filter States
@@ -167,6 +182,62 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editMemStatus, setEditMemStatus] = useState<'active' | 'pending' | 'suspended'>('active');
   const [editMemVillage, setEditMemVillage] = useState(villageSettings.id || '1');
   const [editMemMsg, setEditMemMsg] = useState('');
+
+  // Edit Complaint State
+  const [editingComplaint, setEditingComplaint] = useState<Complaint | null>(null);
+  const [editCompTitle, setEditCompTitle] = useState('');
+  const [editCompCategory, setEditCompCategory] = useState('');
+  const [editCompDesc, setEditCompDesc] = useState('');
+  const [editCompLocation, setEditCompLocation] = useState('');
+  const [editCompStatus, setEditCompStatus] = useState<any>('NEW');
+  const [editCompMsg, setEditCompMsg] = useState('');
+
+  // Edit Social Work State
+  const [editingSocialWork, setEditingSocialWork] = useState<SocialWork | null>(null);
+  const [editSocialTitle, setEditSocialTitle] = useState('');
+  const [editSocialDesc, setEditSocialDesc] = useState('');
+  const [editSocialDate, setEditSocialDate] = useState('');
+  const [editSocialLocation, setEditSocialLocation] = useState('');
+  const [editSocialStatus, setEditSocialStatus] = useState<any>('approved');
+  const [editSocialMsg, setEditSocialMsg] = useState('');
+
+  // Edit Announcement State
+  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  const [editAnnTitle, setEditAnnTitle] = useState('');
+  const [editAnnContent, setEditAnnContent] = useState('');
+  const [editAnnMsg, setEditAnnMsg] = useState('');
+
+  // Edit Event State
+  const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
+  const [editEventTitle, setEditEventTitle] = useState('');
+  const [editEventDesc, setEditEventDesc] = useState('');
+  const [editEventDate, setEditEventDate] = useState('');
+  const [editEventTime, setEditEventTime] = useState('');
+  const [editEventLocation, setEditEventLocation] = useState('');
+  const [editEventStatus, setEditEventStatus] = useState<any>('PUBLISHED');
+  const [editEventMsg, setEditEventMsg] = useState('');
+
+  // Edit Gallery State
+  const [editingGallery, setEditingGallery] = useState<GalleryItem | null>(null);
+  const [editGalleryCaptionText, setEditGalleryCaptionText] = useState('');
+  const [editGalleryMsg, setEditGalleryMsg] = useState('');
+
+  // Edit Elder State
+  const [editingElder, setEditingElder] = useState<Elder | null>(null);
+  const [editElderName, setEditElderName] = useState('');
+  const [editElderMobile, setEditElderMobile] = useState('');
+  const [editElderLocation, setEditElderLocation] = useState('');
+  const [editElderDetails, setEditElderDetails] = useState('');
+  const [editElderMsg, setEditElderMsg] = useState('');
+
+  // Edit Village State
+  const [editingVillage, setEditingVillage] = useState<Village | null>(null);
+  const [editVillageName, setEditVillageName] = useState('');
+  const [editVillageNameHindi, setEditVillageNameHindi] = useState('');
+  const [editVillageContactMobile, setEditVillageContactMobile] = useState('');
+  const [editVillageOrgName, setEditVillageOrgName] = useState('');
+  const [editVillageOrgNameHindi, setEditVillageOrgNameHindi] = useState('');
+  const [editVillageMsg, setEditVillageMsg] = useState('');
 
   // Announcement Form
   const [annTitle, setAnnTitle] = useState('');
@@ -393,6 +464,148 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       }, 1000);
     } catch (err: any) {
       setEditMemMsg(`❌ Error: ${err?.message || 'Update failed'}`);
+    }
+  };
+
+  const handleUpdateComplaintSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingComplaint) return;
+    setEditCompMsg('Updating grievance...');
+    try {
+      await editComplaint(editingComplaint.id, {
+        title: editCompTitle,
+        category: editCompCategory as any,
+        description: editCompDesc,
+        location: editCompLocation,
+        status: editCompStatus,
+      });
+      setEditCompMsg('✅ Grievance updated successfully!');
+      setTimeout(() => {
+        setEditingComplaint(null);
+        setEditCompMsg('');
+      }, 1000);
+    } catch (err: any) {
+      setEditCompMsg(`❌ Error: ${err?.message || 'Update failed'}`);
+    }
+  };
+
+  const handleUpdateSocialWorkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSocialWork) return;
+    setEditSocialMsg('Updating initiative...');
+    try {
+      await editSocialWork(editingSocialWork.id, {
+        title: editSocialTitle,
+        description: editSocialDesc,
+        date: editSocialDate,
+        location: editSocialLocation,
+        status: editSocialStatus,
+      });
+      setEditSocialMsg('✅ Initiative updated successfully!');
+      setTimeout(() => {
+        setEditingSocialWork(null);
+        setEditSocialMsg('');
+      }, 1000);
+    } catch (err: any) {
+      setEditSocialMsg(`❌ Error: ${err?.message || 'Update failed'}`);
+    }
+  };
+
+  const handleUpdateAnnouncementSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAnnouncement) return;
+    setEditAnnMsg('Updating announcement...');
+    try {
+      await updateAnnouncement(editingAnnouncement.id, editAnnTitle, editAnnContent);
+      setEditAnnMsg('✅ Announcement updated successfully!');
+      setTimeout(() => {
+        setEditingAnnouncement(null);
+        setEditAnnMsg('');
+      }, 1000);
+    } catch (err: any) {
+      setEditAnnMsg(`❌ Error: ${err?.message || 'Update failed'}`);
+    }
+  };
+
+  const handleUpdateEventSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingEvent) return;
+    setEditEventMsg('Updating event...');
+    try {
+      await updateEvent(editingEvent.id, {
+        title: editEventTitle,
+        description: editEventDesc,
+        date: editEventDate,
+        time: editEventTime,
+        location: editEventLocation,
+        status: editEventStatus,
+      });
+      setEditEventMsg('✅ Event updated successfully!');
+      setTimeout(() => {
+        setEditingEvent(null);
+        setEditEventMsg('');
+      }, 1000);
+    } catch (err: any) {
+      setEditEventMsg(`❌ Error: ${err?.message || 'Update failed'}`);
+    }
+  };
+
+  const handleUpdateGallerySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingGallery) return;
+    setEditGalleryMsg('Updating caption...');
+    try {
+      await editGalleryCaption(editingGallery.id, editGalleryCaptionText);
+      setEditGalleryMsg('✅ Caption updated successfully!');
+      setTimeout(() => {
+        setEditingGallery(null);
+        setEditGalleryMsg('');
+      }, 1000);
+    } catch (err: any) {
+      setEditGalleryMsg(`❌ Error: ${err?.message || 'Update failed'}`);
+    }
+  };
+
+  const handleUpdateElderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingElder) return;
+    setEditElderMsg('Updating elder record...');
+    try {
+      await editElder(editingElder.id, {
+        name: editElderName,
+        mobile: editElderMobile,
+        location: editElderLocation,
+        details: editElderDetails,
+      });
+      setEditElderMsg('✅ Elder record updated successfully!');
+      setTimeout(() => {
+        setEditingElder(null);
+        setEditElderMsg('');
+      }, 1000);
+    } catch (err: any) {
+      setEditElderMsg(`❌ Error: ${err?.message || 'Update failed'}`);
+    }
+  };
+
+  const handleUpdateVillageSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVillage) return;
+    setEditVillageMsg('Updating village unit...');
+    try {
+      await updateVillage(editingVillage.id, {
+        name: editVillageName,
+        nameHindi: editVillageNameHindi,
+        contactMobile: editVillageContactMobile,
+        orgName: editVillageOrgName,
+        orgNameHindi: editVillageOrgNameHindi,
+      });
+      setEditVillageMsg('✅ Village unit updated successfully!');
+      setTimeout(() => {
+        setEditingVillage(null);
+        setEditVillageMsg('');
+      }, 1000);
+    } catch (err: any) {
+      setEditVillageMsg(`❌ Error: ${err?.message || 'Update failed'}`);
     }
   };
 
@@ -908,6 +1121,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <option value="RESOLVED">RESOLVED</option>
                     </select>
                     <button
+                      onClick={() => {
+                        setEditingComplaint(prob);
+                        setEditCompTitle(prob.title);
+                        setEditCompCategory(prob.category);
+                        setEditCompDesc(prob.description);
+                        setEditCompLocation(prob.location || '');
+                        setEditCompStatus(prob.status);
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+                      title="Edit Grievance"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={() => deleteComplaint(prob.id)}
                       className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
                       title="Delete"
@@ -1023,6 +1250,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       </button>
                     )}
                     <button
+                      onClick={() => {
+                        setEditingSocialWork(soc);
+                        setEditSocialTitle(soc.title);
+                        setEditSocialDesc(soc.description);
+                        setEditSocialDate(soc.date || '');
+                        setEditSocialLocation(soc.location || '');
+                        setEditSocialStatus(soc.status);
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+                      title="Edit Initiative"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
                       onClick={() => deleteSocialWork(soc.id)}
                       className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
                       title="Delete"
@@ -1108,13 +1349,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </h4>
                   <p className="text-xs text-slate-600 dark:text-zinc-400">{info.information}</p>
                 </div>
-                <button
-                  onClick={() => deleteAnnouncement(info.id)}
-                  className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
-                  title="Delete"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setEditingAnnouncement(info as any);
+                      setEditAnnTitle(info.name || 'Notice');
+                      setEditAnnContent(info.information || '');
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+                    title="Edit Announcement"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => deleteAnnouncement(info.id)}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
+                    title="Delete"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -1235,13 +1489,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       {ev.title || ev.name}
                     </h4>
                   </div>
-                  <button
-                    onClick={() => deleteEvent(ev.id)}
-                    className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setEditingEvent(ev);
+                        setEditEventTitle(ev.title || ev.name || '');
+                        setEditEventDesc(ev.description || '');
+                        setEditEventDate(ev.date || '');
+                        setEditEventTime(ev.time || '10:00 AM');
+                        setEditEventLocation(ev.location || '');
+                        setEditEventStatus(ev.status || 'PUBLISHED');
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+                      title="Edit Event"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => deleteEvent(ev.id)}
+                      className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-zinc-300">{ev.description}</p>
                 <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex items-center justify-between text-[11px] text-slate-400 dark:text-zinc-500 font-mono">
@@ -1334,15 +1605,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-[#1c1d22] flex items-center justify-center font-bold text-xs text-emerald-600 dark:text-emerald-400">
                     <Globe className="w-4 h-4" />
                   </div>
-                  {villages.length > 1 && (
+                  <div className="flex items-center gap-1">
                     <button
-                      onClick={() => deleteVillage(v.id)}
-                      className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
-                      title="Delete"
+                      onClick={() => {
+                        setEditingVillage(v);
+                        setEditVillageName(v.name);
+                        setEditVillageNameHindi(v.nameHindi || '');
+                        setEditVillageContactMobile(v.contactMobile || '');
+                        setEditVillageOrgName(v.orgName || '');
+                        setEditVillageOrgNameHindi(v.orgNameHindi || '');
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+                      title="Edit Village Unit"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Edit2 className="w-3.5 h-3.5" />
                     </button>
-                  )}
+                    {villages.length > 1 && (
+                      <button
+                        onClick={() => deleteVillage(v.id)}
+                        className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -1426,13 +1713,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     alt={item.caption || 'Gallery image'}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                   />
-                  <button
-                    onClick={() => deleteGalleryItem(item.id)}
-                    className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-rose-600 text-white rounded-lg opacity-0 group-hover:opacity-100 transition cursor-pointer"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                    <button
+                      onClick={() => {
+                        setEditingGallery(item);
+                        setEditGalleryCaptionText(item.caption || '');
+                      }}
+                      className="p-1.5 bg-black/70 hover:bg-slate-900 text-white rounded-lg transition cursor-pointer"
+                      title="Edit Caption"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => deleteGalleryItem(item.id)}
+                      className="p-1.5 bg-black/70 hover:bg-rose-600 text-white rounded-lg transition cursor-pointer"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <div className="p-3">
                   <p className="text-xs font-bold text-slate-900 dark:text-white truncate">
@@ -1531,13 +1830,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <h4 className="text-sm font-bold text-slate-900 dark:text-white">{el.name}</h4>
                     </div>
                   </div>
-                  <button
-                    onClick={() => deleteElder(el.id)}
-                    className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setEditingElder(el);
+                        setEditElderName(el.name);
+                        setEditElderMobile(el.mobile || '');
+                        setEditElderLocation(el.location || '');
+                        setEditElderDetails(el.details || '');
+                      }}
+                      className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
+                      title="Edit Elder Record"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => deleteElder(el.id)}
+                      className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-zinc-300">{el.details || 'Senior Citizen'}</p>
                 <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex items-center justify-between text-[11px] text-slate-400 dark:text-zinc-500 font-mono">
@@ -1866,6 +2180,585 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <button
                   type="button"
                   onClick={() => setEditingMember(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-500 dark:text-zinc-400 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-bold text-xs rounded-xl cursor-pointer shadow"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: EDIT COMPLAINT / GRIEVANCE
+      ───────────────────────────────────────────────────────────── */}
+      {editingComplaint && (
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Edit Grievance #{editingComplaint.id}
+              </h3>
+              <button
+                onClick={() => setEditingComplaint(null)}
+                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            {editCompMsg && (
+              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg">
+                {editCompMsg}
+              </div>
+            )}
+            <form onSubmit={handleUpdateComplaintSubmit} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Title</label>
+                <input
+                  type="text"
+                  required
+                  value={editCompTitle}
+                  onChange={(e) => setEditCompTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Category</label>
+                  <input
+                    type="text"
+                    required
+                    value={editCompCategory}
+                    onChange={(e) => setEditCompCategory(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Status</label>
+                  <select
+                    value={editCompStatus}
+                    onChange={(e) => setEditCompStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
+                  >
+                    <option value="NEW">NEW</option>
+                    <option value="ACTION IN PROGRESS">IN PROGRESS</option>
+                    <option value="RESOLVED">RESOLVED</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Location</label>
+                <input
+                  type="text"
+                  value={editCompLocation}
+                  onChange={(e) => setEditCompLocation(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  required
+                  value={editCompDesc}
+                  onChange={(e) => setEditCompDesc(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingComplaint(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-500 dark:text-zinc-400 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-bold text-xs rounded-xl cursor-pointer shadow"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: EDIT SOCIAL WORK
+      ───────────────────────────────────────────────────────────── */}
+      {editingSocialWork && (
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Edit Social Work Initiative
+              </h3>
+              <button
+                onClick={() => setEditingSocialWork(null)}
+                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            {editSocialMsg && (
+              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg">
+                {editSocialMsg}
+              </div>
+            )}
+            <form onSubmit={handleUpdateSocialWorkSubmit} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Title</label>
+                <input
+                  type="text"
+                  required
+                  value={editSocialTitle}
+                  onChange={(e) => setEditSocialTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={editSocialDate}
+                    onChange={(e) => setEditSocialDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Status</label>
+                  <select
+                    value={editSocialStatus}
+                    onChange={(e) => setEditSocialStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
+                  >
+                    <option value="approved">Approved</option>
+                    <option value="published">Published</option>
+                    <option value="pending">Pending</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Location</label>
+                <input
+                  type="text"
+                  value={editSocialLocation}
+                  onChange={(e) => setEditSocialLocation(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  required
+                  value={editSocialDesc}
+                  onChange={(e) => setEditSocialDesc(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingSocialWork(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-500 dark:text-zinc-400 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-bold text-xs rounded-xl cursor-pointer shadow"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: EDIT ANNOUNCEMENT
+      ───────────────────────────────────────────────────────────── */}
+      {editingAnnouncement && (
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Edit Announcement
+              </h3>
+              <button
+                onClick={() => setEditingAnnouncement(null)}
+                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            {editAnnMsg && (
+              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg">
+                {editAnnMsg}
+              </div>
+            )}
+            <form onSubmit={handleUpdateAnnouncementSubmit} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Title / Headline</label>
+                <input
+                  type="text"
+                  required
+                  value={editAnnTitle}
+                  onChange={(e) => setEditAnnTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Content / Message</label>
+                <textarea
+                  rows={4}
+                  required
+                  value={editAnnContent}
+                  onChange={(e) => setEditAnnContent(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingAnnouncement(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-500 dark:text-zinc-400 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-bold text-xs rounded-xl cursor-pointer shadow"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: EDIT EVENT
+      ───────────────────────────────────────────────────────────── */}
+      {editingEvent && (
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Edit Event #{editingEvent.id}
+              </h3>
+              <button
+                onClick={() => setEditingEvent(null)}
+                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            {editEventMsg && (
+              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg">
+                {editEventMsg}
+              </div>
+            )}
+            <form onSubmit={handleUpdateEventSubmit} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Title</label>
+                <input
+                  type="text"
+                  required
+                  value={editEventTitle}
+                  onChange={(e) => setEditEventTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={editEventDate}
+                    onChange={(e) => setEditEventDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Time</label>
+                  <input
+                    type="text"
+                    value={editEventTime}
+                    onChange={(e) => setEditEventTime(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Location</label>
+                  <input
+                    type="text"
+                    required
+                    value={editEventLocation}
+                    onChange={(e) => setEditEventLocation(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Status</label>
+                  <select
+                    value={editEventStatus}
+                    onChange={(e) => setEditEventStatus(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold"
+                  >
+                    <option value="PUBLISHED">PUBLISHED</option>
+                    <option value="DRAFT">DRAFT</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  value={editEventDesc}
+                  onChange={(e) => setEditEventDesc(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingEvent(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-500 dark:text-zinc-400 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-bold text-xs rounded-xl cursor-pointer shadow"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: EDIT GALLERY
+      ───────────────────────────────────────────────────────────── */}
+      {editingGallery && (
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Edit Gallery Photo Caption
+              </h3>
+              <button
+                onClick={() => setEditingGallery(null)}
+                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            {editGalleryMsg && (
+              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg">
+                {editGalleryMsg}
+              </div>
+            )}
+            <form onSubmit={handleUpdateGallerySubmit} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Caption / Description</label>
+                <input
+                  type="text"
+                  required
+                  value={editGalleryCaptionText}
+                  onChange={(e) => setEditGalleryCaptionText(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingGallery(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-500 dark:text-zinc-400 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-bold text-xs rounded-xl cursor-pointer shadow"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: EDIT ELDER
+      ───────────────────────────────────────────────────────────── */}
+      {editingElder && (
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Edit Senior Citizen Record
+              </h3>
+              <button
+                onClick={() => setEditingElder(null)}
+                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            {editElderMsg && (
+              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg">
+                {editElderMsg}
+              </div>
+            )}
+            <form onSubmit={handleUpdateElderSubmit} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editElderName}
+                  onChange={(e) => setEditElderName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Mobile Number</label>
+                  <input
+                    type="tel"
+                    value={editElderMobile}
+                    onChange={(e) => setEditElderMobile(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Location</label>
+                  <input
+                    type="text"
+                    value={editElderLocation}
+                    onChange={(e) => setEditElderLocation(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Details / Contributions</label>
+                <textarea
+                  rows={3}
+                  value={editElderDetails}
+                  onChange={(e) => setEditElderDetails(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingElder(null)}
+                  className="px-4 py-2 text-xs font-bold text-slate-500 dark:text-zinc-400 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-bold text-xs rounded-xl cursor-pointer shadow"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
+          MODAL: EDIT VILLAGE UNIT
+      ───────────────────────────────────────────────────────────── */}
+      {editingVillage && (
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fade-in">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Edit Village Chapter Unit
+              </h3>
+              <button
+                onClick={() => setEditingVillage(null)}
+                className="p-1 text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            {editVillageMsg && (
+              <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg">
+                {editVillageMsg}
+              </div>
+            )}
+            <form onSubmit={handleUpdateVillageSubmit} className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Name (English)</label>
+                  <input
+                    type="text"
+                    required
+                    value={editVillageName}
+                    onChange={(e) => setEditVillageName(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Name (Hindi)</label>
+                  <input
+                    type="text"
+                    required
+                    value={editVillageNameHindi}
+                    onChange={(e) => setEditVillageNameHindi(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Contact Mobile</label>
+                <input
+                  type="tel"
+                  required
+                  value={editVillageContactMobile}
+                  onChange={(e) => setEditVillageContactMobile(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-mono"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 dark:text-zinc-400 block mb-1">Chapter Organization Name</label>
+                <input
+                  type="text"
+                  value={editVillageOrgName}
+                  onChange={(e) => setEditVillageOrgName(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingVillage(null)}
                   className="px-4 py-2 text-xs font-bold text-slate-500 dark:text-zinc-400 cursor-pointer"
                 >
                   Cancel

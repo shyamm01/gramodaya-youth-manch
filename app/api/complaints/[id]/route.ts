@@ -26,8 +26,8 @@ export async function PUT(
 
     logAuditAction(
       `Updated Complaint (${updated.title})`,
-      body.updaterName || 'User',
-      body.updaterMobile || '',
+      body.updaterName || body.adminName || 'Admin',
+      body.updaterMobile || body.adminMobile || '',
       updated.title
     );
 
@@ -35,6 +35,13 @@ export async function PUT(
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Error updating complaint' }, { status: 500 });
   }
+}
+
+export async function PATCH(
+  req: Request,
+  props: { params: Promise<{ id: string }> }
+) {
+  return PUT(req, props);
 }
 
 export async function DELETE(
@@ -57,7 +64,7 @@ export async function DELETE(
 
     logAuditAction(
       `Deleted Complaint (${item.title})`,
-      adminName || 'Member/Admin',
+      adminName || 'Admin',
       adminMobile || userMobile || '',
       item.title
     );
