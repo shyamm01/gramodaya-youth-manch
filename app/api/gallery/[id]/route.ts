@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore, logAuditAction } from '@/src/lib/serverStore';
+import { deleteSupabaseObjectByUrl } from '@/src/lib/supabaseStorage';
+import { getDb } from '@/src/db';
+import * as schema from '@/src/db/schema';
+import { eq } from 'drizzle-orm';
 
 export async function PATCH(
   req: Request,
@@ -9,24 +13,34 @@ export async function PATCH(
     const { id } = await params;
     const { status, caption, adminName, adminMobile } = await req.json();
 
+    const db = getDb();
+    const numId = Number(id);
+
+    if (db && !isNaN(numId)) {
+      await db
+        .update(schema.gallery)
+        .set({
+          ...(status !== undefined ? { status } : {}),
+          ...(caption !== undefined ? { caption: caption.trim() } : {}),
+        })
+        .where(eq(schema.gallery.id, numId));
+    }
+
     const store = loadStore();
     const item = store.gallery.find((g) => g.id === id);
 
-    if (!item) {
-      return NextResponse.json({ error: 'गैलरी आइटम नहीं मिला।' }, { status: 404 });
+    if (item) {
+      if (status !== undefined) item.status = status;
+      if (caption !== undefined) item.caption = caption.trim();
+      saveStore(store);
+
+      logAuditAction(
+        `Updated Gallery Item (${item.caption || id})`,
+        adminName || 'Admin',
+        adminMobile || '',
+        item.caption || id
+      );
     }
-
-    if (status !== undefined) item.status = status;
-    if (caption !== undefined) item.caption = caption.trim();
-
-    saveStore(store);
-
-    logAuditAction(
-      `Updated Gallery Item (${item.caption || id})`,
-      adminName || 'Admin',
-      adminMobile || '',
-      item.caption || id
-    );
 
     return NextResponse.json({ success: true, item });
   } catch (error: any) {
@@ -43,10 +57,38 @@ export async function DELETE(
     const body = await req.json().catch(() => ({}));
     const { adminName, adminMobile } = body;
 
+    const db = getDb();
+    const numId = Number(id);
+    let photoToDelete: string | null = null;
+
+    if (db && !isNaN(numId)) {
+      const [existing] = await db
+        .select({ photoUrl: schema.gallery.photoUrl })
+        .from(schema.gallery)
+        .where(eq(schema.gallery.id, numId));
+
+      if (existing?.photoUrl) {
+        photoToDelete = existing.photoUrl;
+      }
+
+      await db.delete(schema.gallery).where(eq(schema.gallery.id, numId));
+    }
+
     const store = loadStore();
     const item = store.gallery.find((g) => g.id === id);
+    if (item?.photoUrl && !photoToDelete) {
+      photoToDelete = item.photoUrl;
+    }
+
     store.gallery = store.gallery.filter((g) => g.id !== id);
     saveStore(store);
+
+    // Auto-clean storage object from Supabase bucket
+    if (photoToDelete) {
+      deleteSupabaseObjectByUrl(photoToDelete).catch((err) =>
+        console.warn('Storage delete error on gallery delete:', err)
+      );
+    }
 
     if (item) {
       logAuditAction(
