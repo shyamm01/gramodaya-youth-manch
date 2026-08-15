@@ -30,6 +30,17 @@ CREATE TABLE IF NOT EXISTS "villages" (
 	CONSTRAINT "villages_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
+ALTER TABLE "villages" ADD COLUMN IF NOT EXISTS "gram_panchayat_name" text DEFAULT 'Bahera';
+ALTER TABLE "villages" ADD COLUMN IF NOT EXISTS "gram_panchayat_name_hindi" text DEFAULT 'बहेरा';
+ALTER TABLE "villages" ADD COLUMN IF NOT EXISTS "district_name" text DEFAULT 'Hardoi';
+ALTER TABLE "villages" ADD COLUMN IF NOT EXISTS "district_name_hindi" text DEFAULT 'हरदोई';
+ALTER TABLE "villages" ADD COLUMN IF NOT EXISTS "state_name" text DEFAULT 'Uttar Pradesh';
+ALTER TABLE "villages" ADD COLUMN IF NOT EXISTS "state_name_hindi" text DEFAULT 'उत्तर प्रदेश';
+ALTER TABLE "villages" ADD COLUMN IF NOT EXISTS "block_name" text DEFAULT 'Hardoi';
+ALTER TABLE "villages" ADD COLUMN IF NOT EXISTS "block_name_hindi" text DEFAULT 'हरदोई';
+ALTER TABLE "villages" ADD COLUMN IF NOT EXISTS "pincode" text DEFAULT '241125';
+ALTER TABLE "villages" ADD COLUMN IF NOT EXISTS "post_office" text DEFAULT 'Bahera Rasoolpur';
+--> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS "idx_villages_slug" ON "villages" USING btree ("slug");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_villages_panchayat_id" ON "villages" USING btree ("gram_panchayat_id");

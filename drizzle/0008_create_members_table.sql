@@ -33,6 +33,16 @@ CREATE TABLE IF NOT EXISTS "members" (
 	CONSTRAINT "members_mobile_unique" UNIQUE("mobile")
 );
 --> statement-breakpoint
+ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "pincode" text DEFAULT '241125';
+ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "state" text DEFAULT 'Uttar Pradesh';
+ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "district" text DEFAULT 'Hardoi';
+ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "block" text DEFAULT 'Hardoi';
+ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "gram_panchayat" text DEFAULT 'Bahera';
+ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "village_name" text DEFAULT 'Rasoolpur';
+ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "post_office" text DEFAULT 'Bahera Rasoolpur';
+ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "house_no" text;
+ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "street" text;
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_members_village_id" ON "members" USING btree ("village_id");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_members_mobile" ON "members" USING btree ("mobile");

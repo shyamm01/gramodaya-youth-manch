@@ -17,6 +17,18 @@ CREATE TABLE IF NOT EXISTS "gram_panchayats" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "gram_panchayats" ADD COLUMN IF NOT EXISTS "district_name" text DEFAULT 'Hardoi';
+ALTER TABLE "gram_panchayats" ADD COLUMN IF NOT EXISTS "district_name_hindi" text DEFAULT 'हरदोई';
+ALTER TABLE "gram_panchayats" ADD COLUMN IF NOT EXISTS "state_id" bigint;
+ALTER TABLE "gram_panchayats" ADD COLUMN IF NOT EXISTS "state_name" text DEFAULT 'Uttar Pradesh';
+ALTER TABLE "gram_panchayats" ADD COLUMN IF NOT EXISTS "state_name_hindi" text DEFAULT 'उत्तर प्रदेश';
+ALTER TABLE "gram_panchayats" ADD COLUMN IF NOT EXISTS "block_name" text DEFAULT 'Hardoi';
+ALTER TABLE "gram_panchayats" ADD COLUMN IF NOT EXISTS "block_name_hindi" text DEFAULT 'हरदोई';
+ALTER TABLE "gram_panchayats" ADD COLUMN IF NOT EXISTS "pincode" text DEFAULT '241125';
+ALTER TABLE "gram_panchayats" ADD COLUMN IF NOT EXISTS "post_office" text DEFAULT 'Bahera Rasoolpur';
+ALTER TABLE "gram_panchayats" ADD COLUMN IF NOT EXISTS "is_active" boolean DEFAULT true;
+ALTER TABLE "gram_panchayats" ADD COLUMN IF NOT EXISTS "updated_at" timestamp with time zone DEFAULT now();
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_gram_panchayats_name" ON "gram_panchayats" USING btree ("name");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_gram_panchayats_district" ON "gram_panchayats" USING btree ("district_name");
