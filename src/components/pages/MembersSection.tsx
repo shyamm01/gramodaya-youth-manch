@@ -1,20 +1,19 @@
-'use client';
+"use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useApp } from '../../context/AppContext';
-import { Member } from '../../types';
-import { DigitalIdCard } from '../features/DigitalIdCard';
-import { MemberChatModal } from '../modals/MemberChatModal';
-import { JoinModal } from '../modals/JoinModal';
+import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { useApp } from "../../context/AppContext";
+import { Member } from "../../types";
+import { DigitalIdCard } from "../features/DigitalIdCard";
+import { MemberChatModal } from "../modals/MemberChatModal";
+import { JoinModal } from "../modals/JoinModal";
 import {
   MemberHeaderBanner,
   MemberSearchFilter,
   MemberPendingBanner,
   MemberCard,
   MemberPhotoModal,
-} from '../features/members';
-import { Card, Button } from '../ui';
-import { Users, RefreshCw } from 'lucide-react';
+} from "../features/members";
+import { Users } from "lucide-react";
 
 export const MembersSection: React.FC = () => {
   const {
@@ -33,8 +32,10 @@ export const MembersSection: React.FC = () => {
     currentMemberMobile,
   } = useApp();
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilter, setActiveFilter] = useState<'ALL' | 'WITH_PHOTO' | 'PENDING'>('ALL');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeFilter, setActiveFilter] = useState<
+    "ALL" | "WITH_PHOTO" | "PENDING"
+  >("ALL");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isGeneralChatOpen, setIsGeneralChatOpen] = useState(false);
   const [photoModalMember, setPhotoModalMember] = useState<Member | null>(null);
@@ -43,17 +44,26 @@ export const MembersSection: React.FC = () => {
     fetchMembers();
   }, [fetchMembers]);
 
-  const activeMembers = useMemo(() => members.filter((m) => m.status === 'active'), [members]);
-  const pendingMembers = useMemo(() => members.filter((m) => m.status === 'pending'), [members]);
-  const membersWithPhoto = useMemo(() => activeMembers.filter((m) => Boolean(m.photoUrl)), [activeMembers]);
+  const activeMembers = useMemo(
+    () => members.filter((m) => m.status === "active"),
+    [members],
+  );
+  const pendingMembers = useMemo(
+    () => members.filter((m) => m.status === "pending"),
+    [members],
+  );
+  const membersWithPhoto = useMemo(
+    () => activeMembers.filter((m) => Boolean(m.photoUrl)),
+    [activeMembers],
+  );
 
   // Identify current logged in member
   const currentLoggedInMember = useMemo(() => {
     if (!currentMemberMobile) return null;
-    const cleanCurr = currentMemberMobile.replace(/\D/g, '').slice(-10);
+    const cleanCurr = currentMemberMobile.replace(/\D/g, "").slice(-10);
     if (!cleanCurr || cleanCurr.length < 10) return null;
     return activeMembers.find((m) => {
-      const cleanM = (m.mobile || '').replace(/\D/g, '').slice(-10);
+      const cleanM = (m.mobile || "").replace(/\D/g, "").slice(-10);
       return cleanM && cleanM.length >= 10 && cleanM === cleanCurr;
     });
   }, [activeMembers, currentMemberMobile]);
@@ -79,7 +89,7 @@ export const MembersSection: React.FC = () => {
 
   const handleSavePhoto = async (photoUrl: string) => {
     if (photoModalMember) {
-      await uploadPhoto('member', photoModalMember.id, photoUrl);
+      await uploadPhoto("member", photoModalMember.id, photoUrl);
       setPhotoModalMember(null);
       fetchMembers();
     }
@@ -87,9 +97,9 @@ export const MembersSection: React.FC = () => {
 
   const filteredMembers = useMemo(() => {
     let list = activeMembers;
-    if (activeFilter === 'WITH_PHOTO') {
+    if (activeFilter === "WITH_PHOTO") {
       list = membersWithPhoto;
-    } else if (activeFilter === 'PENDING') {
+    } else if (activeFilter === "PENDING") {
       list = pendingMembers;
     }
 
@@ -101,9 +111,15 @@ export const MembersSection: React.FC = () => {
         m.name.toLowerCase().includes(term) ||
         (m.mobile && m.mobile.includes(term)) ||
         (m.villageName && m.villageName.toLowerCase().includes(term)) ||
-        (m.designation && m.designation.toLowerCase().includes(term))
+        (m.designation && m.designation.toLowerCase().includes(term)),
     );
-  }, [activeMembers, membersWithPhoto, pendingMembers, activeFilter, searchTerm]);
+  }, [
+    activeMembers,
+    membersWithPhoto,
+    pendingMembers,
+    activeFilter,
+    searchTerm,
+  ]);
 
   return (
     <div className="py-6 sm:py-8 px-4 sm:px-6 max-w-7xl mx-auto space-y-6 transition-colors duration-200">
@@ -134,7 +150,7 @@ export const MembersSection: React.FC = () => {
           pendingMembers={pendingMembers}
           onApprove={handleApprove}
           onDelete={handleDelete}
-          onViewAll={() => setActiveFilter('PENDING')}
+          onViewAll={() => setActiveFilter("PENDING")}
         />
       )}
 
@@ -143,7 +159,9 @@ export const MembersSection: React.FC = () => {
         <div className="text-center py-16 px-4 rounded-2xl bg-[#F8F6F0] dark:bg-[#111726] border border-dashed border-[#E0DCCF] dark:border-slate-800">
           <Users className="w-10 h-10 mx-auto text-[#A59F8E] dark:text-slate-600 mb-3" />
           <h3 className="text-base font-bold text-[#2C3327] dark:text-white">
-            {searchTerm ? 'कोई सदस्य नहीं मिला' : 'कोई सक्रिय सदस्य उपलब्ध नहीं है'}
+            {searchTerm
+              ? "कोई सदस्य नहीं मिला"
+              : "कोई सक्रिय सदस्य उपलब्ध नहीं है"}
           </h3>
           <p className="text-xs text-[#8C8675] dark:text-slate-400 mt-1 max-w-md mx-auto">
             {searchTerm
