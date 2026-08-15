@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@/src/db";
 import * as schema from "@/src/db/schema";
-import { desc, eq, like } from "drizzle-orm";
+import { desc, like } from "drizzle-orm";
 import { validateRequestBody, memberCreateSchema } from "@/src/lib/validations";
 import { normalizeMobile, hashPassword, logAuditAction } from "@/src/lib/authUtils";
 import { signJwtToken } from "@/src/lib/jwtAuth";
@@ -11,38 +11,62 @@ export async function GET() {
     const db = getDb();
     if (!db) return NextResponse.json({ success: true, members: [] });
 
-    const rows = await db.select().from(schema.members).orderBy(desc(schema.members.id));
+    const rows = await db.query.members.findMany({
+      with: {
+        village: {
+          with: {
+            gramPanchayat: {
+              with: {
+                district: {
+                  with: {
+                    state: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      orderBy: [desc(schema.members.id)],
+    });
 
-    const formatted = rows.map((m) => ({
-      id: String(m.id),
-      villageId: m.villageId ? String(m.villageId) : "1",
-      name: m.name,
-      mobile: m.mobile,
-      email: m.email || "",
-      status: m.status,
-      photoUrl: m.photoUrl || "",
-      organizationName: m.organizationName || "ग्रामोदय यूथ मंच",
-      fatherName: m.fatherName || "",
-      dob: m.dob || "",
-      gender: m.gender || "",
-      address: m.address || "ग्राम रसूलपुर, ग्राम पंचायत बहेरा",
-      pincode: m.pincode || "241125",
-      state: m.state || "Uttar Pradesh",
-      district: m.district || "Hardoi",
-      block: m.block || "Hardoi",
-      gramPanchayat: m.gramPanchayat || "Bahera",
-      villageName: m.villageName || "Rasoolpur",
-      postOffice: m.postOffice || "Bahera Rasoolpur",
-      houseNo: m.houseNo || "",
-      street: m.street || "",
-      occupation: m.occupation || "",
-      designation: m.designation || "",
-      politicalBackground: m.politicalBackground || "",
-      bloodGroup: m.bloodGroup || "",
-      role: m.role || "MEMBER",
-      systemRole: m.systemRole || "MEMBER",
-      createdAt: m.createdAt,
-    }));
+    const formatted = rows.map((m) => {
+      const v = m.village;
+      const gp = v?.gramPanchayat;
+      const dist = gp?.district;
+      const st = dist?.state;
+
+      return {
+        id: String(m.id),
+        villageId: m.villageId ? String(m.villageId) : "1",
+        name: m.name,
+        mobile: m.mobile,
+        email: m.email || "",
+        status: m.status,
+        photoUrl: m.photoUrl || "",
+        organizationName: v?.orgNameHindi || v?.orgName || "ग्रामोदय यूथ मंच",
+        fatherName: m.fatherName || "",
+        dob: m.dob || "",
+        gender: m.gender || "",
+        address: m.address || "ग्राम रसूलपुर, ग्राम पंचायत बहेरा",
+        pincode: m.pincode || v?.pincode || gp?.pincode || "241125",
+        state: st?.name || "Uttar Pradesh",
+        district: dist?.name || "Hardoi",
+        block: v?.blockName || gp?.blockName || "Hardoi",
+        gramPanchayat: gp?.name || "Bahera",
+        villageName: v?.name || "Rasoolpur",
+        postOffice: v?.postOffice || gp?.postOffice || "Bahera Rasoolpur",
+        houseNo: m.houseNo || "",
+        street: m.street || "",
+        occupation: m.occupation || "",
+        designation: m.designation || "",
+        politicalBackground: m.politicalBackground || "",
+        bloodGroup: m.bloodGroup || "",
+        role: m.role || "MEMBER",
+        systemRole: m.systemRole || "MEMBER",
+        createdAt: m.createdAt,
+      };
+    });
 
     return NextResponse.json({ success: true, members: formatted });
   } catch (err: any) {
@@ -68,12 +92,6 @@ export async function POST(req: Request) {
       password,
       address,
       pincode,
-      state,
-      district,
-      block,
-      gramPanchayat,
-      villageName,
-      postOffice,
       houseNo,
       street,
       villageId,
@@ -84,7 +102,6 @@ export async function POST(req: Request) {
       status = "active",
       role = "MEMBER",
       systemRole = "MEMBER",
-      organizationName = "ग्रामोदय यूथ मंच",
     } = validation.data;
 
     const db = getDb();
@@ -139,18 +156,11 @@ export async function POST(req: Request) {
         passwordHash,
         status: status as any,
         photoUrl: photoUrl || null,
-        organizationName: organizationName.trim(),
         fatherName: fatherName ? fatherName.trim() : null,
         dob: dob || null,
         gender: gender || null,
         address: address || "ग्राम रसूलपुर, ग्राम पंचायत बहेरा",
         pincode: pincode || "241125",
-        state: state || "Uttar Pradesh",
-        district: district || "Hardoi",
-        block: block || "Hardoi",
-        gramPanchayat: gramPanchayat || "Bahera",
-        villageName: villageName || "Rasoolpur",
-        postOffice: postOffice || "Bahera Rasoolpur",
         houseNo: houseNo || null,
         street: street || null,
         occupation: occupation || null,
@@ -161,6 +171,26 @@ export async function POST(req: Request) {
         systemRole: systemRole as any,
       })
       .returning();
+
+    // Query village details for response
+    const villageRecord = await db.query.villages.findFirst({
+      where: (v, { eq }) => eq(v.id, inserted.villageId),
+      with: {
+        gramPanchayat: {
+          with: {
+            district: {
+              with: {
+                state: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const gp = villageRecord?.gramPanchayat;
+    const dist = gp?.district;
+    const st = dist?.state;
 
     const formatted = {
       id: String(inserted.id),
@@ -174,12 +204,12 @@ export async function POST(req: Request) {
       gender: inserted.gender || "",
       address: inserted.address || "",
       pincode: inserted.pincode || "241125",
-      state: inserted.state || "Uttar Pradesh",
-      district: inserted.district || "Hardoi",
-      block: inserted.block || "Hardoi",
-      gramPanchayat: inserted.gramPanchayat || "Bahera",
-      villageName: inserted.villageName || "Rasoolpur",
-      postOffice: inserted.postOffice || "Bahera Rasoolpur",
+      state: st?.name || "Uttar Pradesh",
+      district: dist?.name || "Hardoi",
+      block: villageRecord?.blockName || gp?.blockName || "Hardoi",
+      gramPanchayat: gp?.name || "Bahera",
+      villageName: villageRecord?.name || "Rasoolpur",
+      postOffice: villageRecord?.postOffice || gp?.postOffice || "Bahera Rasoolpur",
       houseNo: inserted.houseNo || "",
       street: inserted.street || "",
       occupation: inserted.occupation || "",
@@ -189,7 +219,7 @@ export async function POST(req: Request) {
       status: inserted.status,
       role: inserted.role,
       systemRole: inserted.systemRole,
-      organizationName: inserted.organizationName,
+      organizationName: villageRecord?.orgNameHindi || villageRecord?.orgName || "ग्रामोदय यूथ मंच",
       createdAt: inserted.createdAt,
     };
 

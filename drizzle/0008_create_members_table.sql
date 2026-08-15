@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "members" (
 	"id" bigserial PRIMARY KEY NOT NULL,
-	"village_id" bigint,
+	"village_id" bigint NOT NULL,
 	"supabase_user_id" uuid,
 	"name" text NOT NULL,
 	"mobile" text NOT NULL,
@@ -8,20 +8,13 @@ CREATE TABLE IF NOT EXISTS "members" (
 	"password_hash" text,
 	"status" "member_status" DEFAULT 'active' NOT NULL,
 	"photo_url" text,
-	"organization_name" text DEFAULT 'ग्रामोदय यूथ मंच',
 	"father_name" text,
 	"dob" text,
 	"gender" text,
-	"address" text DEFAULT 'ग्राम रसूलपुर, ग्राम पंचायत बहेरा',
-	"pincode" text DEFAULT '241125',
-	"state" text DEFAULT 'Uttar Pradesh',
-	"district" text DEFAULT 'Hardoi',
-	"block" text DEFAULT 'Hardoi',
-	"gram_panchayat" text DEFAULT 'Bahera',
-	"village_name" text DEFAULT 'Rasoolpur',
-	"post_office" text DEFAULT 'Bahera Rasoolpur',
+	"address" text,
 	"house_no" text,
 	"street" text,
+	"pincode" text,
 	"occupation" text,
 	"designation" text,
 	"political_background" text,
@@ -33,33 +26,26 @@ CREATE TABLE IF NOT EXISTS "members" (
 	CONSTRAINT "members_mobile_unique" UNIQUE("mobile")
 );
 --> statement-breakpoint
-ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "pincode" text DEFAULT '241125';
-ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "state" text DEFAULT 'Uttar Pradesh';
-ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "district" text DEFAULT 'Hardoi';
-ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "block" text DEFAULT 'Hardoi';
-ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "gram_panchayat" text DEFAULT 'Bahera';
-ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "village_name" text DEFAULT 'Rasoolpur';
-ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "post_office" text DEFAULT 'Bahera Rasoolpur';
-ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "house_no" text;
-ALTER TABLE "members" ADD COLUMN IF NOT EXISTS "street" text;
+ALTER TABLE "members" DROP COLUMN IF EXISTS "state";
+ALTER TABLE "members" DROP COLUMN IF EXISTS "district";
+ALTER TABLE "members" DROP COLUMN IF EXISTS "block";
+ALTER TABLE "members" DROP COLUMN IF EXISTS "gram_panchayat";
+ALTER TABLE "members" DROP COLUMN IF EXISTS "village_name";
+ALTER TABLE "members" DROP COLUMN IF EXISTS "post_office";
+ALTER TABLE "members" DROP COLUMN IF EXISTS "organization_name";
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_members_village_id" ON "members" USING btree ("village_id");
 --> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_members_mobile" ON "members" USING btree ("mobile");
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_members_mobile" ON "members" USING btree ("mobile");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_members_status" ON "members" USING btree ("status");
---> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_members_pincode" ON "members" USING btree ("pincode");
---> statement-breakpoint
-CREATE INDEX IF NOT EXISTS "idx_members_gram_panchayat" ON "members" USING btree ("gram_panchayat");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_members_system_role" ON "members" USING btree ("system_role");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_members_created_at" ON "members" USING btree ("created_at");
 --> statement-breakpoint
 DO $$ BEGIN
-  ALTER TABLE "members" ADD CONSTRAINT "members_village_id_villages_id_fk" FOREIGN KEY ("village_id") REFERENCES "public"."villages"("id") ON DELETE set null ON UPDATE no action;
+ ALTER TABLE "members" ADD CONSTRAINT "members_village_id_villages_id_fk" FOREIGN KEY ("village_id") REFERENCES "public"."villages"("id") ON DELETE restrict ON UPDATE no action;
 EXCEPTION
-  WHEN duplicate_object THEN null;
+ WHEN duplicate_object THEN null;
 END $$;
---> statement-breakpoint

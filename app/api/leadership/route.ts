@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/src/db';
 import * as schema from '@/src/db/schema';
-import { desc, or, eq } from 'drizzle-orm';
+import { desc } from 'drizzle-orm';
 
 export async function GET() {
   try {
@@ -13,34 +13,53 @@ export async function GET() {
       );
     }
 
-    const leaders = await db
-      .select()
-      .from(schema.members)
-      .where(
+    const leaders = await db.query.members.findMany({
+      where: (m, { or, eq }) =>
         or(
-          eq(schema.members.role, 'ADMIN'),
-          eq(schema.members.systemRole, 'ADMIN'),
-          eq(schema.members.systemRole, 'SUPER_ADMIN')
-        )
-      )
-      .orderBy(desc(schema.members.id));
+          eq(m.role, 'ADMIN'),
+          eq(m.systemRole, 'ADMIN'),
+          eq(m.systemRole, 'SUPER_ADMIN')
+        ),
+      with: {
+        village: {
+          with: {
+            gramPanchayat: {
+              with: {
+                district: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [desc(schema.members.id)],
+    });
 
-    const formattedLeaders = leaders.map((l) => ({
-      id: String(l.id),
-      villageId: l.villageId ? String(l.villageId) : '1',
-      name: l.name,
-      mobile: l.mobile,
-      photoUrl: l.photoUrl || '',
-      designation: l.designation || (l.systemRole === 'SUPER_ADMIN' ? 'केंद्रीय अध्यक्ष (Head Admin)' : 'ग्राम संयोजक (Village Coordinator)'),
-      role: l.role,
-      systemRole: l.systemRole,
-      gramPanchayat: l.gramPanchayat || 'Bahera',
-      village: l.villageName || 'Rasoolpur',
-      district: l.district || 'Hardoi',
-      address: l.address || '',
-      bloodGroup: l.bloodGroup || '',
-      joinedAt: l.createdAt,
-    }));
+    const formattedLeaders = leaders.map((l) => {
+      const v = l.village;
+      const gp = v?.gramPanchayat;
+      const dist = gp?.district;
+
+      return {
+        id: String(l.id),
+        villageId: l.villageId ? String(l.villageId) : '1',
+        name: l.name,
+        mobile: l.mobile,
+        photoUrl: l.photoUrl || '',
+        designation:
+          l.designation ||
+          (l.systemRole === 'SUPER_ADMIN'
+            ? 'केंद्रीय अध्यक्ष (Head Admin)'
+            : 'ग्राम संयोजक (Village Coordinator)'),
+        role: l.role,
+        systemRole: l.systemRole,
+        gramPanchayat: gp?.name || 'Bahera',
+        village: v?.name || 'Rasoolpur',
+        district: dist?.name || 'Hardoi',
+        address: l.address || '',
+        bloodGroup: l.bloodGroup || '',
+        joinedAt: l.createdAt,
+      };
+    });
 
     return NextResponse.json({
       success: true,

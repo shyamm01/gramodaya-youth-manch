@@ -42,7 +42,24 @@ export async function GET() {
         },
         orderBy: [asc(schema.villages.id)],
       }),
-      db.select().from(schema.members).orderBy(desc(schema.members.id)),
+      db.query.members.findMany({
+        with: {
+          village: {
+            with: {
+              gramPanchayat: {
+                with: {
+                  district: {
+                    with: {
+                      state: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderBy: [desc(schema.members.id)],
+      }),
       db.select().from(schema.complaints).orderBy(desc(schema.complaints.id)),
       db.select().from(schema.socialWorks).orderBy(desc(schema.socialWorks.id)),
       db.select().from(schema.events).orderBy(desc(schema.events.id)),
@@ -91,42 +108,50 @@ export async function GET() {
       };
     });
 
-    // Format member records
-    const formattedMembers = membersData.map((m) => ({
-      id: String(m.id),
-      villageId: m.villageId ? String(m.villageId) : '1',
-      name: m.name,
-      mobile: m.mobile,
-      email: m.email || '',
-      status: m.status,
-      photoUrl: m.photoUrl || '',
-      organizationName: m.organizationName || 'ग्रामोदय यूथ मंच',
-      fatherName: m.fatherName || '',
-      dob: m.dob || '',
-      gender: m.gender || '',
-      address: m.address || '',
-      pincode: m.pincode || '241125',
-      state: m.state || 'Uttar Pradesh',
-      district: m.district || 'Hardoi',
-      block: m.block || 'Hardoi',
-      gramPanchayat: m.gramPanchayat || 'Bahera',
-      villageName: m.villageName || 'Rasoolpur',
-      postOffice: m.postOffice || 'Bahera Rasoolpur',
-      houseNo: m.houseNo || '',
-      street: m.street || '',
-      occupation: m.occupation || '',
-      designation: m.designation || '',
-      politicalBackground: m.politicalBackground || '',
-      bloodGroup: m.bloodGroup || '',
-      role: m.role || 'MEMBER',
-      systemRole: m.systemRole || 'MEMBER',
-      createdAt: m.createdAt,
-    }));
+    // Format member records with dynamically resolved geographic relations
+    const formattedMembers = membersData.map((m) => {
+      const v = m.village;
+      const gp = v?.gramPanchayat;
+      const dist = gp?.district;
+      const st = dist?.state;
+
+      return {
+        id: String(m.id),
+        villageId: m.villageId ? String(m.villageId) : '1',
+        name: m.name,
+        mobile: m.mobile,
+        email: m.email || '',
+        status: m.status,
+        photoUrl: m.photoUrl || '',
+        organizationName: v?.orgNameHindi || v?.orgName || 'ग्रामोदय यूथ मंच',
+        fatherName: m.fatherName || '',
+        dob: m.dob || '',
+        gender: m.gender || '',
+        address: m.address || '',
+        pincode: m.pincode || v?.pincode || gp?.pincode || '241125',
+        state: st?.name || 'Uttar Pradesh',
+        district: dist?.name || 'Hardoi',
+        block: v?.blockName || gp?.blockName || 'Hardoi',
+        gramPanchayat: gp?.name || 'Bahera',
+        villageName: v?.name || 'Rasoolpur',
+        postOffice: v?.postOffice || gp?.postOffice || 'Bahera Rasoolpur',
+        houseNo: m.houseNo || '',
+        street: m.street || '',
+        occupation: m.occupation || '',
+        designation: m.designation || '',
+        politicalBackground: m.politicalBackground || '',
+        bloodGroup: m.bloodGroup || '',
+        role: m.role || 'MEMBER',
+        systemRole: m.systemRole || 'MEMBER',
+        createdAt: m.createdAt,
+      };
+    });
 
     // Format complaints
     const formattedComplaints = complaintsData.map((c) => ({
       id: String(c.id),
       villageId: c.villageId ? String(c.villageId) : '1',
+      memberId: c.memberId ? String(c.memberId) : undefined,
       title: c.title,
       category: c.category,
       description: c.description,
@@ -136,6 +161,7 @@ export async function GET() {
       status: c.status,
       photoUrl: c.photoUrl || '',
       videoUrl: c.videoUrl || '',
+      isDemo: c.isDemo || false,
       createdAt: c.createdAt,
       resolvedAt: c.resolvedAt,
     }));
@@ -144,6 +170,7 @@ export async function GET() {
     const formattedSocialWorks = socialWorksData.map((s) => ({
       id: String(s.id),
       villageId: s.villageId ? String(s.villageId) : '1',
+      memberId: s.memberId ? String(s.memberId) : undefined,
       title: s.title,
       description: s.description,
       date: s.date,
