@@ -42,13 +42,13 @@ async function seed() {
     const stateId = stateRow?.id || 1;
 
     // 2. Seed District
-    console.log('Inserting default district (Jaunpur)...');
+    console.log('Inserting default district (Hardoi)...');
     const [distRow] = await db
       .insert(districts)
       .values({
         stateId,
-        name: 'Jaunpur',
-        nameHindi: 'जौनपुर',
+        name: 'Hardoi',
+        nameHindi: 'हरदोई',
       })
       .onConflictDoNothing()
       .returning({ id: districts.id });
