@@ -84,7 +84,7 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
     villages.forEach((v) => {
       const vState = (v as any).state || (v as any).stateName || villageSettings.state || 'Uttar Pradesh';
       if (state === 'ALL' || !state || vState === state) {
-        const dst = v.districtName || (v as any).district || villageSettings.district || 'Jaunpur';
+        const dst = v.districtName || (v as any).district || villageSettings.district || 'Hardoi';
         if (dst) districts.add(dst);
       }
     });
@@ -96,7 +96,7 @@ export const AdminLocationSelector: React.FC<AdminLocationSelectorProps> = ({
   const dynamicFilteredVillages = useMemo(() => {
     return villages.filter((v) => {
       const vState = (v as any).state || (v as any).stateName || villageSettings.state || 'Uttar Pradesh';
-      const vDistrict = v.districtName || (v as any).district || villageSettings.district || 'Jaunpur';
+      const vDistrict = v.districtName || (v as any).district || villageSettings.district || 'Hardoi';
 
       const matchesState = state === 'ALL' || !state || vState === state;
       const matchesDistrict = district === 'ALL' || !district || vDistrict === district;

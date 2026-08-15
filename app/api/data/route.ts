@@ -1,82 +1,107 @@
 import { NextResponse } from 'next/server';
-import { getSqlClient, logAuditAction } from '@/src/lib/authUtils';
+import { getDb } from '@/src/db';
+import * as schema from '@/src/db/schema';
+import { desc, asc } from 'drizzle-orm';
 
 export async function GET() {
   try {
-    const sql = getSqlClient();
-    if (!sql) {
-      return NextResponse.json({ error: 'Database connection unavailable' }, { status: 500 });
+    const db = getDb();
+    if (!db) {
+      return NextResponse.json(
+        { success: false, error: 'Database connection is not configured.' },
+        { status: 500 }
+      );
     }
 
-    const villagesData = await sql`SELECT * FROM public.villages ORDER BY id ASC`;
-    // Auto-ensure schema columns if not yet applied
-    try {
-      await sql`
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS pincode TEXT DEFAULT '241125';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS state TEXT DEFAULT 'Uttar Pradesh';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS district TEXT DEFAULT 'Hardoi';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS block TEXT DEFAULT 'Hardoi';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS gram_panchayat TEXT DEFAULT 'Bahera';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS village_name TEXT DEFAULT 'Rasoolpur';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS post_office TEXT DEFAULT 'Bahera Rasoolpur';
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS house_no TEXT;
-        ALTER TABLE public.members ADD COLUMN IF NOT EXISTS street TEXT;
-        ALTER TABLE public.villages ADD COLUMN IF NOT EXISTS pincode TEXT DEFAULT '241125';
-        ALTER TABLE public.villages ADD COLUMN IF NOT EXISTS gram_panchayat_name TEXT DEFAULT 'Bahera';
-        ALTER TABLE public.villages ADD COLUMN IF NOT EXISTS district_name TEXT DEFAULT 'Hardoi';
-        ALTER TABLE public.villages ADD COLUMN IF NOT EXISTS state_name TEXT DEFAULT 'Uttar Pradesh';
-        ALTER TABLE public.villages ADD COLUMN IF NOT EXISTS block_name TEXT DEFAULT 'Hardoi';
-        ALTER TABLE public.villages ADD COLUMN IF NOT EXISTS post_office TEXT DEFAULT 'Bahera Rasoolpur';
-      `;
-    } catch (migErr) {
-      // Ignored if permissions are restricted or columns already exist
-    }
+    // Execute all queries in parallel via Drizzle ORM
+    const [
+      villagesData,
+      membersData,
+      complaintsData,
+      socialWorksData,
+      eventsData,
+      galleryData,
+      eldersData,
+      announcementsData,
+      publicInfosData,
+      groupMessagesData,
+      auditLogsData,
+      permissionsData,
+    ] = await Promise.all([
+      db.query.villages.findMany({
+        with: {
+          gramPanchayat: {
+            with: {
+              district: {
+                with: {
+                  state: true,
+                },
+              },
+            },
+          },
+        },
+        orderBy: [asc(schema.villages.id)],
+      }),
+      db.select().from(schema.members).orderBy(desc(schema.members.id)),
+      db.select().from(schema.complaints).orderBy(desc(schema.complaints.id)),
+      db.select().from(schema.socialWorks).orderBy(desc(schema.socialWorks.id)),
+      db.select().from(schema.events).orderBy(desc(schema.events.id)),
+      db.select().from(schema.gallery).orderBy(desc(schema.gallery.id)),
+      db.select().from(schema.elders).orderBy(desc(schema.elders.id)),
+      db.select().from(schema.announcements).orderBy(desc(schema.announcements.id)),
+      db.select().from(schema.publicInfos).orderBy(desc(schema.publicInfos.id)),
+      db.select().from(schema.groupMessages).orderBy(asc(schema.groupMessages.id)),
+      db.select().from(schema.auditLogs).orderBy(desc(schema.auditLogs.id)).limit(50),
+      db.select().from(schema.permissions).orderBy(asc(schema.permissions.code)),
+    ]);
 
-    const membersData = await sql`SELECT * FROM public.members ORDER BY id DESC`;
-    const complaintsData = await sql`SELECT * FROM public.complaints ORDER BY id DESC`;
-    const socialWorksData = await sql`SELECT * FROM public.social_works ORDER BY id DESC`;
-    const eventsData = await sql`SELECT * FROM public.events ORDER BY id DESC`;
-    const galleryData = await sql`SELECT * FROM public.gallery ORDER BY id DESC`;
-    const eldersData = await sql`SELECT * FROM public.elders ORDER BY id DESC`;
-    const announcementsData = await sql`SELECT * FROM public.announcements ORDER BY id DESC`;
-    const publicInfosData = await sql`SELECT * FROM public.public_infos ORDER BY id DESC`;
-    const groupMessagesData = await sql`SELECT * FROM public.group_messages ORDER BY id ASC`;
-    const auditLogsData = await sql`SELECT * FROM public.audit_logs ORDER BY id DESC LIMIT 50`;
-    const permissionsData = await sql`SELECT * FROM public.permissions ORDER BY id ASC`;
+    // Format relational village records
+    const formattedVillages = villagesData.map((v) => {
+      const gp = v.gramPanchayat;
+      const dist = gp?.district;
+      const st = dist?.state;
 
-    // Format fields to camelCase for UI consumption
-    const formattedVillages = villagesData.map((v: any) => ({
-      id: String(v.id),
-      slug: v.slug,
-      name: v.name,
-      nameHindi: v.name_hindi,
-      gramPanchayatName: v.gram_panchayat_name || 'Bahera',
-      gramPanchayatNameHindi: v.gram_panchayat_name_hindi || 'बहेरा',
-      districtName: v.district_name || 'Hardoi',
-      districtNameHindi: v.district_name_hindi || 'जौनपुर',
-      stateName: v.state_name || 'Uttar Pradesh',
-      stateNameHindi: v.state_name_hindi || 'उत्तर प्रदेश',
-      blockName: v.block_name || 'Hardoi',
-      blockNameHindi: v.block_name_hindi || 'शाहगंज',
-      pincode: v.pincode || '241125',
-      postOffice: v.post_office || 'Bahera Rasoolpur',
-      orgName: v.org_name,
-      orgNameHindi: v.org_name_hindi,
-      sloganHindi: v.slogan_hindi,
-      taglineHindi: v.tagline_hindi,
-      isActive: v.is_active,
-    }));
+      return {
+        id: String(v.id),
+        slug: v.slug,
+        name: v.name,
+        nameHindi: v.nameHindi,
+        gramPanchayatId: v.gramPanchayatId ? String(v.gramPanchayatId) : undefined,
+        gramPanchayatName: gp?.name || 'Bahera',
+        gramPanchayatNameHindi: gp?.nameHindi || 'बहेरा',
+        districtId: dist ? String(dist.id) : undefined,
+        districtName: dist?.name || 'Hardoi',
+        districtNameHindi: dist?.nameHindi || 'हरदोई',
+        stateId: st ? String(st.id) : undefined,
+        stateName: st?.name || 'Uttar Pradesh',
+        stateNameHindi: st?.nameHindi || 'उत्तर प्रदेश',
+        blockName: v.blockName || gp?.blockName || 'Hardoi',
+        blockNameHindi: v.blockNameHindi || gp?.blockNameHindi || 'हरदोई',
+        pincode: v.pincode || gp?.pincode || '241125',
+        postOffice: v.postOffice || gp?.postOffice || 'Bahera Rasoolpur',
+        orgName: v.orgName,
+        orgNameHindi: v.orgNameHindi,
+        sloganHindi: v.sloganHindi,
+        taglineHindi: v.taglineHindi,
+        orgPurposeHindi: v.orgPurposeHindi,
+        contactMobile: v.contactMobile,
+        contactEmail: v.contactEmail,
+        bannerPhotoUrl: v.bannerPhotoUrl,
+        isActive: v.isActive,
+      };
+    });
 
-    const formattedMembers = membersData.map((m: any) => ({
+    // Format member records
+    const formattedMembers = membersData.map((m) => ({
       id: String(m.id),
-      villageId: m.village_id ? String(m.village_id) : 'vil_rasoolpur',
+      villageId: m.villageId ? String(m.villageId) : '1',
       name: m.name,
       mobile: m.mobile,
       email: m.email || '',
       status: m.status,
-      photoUrl: m.photo_url || '',
-      organizationName: m.organization_name,
-      fatherName: m.father_name || '',
+      photoUrl: m.photoUrl || '',
+      organizationName: m.organizationName || 'ग्रामोदय यूथ मंच',
+      fatherName: m.fatherName || '',
       dob: m.dob || '',
       gender: m.gender || '',
       address: m.address || '',
@@ -84,155 +109,167 @@ export async function GET() {
       state: m.state || 'Uttar Pradesh',
       district: m.district || 'Hardoi',
       block: m.block || 'Hardoi',
-      gramPanchayat: m.gram_panchayat || 'Bahera',
-      villageName: m.village_name || 'Rasoolpur',
-      postOffice: m.post_office || 'Bahera Rasoolpur',
-      houseNo: m.house_no || '',
+      gramPanchayat: m.gramPanchayat || 'Bahera',
+      villageName: m.villageName || 'Rasoolpur',
+      postOffice: m.postOffice || 'Bahera Rasoolpur',
+      houseNo: m.houseNo || '',
       street: m.street || '',
       occupation: m.occupation || '',
       designation: m.designation || '',
-      politicalBackground: m.political_background || '',
-      bloodGroup: m.blood_group || '',
+      politicalBackground: m.politicalBackground || '',
+      bloodGroup: m.bloodGroup || '',
       role: m.role || 'MEMBER',
-      systemRole: m.system_role || 'MEMBER',
-      createdAt: m.created_at,
+      systemRole: m.systemRole || 'MEMBER',
+      createdAt: m.createdAt,
     }));
 
-    const formattedComplaints = complaintsData.map((c: any) => ({
+    // Format complaints
+    const formattedComplaints = complaintsData.map((c) => ({
       id: String(c.id),
-      villageId: c.village_id ? String(c.village_id) : 'vil_rasoolpur',
+      villageId: c.villageId ? String(c.villageId) : '1',
       title: c.title,
       category: c.category,
       description: c.description,
       location: c.location,
-      reporterName: c.reporter_name,
-      reporterMobile: c.reporter_mobile,
+      reporterName: c.reporterName,
+      reporterMobile: c.reporterMobile,
       status: c.status,
-      photoUrl: c.photo_url || '',
-      videoUrl: c.video_url || '',
-      createdAt: c.created_at,
-      resolvedAt: c.resolved_at,
+      photoUrl: c.photoUrl || '',
+      videoUrl: c.videoUrl || '',
+      createdAt: c.createdAt,
+      resolvedAt: c.resolvedAt,
     }));
 
-    const formattedSocialWorks = socialWorksData.map((s: any) => ({
+    // Format social works
+    const formattedSocialWorks = socialWorksData.map((s) => ({
       id: String(s.id),
-      villageId: s.village_id ? String(s.village_id) : 'vil_rasoolpur',
+      villageId: s.villageId ? String(s.villageId) : '1',
       title: s.title,
       description: s.description,
       date: s.date,
       location: s.location,
-      submitterName: s.submitter_name,
-      submitterMobile: s.submitter_mobile,
-      photoUrl: s.photo_url || '',
-      videoUrl: s.video_url || '',
+      submitterName: s.submitterName,
+      submitterMobile: s.submitterMobile,
+      photoUrl: s.photoUrl || '',
+      videoUrl: s.videoUrl || '',
       status: s.status,
-      createdAt: s.created_at,
+      createdAt: s.createdAt,
     }));
 
-    const formattedEvents = eventsData.map((e: any) => ({
+    // Format events
+    const formattedEvents = eventsData.map((e) => ({
       id: String(e.id),
-      villageId: e.village_id ? String(e.village_id) : 'vil_rasoolpur',
+      villageId: e.villageId ? String(e.villageId) : '1',
       title: e.title,
       name: e.title,
-      description: e.description,
+      description: e.description || '',
       date: e.date,
       time: e.time,
       location: e.location,
-      photoUrl: e.photo_url || '',
+      photoUrl: e.photoUrl || '',
+      videoUrl: e.videoUrl || '',
       status: e.status,
-      createdAt: e.created_at,
+      createdAt: e.createdAt,
     }));
 
-    const formattedGallery = galleryData.map((g: any) => ({
+    // Format gallery items
+    const formattedGallery = galleryData.map((g) => ({
       id: String(g.id),
-      villageId: g.village_id ? String(g.village_id) : 'vil_rasoolpur',
-      caption: g.caption,
-      photoUrl: g.photo_url,
-      uploadedBy: g.uploaded_by,
-      uploadedByMobile: g.uploaded_by_mobile,
+      villageId: g.villageId ? String(g.villageId) : '1',
+      caption: g.caption || '',
+      photoUrl: g.photoUrl,
+      uploadedBy: g.uploadedBy,
+      uploadedByMobile: g.uploadedByMobile || '',
       date: g.date,
       status: g.status,
-      createdAt: g.created_at,
+      createdAt: g.createdAt,
     }));
 
-    const formattedElders = eldersData.map((el: any) => ({
+    // Format elders
+    const formattedElders = eldersData.map((el) => ({
       id: String(el.id),
-      villageId: el.village_id ? String(el.village_id) : 'vil_rasoolpur',
+      villageId: el.villageId ? String(el.villageId) : '1',
       name: el.name,
-      age: el.age,
-      role: el.role,
-      contribution: el.contribution,
-      photoUrl: el.photo_url,
-      createdAt: el.created_at,
+      age: el.age || '',
+      role: el.role || '',
+      contribution: el.contribution || '',
+      photoUrl: el.photoUrl || '',
+      createdAt: el.createdAt,
     }));
 
-    const formattedAnnouncements = announcementsData.map((a: any) => ({
+    // Format announcements
+    const formattedAnnouncements = announcementsData.map((a) => ({
       id: String(a.id),
-      villageId: a.village_id ? String(a.village_id) : 'vil_rasoolpur',
+      villageId: a.villageId ? String(a.villageId) : '1',
       title: a.title,
       content: a.content,
-      publishedBy: a.published_by,
-      isUrgent: a.is_urgent,
+      publishedBy: a.publishedBy,
+      isUrgent: a.isUrgent || false,
       date: a.date,
-      createdAt: a.created_at,
+      createdAt: a.createdAt,
     }));
 
-    const formattedPublicInfos = publicInfosData.map((p: any) => ({
+    // Format public infos
+    const formattedPublicInfos = publicInfosData.map((p) => ({
       id: String(p.id),
-      villageId: p.village_id ? String(p.village_id) : 'vil_rasoolpur',
+      villageId: p.villageId ? String(p.villageId) : '1',
       title: p.title,
       description: p.description,
       category: p.category,
-      submitterName: p.submitter_name,
-      submitterMobile: p.submitter_mobile,
+      submitterName: p.submitterName,
+      submitterMobile: p.submitterMobile,
       status: p.status,
-      createdAt: p.created_at,
+      createdAt: p.createdAt,
     }));
 
-    const formattedGroupMessages = groupMessagesData.map((gm: any) => ({
+    // Format group chat messages
+    const formattedGroupMessages = groupMessagesData.map((gm) => ({
       id: String(gm.id),
-      villageId: gm.village_id ? String(gm.village_id) : 'vil_rasoolpur',
-      senderName: gm.sender_name,
-      senderRole: gm.sender_role,
-      senderMobile: gm.sender_mobile,
-      senderPhoto: gm.sender_photo,
+      villageId: gm.villageId ? String(gm.villageId) : '1',
+      senderName: gm.senderName,
+      senderRole: gm.senderRole || 'Member',
+      senderMobile: gm.senderMobile || '',
+      senderPhoto: gm.senderPhoto || '',
       text: gm.text,
-      createdAt: gm.created_at,
+      createdAt: gm.createdAt,
     }));
 
-    const formattedAuditLogs = auditLogsData.map((al: any) => ({
+    // Format audit logs
+    const formattedAuditLogs = auditLogsData.map((al) => ({
       id: String(al.id),
       action: al.action,
-      adminName: al.user_name,
+      adminName: al.userName,
       adminMobile: '',
       recordAffected: al.details || '',
       timestamp: al.timestamp,
     }));
 
-    const village = formattedVillages[0] || {
-      id: 'vil_rasoolpur',
+    const activeVillage = formattedVillages[0] || {
+      id: '1',
+      slug: 'rasoolpur',
       name: 'Rasoolpur',
       nameHindi: 'रसूलपुर',
       gramPanchayat: 'Bahera',
       gramPanchayatHindi: 'बहेरा',
       district: 'Hardoi',
-      districtHindi: 'जौनपुर',
+      districtHindi: 'हरदोई',
       state: 'Uttar Pradesh',
       stateHindi: 'उत्तर प्रदेश',
-      tagline: 'Empowering Village Youth',
-      taglineHindi: 'युवा शक्ति से ग्रामोदय की ओर',
-      slogan: 'Youth Power • Village Progress • Bright Future',
-      sloganHindi: 'युवा शक्ति • ग्राम विकास • उज्ज्वल भविष्य',
+      tagline: 'युवा शक्ति • ग्राम विकास • उज्ज्वल भविष्य',
+      taglineHindi: 'युवा शक्ति • ग्राम विकास • उज्ज्वल भविष्य',
+      slogan: 'युवा शक्ति से ग्रामोदय की ओर',
+      sloganHindi: 'युवा शक्ति से ग्रामोदय की ओर',
       orgName: 'Gramodaya Youth Manch',
       orgNameHindi: 'ग्रामोदय यूथ मंच',
     };
 
     return NextResponse.json({
-      villageSettings: village,
+      success: true,
+      villageSettings: activeVillage,
       villages: formattedVillages,
       members: formattedMembers,
       admins: formattedMembers.filter(
-        (m: any) => m.systemRole === 'ADMIN' || m.systemRole === 'SUPER_ADMIN'
+        (m) => m.systemRole === 'ADMIN' || m.systemRole === 'SUPER_ADMIN'
       ),
       complaints: formattedComplaints,
       socialWorks: formattedSocialWorks,
@@ -248,18 +285,18 @@ export async function GET() {
       apiIntegrations: [
         {
           id: 'int_supabase',
-          name: 'PostgreSQL Supabase',
+          name: 'PostgreSQL Database',
           status: 'Connected',
           keyMasked: 'postgresql_••••••••',
         },
       ],
       stats: {
         totalMembers: formattedMembers.length,
-        activeMembers: formattedMembers.filter((m: any) => m.status === 'active').length,
-        pendingMembers: formattedMembers.filter((m: any) => m.status === 'pending').length,
+        activeMembers: formattedMembers.filter((m) => m.status === 'active').length,
+        pendingMembers: formattedMembers.filter((m) => m.status === 'pending').length,
         totalComplaints: formattedComplaints.length,
-        resolvedComplaints: formattedComplaints.filter((c: any) => c.status === 'RESOLVED').length,
-        pendingComplaints: formattedComplaints.filter((c: any) => c.status !== 'RESOLVED').length,
+        resolvedComplaints: formattedComplaints.filter((c) => c.status === 'RESOLVED').length,
+        pendingComplaints: formattedComplaints.filter((c) => c.status !== 'RESOLVED').length,
         totalSocialWorks: formattedSocialWorks.length,
         totalEvents: formattedEvents.length,
         totalGallery: formattedGallery.length,
@@ -268,7 +305,10 @@ export async function GET() {
       },
     });
   } catch (error: any) {
-    console.error('Error fetching data from Postgres:', error);
-    return NextResponse.json({ error: error.message || 'Failed to fetch data' }, { status: 500 });
+    console.error('Error fetching data with Drizzle ORM:', error);
+    return NextResponse.json(
+      { success: false, error: error?.message || 'Failed to fetch data' },
+      { status: 500 }
+    );
   }
 }
