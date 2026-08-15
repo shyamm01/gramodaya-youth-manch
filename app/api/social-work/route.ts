@@ -115,9 +115,7 @@ export async function POST(req: Request) {
     await logAuditAction(
       `सामाजिक कार्य जोड़ा गया: ${formatted.title}`,
       adminName || submitterName,
-      adminMobile || submitterMobile,
-      inserted.villageId,
-      resolvedMemberId
+      `Mobile: ${adminMobile || submitterMobile}`
     );
 
     return NextResponse.json({ success: true, socialWork: formatted });

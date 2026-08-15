@@ -205,6 +205,15 @@ export const authLoginSchema = z.object({
   otp: z.string().optional(),
 });
 
+export const groupMessageSchema = z.object({
+  senderName: z.string().min(2, 'Sender name is required'),
+  senderRole: z.string().default('Member'),
+  senderMobile: z.string().optional(),
+  senderPhoto: z.string().optional(),
+  text: z.string().min(1, 'Message text cannot be empty'),
+  villageId: z.union([z.string(), z.number()]).optional(),
+});
+
 export type ValidationResult<T> =
   | { success: true; data: T; response?: never }
   | { success: false; response: NextResponse; data?: never };

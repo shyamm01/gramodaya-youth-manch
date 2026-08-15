@@ -1,22 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/src/db';
 import * as schema from '@/src/db/schema';
-import { desc, asc } from 'drizzle-orm';
-import {
-  formatVillage,
-  formatMember,
-  formatComplaint,
-  formatSocialWork,
-  formatEvent,
-  formatGallery,
-  formatElder,
-  formatAnnouncement,
-  formatPublicInfo,
-  formatGroupMessage,
-  formatAuditLog,
-} from '@/src/lib/apiResponse';
+import { asc } from 'drizzle-orm';
+import { extractTokenFromRequest, verifyJwtToken } from '@/src/lib/jwtAuth';
+import { formatVillage } from '@/src/lib/apiResponse';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const db = getDb();
     if (!db) {
@@ -26,21 +15,97 @@ export async function GET() {
       );
     }
 
-    // Execute all queries in parallel via Drizzle ORM
-    const [
-      villagesData,
-      membersData,
-      complaintsData,
-      socialWorksData,
-      eventsData,
-      galleryData,
-      eldersData,
-      announcementsData,
-      publicInfosData,
-      groupMessagesData,
-      auditLogsData,
-      permissionsData,
-    ] = await Promise.all([
+    // 1. Resolve Authenticated User and Permissions
+    const token = extractTokenFromRequest(req);
+    let authenticatedUser: any = null;
+    let userPermissionsList: string[] = [];
+
+    if (token) {
+      const payload = await verifyJwtToken(token);
+      if (payload) {
+        let memberRecord: any = null;
+        if (payload.id && !isNaN(Number(payload.id))) {
+          memberRecord = await db.query.members.findFirst({
+            where: (m, { eq }) => eq(m.id, Number(payload.id)),
+            with: {
+              village: {
+                with: {
+                  gramPanchayat: {
+                    with: {
+                      district: {
+                        with: {
+                          state: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          });
+        } else if (payload.mobile) {
+          const cleanMob = payload.mobile.replace(/\D/g, '').slice(-10);
+          memberRecord = await db.query.members.findFirst({
+            where: (m, { sql }) =>
+              sql`RIGHT(REGEXP_REPLACE(${m.mobile}, '\\D', '', 'g'), 10) = ${cleanMob}`,
+            with: {
+              village: {
+                with: {
+                  gramPanchayat: {
+                    with: {
+                      district: {
+                        with: {
+                          state: true,
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          });
+        }
+
+        if (memberRecord) {
+          const isSuperAdmin = memberRecord.systemRole === 'SUPER_ADMIN';
+          const isAdmin =
+            isSuperAdmin ||
+            memberRecord.systemRole === 'ADMIN' ||
+            memberRecord.role === 'ADMIN';
+
+          // Fetch explicit granted permissions for the member
+          const userPerms = await db.query.userPermissions.findMany({
+            where: (up, { eq }) => eq(up.memberId, memberRecord.id),
+          });
+
+          userPermissionsList = userPerms
+            .filter((p) => p.isGranted)
+            .map((p) => p.permissionCode);
+
+          authenticatedUser = {
+            id: String(memberRecord.id),
+            name: memberRecord.name,
+            mobile: memberRecord.mobile,
+            email: memberRecord.email || '',
+            photoUrl: memberRecord.photoUrl || '',
+            status: memberRecord.status,
+            role: memberRecord.role,
+            systemRole: memberRecord.systemRole,
+            villageId: memberRecord.villageId ? String(memberRecord.villageId) : '1',
+            villageName: memberRecord.village?.name || 'Rasoolpur',
+            gramPanchayat: memberRecord.village?.gramPanchayat?.name || 'Bahera',
+            district: memberRecord.village?.gramPanchayat?.district?.name || 'Hardoi',
+            state: memberRecord.village?.gramPanchayat?.district?.state?.name || 'Uttar Pradesh',
+            permissions: userPermissionsList,
+            isAdmin,
+            isSuperAdmin,
+          };
+        }
+      }
+    }
+
+    // 2. Fetch Village Chapters and System Permissions List
+    const [villagesData, permissionsData] = await Promise.all([
       db.query.villages.findMany({
         with: {
           gramPanchayat: {
@@ -55,95 +120,51 @@ export async function GET() {
         },
         orderBy: [asc(schema.villages.id)],
       }),
-      db.query.members.findMany({
-        with: {
-          village: {
-            with: {
-              gramPanchayat: {
-                with: {
-                  district: {
-                    with: {
-                      state: true,
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        orderBy: [desc(schema.members.id)],
-      }),
-      db.select().from(schema.complaints).orderBy(desc(schema.complaints.id)),
-      db.select().from(schema.socialWorks).orderBy(desc(schema.socialWorks.id)),
-      db.select().from(schema.events).orderBy(desc(schema.events.id)),
-      db.select().from(schema.gallery).orderBy(desc(schema.gallery.id)),
-      db.select().from(schema.elders).orderBy(desc(schema.elders.id)),
-      db.select().from(schema.announcements).orderBy(desc(schema.announcements.id)),
-      db.select().from(schema.publicInfos).orderBy(desc(schema.publicInfos.id)),
-      db.select().from(schema.groupMessages).orderBy(asc(schema.groupMessages.id)),
-      db.select().from(schema.auditLogs).orderBy(desc(schema.auditLogs.id)).limit(50),
       db.select().from(schema.permissions).orderBy(asc(schema.permissions.code)),
     ]);
 
     const formattedVillages = villagesData.map(formatVillage).filter(Boolean);
-    const formattedMembers = membersData.map(formatMember).filter(Boolean);
-    const formattedComplaints = complaintsData.map(formatComplaint).filter(Boolean);
-    const formattedSocialWorks = socialWorksData.map(formatSocialWork).filter(Boolean);
-    const formattedEvents = eventsData.map(formatEvent).filter(Boolean);
-    const formattedGallery = galleryData.map(formatGallery).filter(Boolean);
-    const formattedElders = eldersData.map(formatElder).filter(Boolean);
-    const formattedAnnouncements = announcementsData.map(formatAnnouncement).filter(Boolean);
-    const formattedPublicInfos = publicInfosData.map(formatPublicInfo).filter(Boolean);
-    const formattedGroupMessages = groupMessagesData.map(formatGroupMessage).filter(Boolean);
-    const formattedAuditLogs = auditLogsData.map(formatAuditLog).filter(Boolean);
+    const activeVillage =
+      formattedVillages.find((v) => v.id === authenticatedUser?.villageId) ||
+      formattedVillages[0] ||
+      null;
 
-    const activeVillage = formattedVillages[0] || null;
+    const isSuperAdmin = Boolean(authenticatedUser?.isSuperAdmin || authenticatedUser?.systemRole === 'SUPER_ADMIN');
+    const isAdm = Boolean(isSuperAdmin || authenticatedUser?.isAdmin || authenticatedUser?.systemRole === 'ADMIN');
 
     return NextResponse.json({
       success: true,
+      authenticated: Boolean(authenticatedUser),
+      user: authenticatedUser,
+      role: authenticatedUser?.systemRole || (isSuperAdmin ? 'SUPER_ADMIN' : isAdm ? 'ADMIN' : authenticatedUser ? 'MEMBER' : 'GUEST'),
+      systemRole: authenticatedUser?.systemRole || (isSuperAdmin ? 'SUPER_ADMIN' : 'GUEST'),
+      isAdmin: isAdm,
+      isSuperAdmin: isSuperAdmin,
+      userPermissions: isSuperAdmin ? permissionsData.map((p) => p.code) : userPermissionsList,
+      permissions: permissionsData,
       villageSettings: activeVillage,
       villages: formattedVillages,
-      members: formattedMembers,
-      admins: formattedMembers.filter(
-        (m: any) => m.systemRole === 'ADMIN' || m.systemRole === 'SUPER_ADMIN'
-      ),
-      complaints: formattedComplaints,
-      socialWorks: formattedSocialWorks,
-      publicInfos: formattedPublicInfos,
-      announcements: formattedAnnouncements,
-      events: formattedEvents,
-      gallery: formattedGallery,
-      elders: formattedElders,
-      groupMessages: formattedGroupMessages,
-      messages: [],
-      auditLogs: formattedAuditLogs,
-      permissions: permissionsData,
-      apiIntegrations: [
-        {
-          id: 'int_supabase',
-          name: 'PostgreSQL Database',
-          status: 'Connected',
-          keyMasked: 'postgresql_••••••••',
-        },
-      ],
-      stats: {
-        totalMembers: formattedMembers.length,
-        activeMembers: formattedMembers.filter((m: any) => m.status === 'active').length,
-        pendingMembers: formattedMembers.filter((m: any) => m.status === 'pending').length,
-        totalComplaints: formattedComplaints.length,
-        resolvedComplaints: formattedComplaints.filter((c: any) => c.status === 'RESOLVED').length,
-        pendingComplaints: formattedComplaints.filter((c: any) => c.status !== 'RESOLVED').length,
-        totalSocialWorks: formattedSocialWorks.length,
-        totalEvents: formattedEvents.length,
-        totalGallery: formattedGallery.length,
-        totalElders: formattedElders.length,
-        totalVillages: formattedVillages.length,
+      access: {
+        canAccessAdmin: isAdm,
+        canManageMembers: isSuperAdmin || isAdm || userPermissionsList.includes('members:approve'),
+        canManageComplaints: isSuperAdmin || isAdm || userPermissionsList.includes('complaints:view'),
+        canManageSocialWorks: isSuperAdmin || isAdm || userPermissionsList.includes('social_work:create'),
+        canManageEvents: isSuperAdmin || isAdm || userPermissionsList.includes('events:create'),
+        canManageGallery: isSuperAdmin || isAdm || userPermissionsList.includes('gallery:upload'),
+        canManageAnnouncements: isSuperAdmin || isAdm || userPermissionsList.includes('announcements:create'),
+        canManageVillages: isSuperAdmin,
+        canManageElders: isSuperAdmin || isAdm,
+        canManagePublicInfo: isSuperAdmin || isAdm,
+        canManageIntegrations: isSuperAdmin,
+        canManagePermissions: isSuperAdmin,
+        canAccessAuditLogs: isSuperAdmin || isAdm,
+        canAccessAllModules: isSuperAdmin,
       },
     });
   } catch (error: any) {
-    console.error('Error fetching data with Drizzle ORM:', error);
+    console.error('Error fetching access data in /api/data:', error);
     return NextResponse.json(
-      { success: false, error: error?.message || 'Failed to fetch data' },
+      { success: false, error: error?.message || 'Failed to fetch access data' },
       { status: 500 }
     );
   }

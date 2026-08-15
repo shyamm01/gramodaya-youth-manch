@@ -82,8 +82,15 @@ export function hasUserPermission(
 ): boolean {
   if (!session) return false;
 
-  // 1. Super Admin has all permissions everywhere
-  if (session.role === 'SUPER_ADMIN') return true;
+  // 1. Super Admin has unrestricted access to ALL operations in ALL modules across the entire app
+  if (
+    session.systemRole === 'SUPER_ADMIN' ||
+    session.role === 'SUPER_ADMIN' ||
+    session.currentMember?.systemRole === 'SUPER_ADMIN' ||
+    (session as any).isSuperAdmin
+  ) {
+    return true;
+  }
 
   // 2. Legacy admin session check fallback
   if (session.isAdminLoggedIn && (!session.role || session.role === 'ADMIN')) {

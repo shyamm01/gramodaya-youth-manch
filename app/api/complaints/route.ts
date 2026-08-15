@@ -120,9 +120,7 @@ export async function POST(req: Request) {
     await logAuditAction(
       `शिकायत दर्ज की गई: ${inserted.title}`,
       adminName || reporterName,
-      adminMobile || reporterMobile,
-      inserted.villageId,
-      resolvedMemberId
+      `Mobile: ${adminMobile || reporterMobile}`
     );
 
     return NextResponse.json({ success: true, complaint: formatted });

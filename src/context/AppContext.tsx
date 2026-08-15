@@ -606,41 +606,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             store.dispatch(reduxSetVillagesList(data.villages));
           }
           if (data.userPermissions) setUserPermissions(data.userPermissions);
-          if (data.admins) setAdmins(data.admins);
-          if (data.members) {
-            setMembers(data.members);
-            store.dispatch(reduxSetMembers(data.members));
+          if (data.user) {
+            const isAdm = Boolean(data.isAdmin || data.user.isAdmin || data.user.isSuperAdmin);
+            setAuthSession((prev) => ({
+              ...prev,
+              isAdminLoggedIn: isAdm,
+              isMemberLoggedIn: true,
+              role: data.user.role,
+              systemRole: data.user.systemRole,
+              adminMobile: isAdm ? data.user.mobile : prev.adminMobile,
+              adminName: isAdm ? data.user.name : prev.adminName,
+              adminId: isAdm ? data.user.id : prev.adminId,
+              adminVillageId: data.user.villageId,
+              currentMemberMobile: data.user.mobile,
+              currentMember: data.user,
+              email: data.user.email,
+              permissions: data.user.permissions || data.userPermissions || [],
+            }));
           }
-          if (data.complaints) {
-            setComplaints(data.complaints);
-            store.dispatch(reduxSetComplaints(data.complaints));
-          }
-          if (data.socialWorks) {
-            setSocialWorks(data.socialWorks);
-            store.dispatch(reduxSetSocialWorks(data.socialWorks));
-          }
-          if (data.publicInfos) {
-            setPublicInfos(data.publicInfos);
-            store.dispatch(reduxSetPublicInfos(data.publicInfos));
-          }
-          if (data.announcements) {
-            setAnnouncements(data.announcements);
-            store.dispatch(reduxSetAnnouncements(data.announcements));
-          }
-          if (data.events) {
-            setEvents(data.events);
-            store.dispatch(reduxSetEvents(data.events));
-          }
-          if (data.gallery) {
-            setGallery(data.gallery);
-            store.dispatch(reduxSetGallery(data.gallery));
-          }
-          if (data.elders) {
-            setElders(data.elders);
-            store.dispatch(reduxSetElders(data.elders));
-          }
-          if (data.auditLogs) setAuditLogs(data.auditLogs);
-          if (data.apiIntegrations) setIntegrations(data.apiIntegrations);
         }
       } else if (retryCount > 0) {
         isFetchingDataRef.current = false;
