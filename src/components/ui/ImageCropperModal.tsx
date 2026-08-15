@@ -13,6 +13,9 @@ import {
   RectangleHorizontal,
   Move,
   Loader2,
+  Plus,
+  Minus,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from './button';
 
@@ -48,12 +51,14 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
   const [isFlipped, setIsFlipped] = useState<boolean>(false);
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [naturalSize, setNaturalSize] = useState<{ width: number; height: number }>({ width: 800, height: 800 });
   const [containerDimensions, setContainerDimensions] = useState<{ width: number; height: number }>({ width: 300, height: 300 });
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const dragStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const initialPinchDistRef = useRef<number | null>(null);
+  const initialZoomOnPinchRef = useRef<number>(1);
 
   // Load natural dimensions
   useEffect(() => {
@@ -93,45 +98,92 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
     }
   }, [isOpen, initialRatio]);
 
-  // Handle Drag / Pan with mouse or touch
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // ── Ultra-Smooth Pointer Events (Mouse & Touch unified) ──
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Only drag with left click or single touch
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
     e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
     setIsDragging(true);
-    setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y });
+    dragStartRef.current = {
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
+    };
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!isDragging) return;
+    e.preventDefault();
     setPosition({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
+      x: Math.round(e.clientX - dragStartRef.current.x),
+      y: Math.round(e.clientY - dragStartRef.current.y),
     });
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      setIsDragging(true);
-      setDragStart({
-        x: e.touches[0].clientX - position.x,
-        y: e.touches[0].clientY - position.y,
-      });
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isDragging) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {}
+      setIsDragging(false);
     }
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || e.touches.length !== 1) return;
-    setPosition({
-      x: e.touches[0].clientX - dragStart.x,
-      y: e.touches[0].clientY - dragStart.y,
-    });
+  // ── Multi-touch Pinch to Zoom on Mobile ──
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      initialPinchDistRef.current = dist;
+      initialZoomOnPinchRef.current = zoom;
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2 && initialPinchDistRef.current) {
+      e.preventDefault();
+      const currentDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const factor = currentDist / initialPinchDistRef.current;
+      const newZoom = Math.min(3.5, Math.max(0.5, initialZoomOnPinchRef.current * factor));
+      setZoom(parseFloat(newZoom.toFixed(2)));
+    }
   };
 
   const handleTouchEnd = () => {
-    setIsDragging(false);
+    initialPinchDistRef.current = null;
+  };
+
+  // ── Smooth Mouse Wheel Zoom ──
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 0.08 : -0.08;
+    setZoom((prev) => {
+      const next = Math.min(3.5, Math.max(0.5, prev + delta));
+      return parseFloat(next.toFixed(2));
+    });
+  };
+
+  // Double click/tap to toggle center & zoom
+  const handleDoubleClick = () => {
+    if (zoom !== 1 || position.x !== 0 || position.y !== 0) {
+      setZoom(1);
+      setPosition({ x: 0, y: 0 });
+    } else {
+      setZoom(1.4);
+    }
+  };
+
+  // Step Zoom Controls
+  const stepZoom = (delta: number) => {
+    setZoom((prev) => {
+      const next = Math.min(3.5, Math.max(0.5, prev + delta));
+      return parseFloat(next.toFixed(2));
+    });
   };
 
   // Perform Final Canvas Crop - 100% WYSIWYG
@@ -265,10 +317,10 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
-                फ़ोटो क्रॉप करें (Crop & Center Frame)
+                फ़ोटो क्रॉप करें (Crop & Frame Photo)
               </h3>
               <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                फ़ोटो फ्रेम के बीच में सेट करें और व्यवस्थित करें
+                फ़ोटो को ज़ूम, रोटेट और फ्रेम के बीच में आसानी से सेट करें
               </p>
             </div>
           </div>
@@ -325,21 +377,26 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
             </button>
           </div>
 
-          {/* Viewport / Crop Canvas Box */}
-          <div className="relative w-full h-72 sm:h-80 bg-slate-950 rounded-2xl overflow-hidden flex items-center justify-center p-3 border border-slate-800 select-none">
+          {/* Viewport / Crop Canvas Box with Hardware Acceleration */}
+          <div
+            onWheel={handleWheel}
+            className="relative w-full h-72 sm:h-80 bg-slate-950 rounded-2xl overflow-hidden flex items-center justify-center p-3 border border-slate-800 select-none touch-none"
+          >
             {/* Draggable Viewport Frame */}
             <div
               ref={containerRef}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
-              className={`relative overflow-hidden border-2 border-emerald-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.75)] rounded-xl cursor-grab active:cursor-grabbing w-full flex items-center justify-center ${frameRatioClass}`}
+              onDoubleClick={handleDoubleClick}
+              className={`relative overflow-hidden border-2 border-emerald-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.78)] rounded-2xl cursor-grab active:cursor-grabbing w-full flex items-center justify-center ${frameRatioClass}`}
             >
-              {/* 3x3 Grid Overlay */}
-              <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none z-20 opacity-30">
+              {/* 3x3 Grid Guidelines Overlay */}
+              <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none z-20 opacity-35">
                 <div className="border-r border-b border-white"></div>
                 <div className="border-r border-b border-white"></div>
                 <div className="border-b border-white"></div>
@@ -362,45 +419,69 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                   top: '50%',
                   width: `${dispW}px`,
                   height: `${dispH}px`,
-                  transform: `translate(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px)) scale(${zoom}) rotate(${rotation}deg) scaleX(${
+                  transform: `translate3d(calc(-50% + ${position.x}px), calc(-50% + ${position.y}px), 0) scale(${zoom}) rotate(${rotation}deg) scaleX(${
                     isFlipped ? -1 : 1
                   })`,
                   transformOrigin: 'center center',
                   maxWidth: 'none',
                   maxHeight: 'none',
+                  willChange: isDragging ? 'transform' : 'auto',
+                  transition: isDragging ? 'none' : 'transform 0.15s cubic-bezier(0.2, 0, 0, 1)',
                 }}
                 className="pointer-events-none select-none z-10 object-fill"
               />
             </div>
 
-            {/* Drag Hint Overlay */}
-            <div className="absolute bottom-2 left-3 flex items-center gap-1 text-[10px] text-white/60 pointer-events-none z-30">
-              <Move className="w-3 h-3" />
-              <span>खींचकर बीच में सेट करें (Drag to center)</span>
+            {/* Gesture Hints Overlay */}
+            <div className="absolute bottom-2 left-3 right-3 flex items-center justify-between text-[10px] text-white/70 pointer-events-none z-30">
+              <span className="flex items-center gap-1">
+                <Move className="w-3 h-3 text-emerald-400" />
+                खींचकर सेट करें (Drag to pan)
+              </span>
+              <span className="hidden sm:inline opacity-80">
+                माउस स्क्रॉल या पिंच से ज़ूम करें (Scroll to zoom)
+              </span>
             </div>
           </div>
 
-          {/* Action Controls: Zoom, Rotate, Flip */}
+          {/* Action Controls: Zoom, Quick Steps, Rotate, Flip */}
           <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5">
-            {/* Zoom Slider */}
-            <div className="flex items-center gap-3">
-              <ZoomOut className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            {/* Zoom Slider with +/- buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => stepZoom(-0.15)}
+                className="p-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 cursor-pointer shadow-2xs"
+                title="Zoom Out"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+
               <input
                 type="range"
                 min="0.5"
-                max="3"
-                step="0.05"
+                max="3.5"
+                step="0.02"
                 value={zoom}
                 onChange={(e) => setZoom(parseFloat(e.target.value))}
                 className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-600"
               />
-              <ZoomIn className="w-4 h-4 text-slate-400 flex-shrink-0" />
-              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 w-10 text-right">
+
+              <button
+                type="button"
+                onClick={() => stepZoom(0.15)}
+                className="p-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 cursor-pointer shadow-2xs"
+                title="Zoom In"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+
+              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 min-w-[42px] text-right font-mono">
                 {Math.round(zoom * 100)}%
               </span>
             </div>
 
-            {/* Quick Rotate and Mirror Buttons */}
+            {/* Quick Rotate, Flip and Recenter Buttons */}
             <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 dark:border-slate-800/60 text-xs">
               <div className="flex items-center gap-2">
                 <button
@@ -430,9 +511,10 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
                   setIsFlipped(false);
                   setPosition({ x: 0, y: 0 });
                 }}
-                className="text-[11px] text-slate-500 dark:text-slate-400 hover:underline cursor-pointer font-semibold"
+                className="text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline cursor-pointer font-bold flex items-center gap-1"
               >
-                रीसेट (Reset to Center)
+                <Sparkles className="w-3 h-3" />
+                रीसेट (Center)
               </button>
             </div>
           </div>
@@ -456,7 +538,7 @@ export const ImageCropperModal: React.FC<ImageCropperModalProps> = ({
               size="sm"
               onClick={handleApplyCrop}
               disabled={isProcessing}
-              className="rounded-xl text-xs font-bold shadow-md bg-emerald-600 hover:bg-emerald-700 text-white min-w-[120px]"
+              className="rounded-xl text-xs font-bold shadow-md bg-emerald-600 hover:bg-emerald-700 text-white min-w-[125px]"
             >
               {isProcessing ? (
                 <>
