@@ -18,22 +18,32 @@ export const LeadershipSection: React.FC = () => {
   const [fetchedAdmins, setFetchedAdmins] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Dedicated API Fetch: GET /api/leadership
+  const inFlightLeadershipPromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/leadership (deduplicated)
   const fetchLeadership = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/leadership', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.leaders)) {
-          setFetchedAdmins(data.leaders);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to fetch /api/leadership:', e);
-    } finally {
-      setLoading(false);
+    if (inFlightLeadershipPromiseRef.current) {
+      return inFlightLeadershipPromiseRef.current;
     }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/leadership', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.leaders)) {
+            setFetchedAdmins(data.leaders);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/leadership:', e);
+      } finally {
+        setLoading(false);
+        inFlightLeadershipPromiseRef.current = null;
+      }
+    })();
+    inFlightLeadershipPromiseRef.current = promise;
+    return promise;
   }, []);
 
   React.useEffect(() => {

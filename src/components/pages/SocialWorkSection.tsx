@@ -42,22 +42,32 @@ export const SocialWorkSection: React.FC = () => {
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Dedicated API Fetch: GET /api/social-work
+  const inFlightSocialWorksPromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/social-work (deduplicated)
   const fetchSocialWorks = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/social-work', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.socialWorks)) {
-          setFetchedSocialWorks(data.socialWorks);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to fetch /api/social-work:', e);
-    } finally {
-      setLoading(false);
+    if (inFlightSocialWorksPromiseRef.current) {
+      return inFlightSocialWorksPromiseRef.current;
     }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/social-work', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.socialWorks)) {
+            setFetchedSocialWorks(data.socialWorks);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/social-work:', e);
+      } finally {
+        setLoading(false);
+        inFlightSocialWorksPromiseRef.current = null;
+      }
+    })();
+    inFlightSocialWorksPromiseRef.current = promise;
+    return promise;
   }, []);
 
   React.useEffect(() => {

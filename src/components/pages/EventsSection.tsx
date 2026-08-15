@@ -33,22 +33,32 @@ export const EventsSection: React.FC = () => {
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Dedicated API Fetch: GET /api/events
+  const inFlightEventsPromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/events (deduplicated)
   const fetchEvents = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/events', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.events)) {
-          setFetchedEvents(data.events);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to fetch /api/events:', e);
-    } finally {
-      setLoading(false);
+    if (inFlightEventsPromiseRef.current) {
+      return inFlightEventsPromiseRef.current;
     }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/events', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.events)) {
+            setFetchedEvents(data.events);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/events:', e);
+      } finally {
+        setLoading(false);
+        inFlightEventsPromiseRef.current = null;
+      }
+    })();
+    inFlightEventsPromiseRef.current = promise;
+    return promise;
   }, []);
 
   React.useEffect(() => {

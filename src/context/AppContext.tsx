@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '../lib/supabase';
 import {
@@ -203,6 +203,7 @@ interface AppContextType {
   editComplaint: (id: string, updates: Partial<Complaint>) => Promise<{ success: boolean; error?: string }>;
   editSocialWork: (id: string, updates: Partial<SocialWork>) => Promise<{ success: boolean; error?: string }>;
   editPublicInfo: (id: string, updates: Partial<PublicInfo>) => Promise<{ success: boolean; error?: string }>;
+  fetchMembers: () => Promise<Member[]>;
   changeMemberRole: (id: string, role: 'SUPER_ADMIN' | 'ADMIN' | 'MEMBER', villageId?: string) => Promise<{ success: boolean; error?: string }>;
   isSuperAdmin: boolean;
   isApprovedMember: boolean;
@@ -1922,6 +1923,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const membersFetchPromiseRef = useRef<Promise<Member[]> | null>(null);
+  const lastMembersFetchedAtRef = useRef<number>(0);
+
+  const fetchMembers = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (membersFetchPromiseRef.current) {
+      return membersFetchPromiseRef.current;
+    }
+    if (!force && now - lastMembersFetchedAtRef.current < 3000 && members.length > 0) {
+      return members;
+    }
+
+    const promise = (async () => {
+      try {
+        const res = await fetch('/api/members', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.members)) {
+            setMembers(data.members);
+            lastMembersFetchedAtRef.current = Date.now();
+            return data.members as Member[];
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/members:', e);
+      } finally {
+        membersFetchPromiseRef.current = null;
+      }
+      return [];
+    })();
+
+    membersFetchPromiseRef.current = promise;
+    return promise;
+  }, [members]);
+
+
+
   const fetchUserMessages = async (mobile: string): Promise<ChatMessage[]> => {
     if (!mobile) return [];
     try {
@@ -1986,6 +2024,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         checkPermission,
         admins,
         members,
+        fetchMembers,
         complaints,
         socialWorks,
         publicInfos,

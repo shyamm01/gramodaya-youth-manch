@@ -14,22 +14,32 @@ export const AboutSection: React.FC = () => {
   const [aboutData, setAboutData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
-  // Dedicated API Fetch: GET /api/about
+  const inFlightAboutPromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/about (deduplicated)
   const fetchAbout = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/about', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.village) {
-          setAboutData(data);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to fetch /api/about:', e);
-    } finally {
-      setLoading(false);
+    if (inFlightAboutPromiseRef.current) {
+      return inFlightAboutPromiseRef.current;
     }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/about', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.village) {
+            setAboutData(data);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/about:', e);
+      } finally {
+        setLoading(false);
+        inFlightAboutPromiseRef.current = null;
+      }
+    })();
+    inFlightAboutPromiseRef.current = promise;
+    return promise;
   }, []);
 
   React.useEffect(() => {

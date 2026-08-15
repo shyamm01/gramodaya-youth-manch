@@ -37,31 +37,41 @@ export const AnnouncementsSection: React.FC = () => {
   const [isAnnModalOpen, setIsAnnModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
 
-  // Dedicated API Fetch: GET /api/announcements and GET /api/public-info
+  const inFlightAnnouncementsPromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/announcements and GET /api/public-info (deduplicated)
   const fetchAnnouncementsData = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      const [resAnn, resInfo] = await Promise.all([
-        fetch('/api/announcements', { credentials: 'include' }),
-        fetch('/api/public-info', { credentials: 'include' }),
-      ]);
-      if (resAnn.ok) {
-        const dAnn = await resAnn.json();
-        if (dAnn.success && Array.isArray(dAnn.announcements)) {
-          setFetchedAnnouncements(dAnn.announcements);
-        }
-      }
-      if (resInfo.ok) {
-        const dInfo = await resInfo.json();
-        if (dInfo.success && Array.isArray(dInfo.publicInfos)) {
-          setFetchedPublicInfos(dInfo.publicInfos);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to fetch announcements/public-info:', e);
-    } finally {
-      setLoading(false);
+    if (inFlightAnnouncementsPromiseRef.current) {
+      return inFlightAnnouncementsPromiseRef.current;
     }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const [resAnn, resInfo] = await Promise.all([
+          fetch('/api/announcements', { credentials: 'include' }),
+          fetch('/api/public-info', { credentials: 'include' }),
+        ]);
+        if (resAnn.ok) {
+          const dAnn = await resAnn.json();
+          if (dAnn.success && Array.isArray(dAnn.announcements)) {
+            setFetchedAnnouncements(dAnn.announcements);
+          }
+        }
+        if (resInfo.ok) {
+          const dInfo = await resInfo.json();
+          if (dInfo.success && Array.isArray(dInfo.publicInfos)) {
+            setFetchedPublicInfos(dInfo.publicInfos);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch announcements/public-info:', e);
+      } finally {
+        setLoading(false);
+        inFlightAnnouncementsPromiseRef.current = null;
+      }
+    })();
+    inFlightAnnouncementsPromiseRef.current = promise;
+    return promise;
   }, []);
 
   React.useEffect(() => {

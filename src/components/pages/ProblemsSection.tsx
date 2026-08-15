@@ -63,22 +63,32 @@ export const ProblemsSection: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
 
-  // Dedicated API Fetch: GET /api/complaints
+  const inFlightComplaintsPromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/complaints (deduplicated)
   const fetchComplaints = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/complaints', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.complaints)) {
-          setFetchedComplaints(data.complaints);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to fetch /api/complaints:', e);
-    } finally {
-      setLoading(false);
+    if (inFlightComplaintsPromiseRef.current) {
+      return inFlightComplaintsPromiseRef.current;
     }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/complaints', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.complaints)) {
+            setFetchedComplaints(data.complaints);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/complaints:', e);
+      } finally {
+        setLoading(false);
+        inFlightComplaintsPromiseRef.current = null;
+      }
+    })();
+    inFlightComplaintsPromiseRef.current = promise;
+    return promise;
   }, []);
 
   React.useEffect(() => {

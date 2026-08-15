@@ -3,6 +3,17 @@ import authReducer from './slices/authSlice';
 import villageReducer from './slices/villageSlice';
 import uiReducer from './slices/uiSlice';
 import communityReducer from './slices/communitySlice';
+import membersReducer from './slices/membersSlice';
+import complaintsReducer from './slices/complaintsSlice';
+import socialWorksReducer from './slices/socialWorksSlice';
+import eventsReducer from './slices/eventsSlice';
+import galleryReducer from './slices/gallerySlice';
+import announcementsReducer from './slices/announcementsSlice';
+import publicInfoReducer from './slices/publicInfoSlice';
+import eldersReducer from './slices/eldersSlice';
+import leadershipReducer from './slices/leadershipSlice';
+import chatReducer from './slices/chatSlice';
+import permissionsReducer from './slices/permissionsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +21,17 @@ export const store = configureStore({
     village: villageReducer,
     ui: uiReducer,
     community: communityReducer,
+    members: membersReducer,
+    complaints: complaintsReducer,
+    socialWorks: socialWorksReducer,
+    events: eventsReducer,
+    gallery: galleryReducer,
+    announcements: announcementsReducer,
+    publicInfo: publicInfoReducer,
+    elders: eldersReducer,
+    leadership: leadershipReducer,
+    chat: chatReducer,
+    permissions: permissionsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -35,22 +35,32 @@ export const GallerySection: React.FC = () => {
   const [msg, setMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Dedicated API Fetch: GET /api/gallery
+  const inFlightGalleryPromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/gallery (deduplicated)
   const fetchGallery = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/gallery', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.gallery)) {
-          setFetchedGallery(data.gallery);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to fetch /api/gallery:', e);
-    } finally {
-      setLoading(false);
+    if (inFlightGalleryPromiseRef.current) {
+      return inFlightGalleryPromiseRef.current;
     }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/gallery', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.gallery)) {
+            setFetchedGallery(data.gallery);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/gallery:', e);
+      } finally {
+        setLoading(false);
+        inFlightGalleryPromiseRef.current = null;
+      }
+    })();
+    inFlightGalleryPromiseRef.current = promise;
+    return promise;
   }, []);
 
   React.useEffect(() => {

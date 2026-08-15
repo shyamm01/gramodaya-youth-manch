@@ -17,22 +17,32 @@ export const HelplineSection: React.FC = () => {
   const [fetchedAdmins, setFetchedAdmins] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Dedicated API Fetch: GET /api/helpline
+  const inFlightHelplinePromiseRef = React.useRef<Promise<any> | null>(null);
+
+  // Dedicated API Fetch: GET /api/helpline (deduplicated)
   const fetchHelpline = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/helpline', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.helplineContacts)) {
-          setFetchedAdmins(data.helplineContacts);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to fetch /api/helpline:', e);
-    } finally {
-      setLoading(false);
+    if (inFlightHelplinePromiseRef.current) {
+      return inFlightHelplinePromiseRef.current;
     }
+    const promise = (async () => {
+      try {
+        setLoading(true);
+        const res = await fetch('/api/helpline', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.helplineContacts)) {
+            setFetchedAdmins(data.helplineContacts);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch /api/helpline:', e);
+      } finally {
+        setLoading(false);
+        inFlightHelplinePromiseRef.current = null;
+      }
+    })();
+    inFlightHelplinePromiseRef.current = promise;
+    return promise;
   }, []);
 
   React.useEffect(() => {

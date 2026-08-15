@@ -19,7 +19,8 @@ import { Users, RefreshCw } from 'lucide-react';
 export const MembersSection: React.FC = () => {
   const {
     t,
-    members: contextMembers,
+    members,
+    fetchMembers,
     addMember,
     authSession,
     uploadPhoto,
@@ -32,37 +33,15 @@ export const MembersSection: React.FC = () => {
     currentMemberMobile,
   } = useApp();
 
-  const [fetchedMembers, setFetchedMembers] = useState<Member[] | null>(null);
-  const [loading, setLoading] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'WITH_PHOTO' | 'PENDING'>('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isGeneralChatOpen, setIsGeneralChatOpen] = useState(false);
   const [photoModalMember, setPhotoModalMember] = useState<Member | null>(null);
 
-  // Dedicated API Fetch: GET /api/members
-  const fetchMembers = useCallback(async () => {
-    try {
-      setLoading(true);
-      const res = await fetch('/api/members', { credentials: 'include' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.members)) {
-          setFetchedMembers(data.members);
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to fetch /api/members:', e);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
     fetchMembers();
   }, [fetchMembers]);
-
-  const members = fetchedMembers || contextMembers;
 
   const activeMembers = useMemo(() => members.filter((m) => m.status === 'active'), [members]);
   const pendingMembers = useMemo(() => members.filter((m) => m.status === 'pending'), [members]);
