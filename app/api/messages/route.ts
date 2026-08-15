@@ -59,3 +59,44 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message || 'Error sending message' }, { status: 500 });
   }
 }
+
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    const userMobile = searchParams.get('userMobile');
+    const isAdmin = searchParams.get('isAdmin') === 'true';
+
+    let messageId = id;
+    let senderMobile = userMobile;
+
+    if (!messageId) {
+      const body = await req.json().catch(() => ({}));
+      messageId = body.id;
+      senderMobile = body.userMobile;
+    }
+
+    if (!messageId) {
+      return NextResponse.json({ error: 'संदेश ID आवश्यक है।' }, { status: 400 });
+    }
+
+    const store = loadStore();
+    if (!store.messages) store.messages = [];
+
+    const existing = store.messages.find((m) => String(m.id) === String(messageId));
+    if (existing && !isAdmin && senderMobile) {
+      const uDigits = normalizeMobile(senderMobile);
+      const sDigits = normalizeMobile(existing.senderMobile || '');
+      if (uDigits && sDigits && uDigits !== sDigits) {
+        return NextResponse.json({ error: 'आप केवल अपने भेजे गए संदेश ही हटा सकते हैं।' }, { status: 403 });
+      }
+    }
+
+    store.messages = store.messages.filter((m) => String(m.id) !== String(messageId));
+    saveStore(store);
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Error deleting message' }, { status: 500 });
+  }
+}

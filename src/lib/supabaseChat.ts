@@ -407,20 +407,44 @@ export async function fetchRoomMessages(roomId: string, userMobile?: string): Pr
   return [];
 }
 
-// 6. Delete Message (Sender or Admin)
+// 6. Delete Message (Sender or Admin) with multi-tier persistence
 export async function deleteChatMessage(
   messageId: string,
   userMobile: string,
-  isAdmin: boolean = false
+  isAdmin: boolean = false,
+  roomId?: string
 ): Promise<{ success: boolean; error?: string }> {
+  // 1. Supabase Deletion
   if (isChatMessagesTableAvailable) {
     try {
       await supabase.from('chat_messages').delete().eq('id', messageId);
-      return { success: true };
     } catch (e: any) {
-      return { success: true };
+      console.warn('Supabase delete note:', e);
     }
   }
+
+  // 2. Next.js Backend DB Deletion
+  try {
+    if (roomId === 'common_group_room') {
+      await fetch(`/api/group-chat/${messageId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+    } else {
+      await fetch(
+        `/api/messages?id=${encodeURIComponent(messageId)}&userMobile=${encodeURIComponent(
+          userMobile
+        )}&isAdmin=${isAdmin}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+        }
+      );
+    }
+  } catch (err) {
+    console.warn('API delete note:', err);
+  }
+
   return { success: true };
 }
 

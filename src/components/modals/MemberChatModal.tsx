@@ -15,6 +15,7 @@ import {
   LogOut,
   User,
   CheckCheck,
+  Trash2,
 } from 'lucide-react';
 
 interface MemberChatModalProps {
@@ -129,6 +130,21 @@ export const MemberChatModal: React.FC<MemberChatModalProps> = ({ initialPartner
     if (res.success) {
       await loadMessages();
       scrollToBottom();
+    }
+  };
+
+  const handleDeleteMessage = async (msgId: string) => {
+    if (!currentMemberObj) return;
+    setMessages((prev) => prev.filter((m) => m.id !== msgId));
+    try {
+      await fetch(
+        `/api/messages?id=${encodeURIComponent(msgId)}&userMobile=${encodeURIComponent(
+          currentMemberObj.mobile
+        )}`,
+        { method: 'DELETE', credentials: 'include' }
+      );
+    } catch (e) {
+      console.warn('Delete error:', e);
     }
   };
 
@@ -400,26 +416,38 @@ export const MemberChatModal: React.FC<MemberChatModalProps> = ({ initialPartner
                             key={msg.id}
                             className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                           >
-                            <div
-                              className={`max-w-[80%] rounded-2xl px-4 py-2.5 shadow-2xs text-xs font-medium leading-relaxed ${
-                                isMe
-                                  ? 'bg-[#4B634D] text-white rounded-tr-none'
-                                  : 'bg-white text-[#2C3327] border border-[#E0DCCF] rounded-tl-none'
-                              }`}
-                            >
-                              <p>{msg.text}</p>
+                            <div className="flex items-center gap-1.5 group">
                               <div
-                                className={`flex items-center justify-end gap-1 mt-1 text-[9px] ${
-                                  isMe ? 'text-emerald-100' : 'text-[#8C8675]'
+                                className={`max-w-[80%] rounded-2xl px-4 py-2.5 shadow-2xs text-xs font-medium leading-relaxed ${
+                                  isMe
+                                    ? 'bg-[#4B634D] text-white rounded-tr-none'
+                                    : 'bg-white text-[#2C3327] border border-[#E0DCCF] rounded-tl-none'
                                 }`}
                               >
-                                <span>{time}</span>
-                                {isMe && (
-                                  <CheckCheck
-                                    className={`w-3 h-3 ${msg.read ? 'text-amber-300' : 'text-emerald-200'}`}
-                                  />
-                                )}
+                                <p>{msg.text}</p>
+                                <div
+                                  className={`flex items-center justify-end gap-1 mt-1 text-[9px] ${
+                                    isMe ? 'text-emerald-100' : 'text-[#8C8675]'
+                                  }`}
+                                >
+                                  <span>{time}</span>
+                                  {isMe && (
+                                    <CheckCheck
+                                      className={`w-3 h-3 ${msg.read ? 'text-amber-300' : 'text-emerald-200'}`}
+                                    />
+                                  )}
+                                </div>
                               </div>
+                              {isMe && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteMessage(msg.id)}
+                                  className="opacity-0 group-hover:opacity-100 transition text-slate-400 hover:text-red-600 p-1 cursor-pointer"
+                                  title="संदेश हटाएं"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                             </div>
                           </div>
                         );

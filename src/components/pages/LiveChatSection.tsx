@@ -207,6 +207,11 @@ export const LiveChatSection: React.FC = () => {
           );
         }
       })
+      .on('broadcast', { event: 'delete_message' }, ({ payload }) => {
+        if (payload && payload.id) {
+          setMessages((prev) => prev.filter((m) => m.id !== payload.id));
+        }
+      })
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
         if (payload && payload.user) {
           setTypingUser(payload.user);
@@ -452,16 +457,31 @@ export const LiveChatSection: React.FC = () => {
 
   // Handle Delete Message
   const handleDeleteMessage = async (msgId: string) => {
+    const roomId = getActiveRoomId();
+
+    // 1. Optimistic local removal
+    setMessages((prev) => prev.filter((m) => m.id !== msgId));
+
+    // 2. Broadcast deletion to all users in room
+    if (activeChannelRef.current) {
+      activeChannelRef.current.send({
+        type: 'broadcast',
+        event: 'delete_message',
+        payload: { id: msgId },
+      });
+    }
+
+    // 3. Delete across database & backends
     const res = await deleteChatMessage(
       msgId,
       currentMobile || '',
-      authSession.isAdminLoggedIn
+      authSession.isAdminLoggedIn,
+      roomId
     );
 
-    if (res.success) {
-      setMessages((prev) => prev.filter((m) => m.id !== msgId));
-    } else {
+    if (!res.success) {
       alert(res.error || (lang === 'en' ? 'Could not delete message.' : 'संदेश नहीं हटाया जा सका।'));
+      await loadRoomMessages();
     }
   };
 
