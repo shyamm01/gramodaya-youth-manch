@@ -1,10 +1,23 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { verifyJwtToken } from './src/lib/jwtAuth';
+import { updateSession } from './lib/supabase/proxy';
 
 export async function proxy(request: NextRequest) {
+  // 1. Update Supabase Auth Session & Cookies (PRD Section 11 & 28)
+  const { supabaseResponse, user: supabaseUser } = await updateSession(request);
+
   const requestHeaders = new Headers(request.headers);
 
-  // 1. Extract token from Authorization header or gym_auth_token cookie
+  // 2. If Supabase Auth user is present, inject headers
+  if (supabaseUser) {
+    requestHeaders.set('x-supabase-user-id', supabaseUser.id);
+    if (supabaseUser.email) requestHeaders.set('x-user-email', supabaseUser.email);
+    if (!requestHeaders.has('x-user-id')) {
+      requestHeaders.set('x-user-id', supabaseUser.id);
+    }
+  }
+
+  // 3. Extract legacy token from Authorization header or gym_auth_token cookie
   let token: string | null = null;
   const authHeader = request.headers.get('Authorization') || request.headers.get('authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -15,7 +28,7 @@ export async function proxy(request: NextRequest) {
     token = request.cookies.get('gym_auth_token')?.value || null;
   }
 
-  // 2. Verify JWT token and inject user context into request headers
+  // 4. Verify custom JWT token and inject user context into request headers
   if (token) {
     try {
       const user = await verifyJwtToken(token);
@@ -34,10 +47,16 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  // 5. Build response preserving Supabase cookies
   const response = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
+  });
+
+  // Copy cookies from supabaseResponse
+  supabaseResponse.cookies.getAll().forEach((cookie) => {
+    response.cookies.set(cookie.name, cookie.value, cookie);
   });
 
   // Set Permissions-Policy header to allow extension handlers without unload violations

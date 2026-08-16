@@ -189,6 +189,18 @@ export const villages = pgTable(
 // ==============================================================================
 
 /**
+ * 3.0 PROFILES (Supabase Auth उपयोगकर्ता प्रोफाइल)
+ * Implements PRD Section 19: User Profile Data Model
+ */
+export const profiles = pgTable('profiles', {
+  id: uuid('id').primaryKey(),
+  fullName: text('full_name'),
+  avatarUrl: text('avatar_url'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
  * 3.1 PERMISSIONS (सिस्टम अनुमतियां)
  */
 export const permissions = pgTable('permissions', {
@@ -736,6 +748,9 @@ export type NewGramPanchayat = typeof gramPanchayats.$inferInsert;
 
 export type VillageModel = typeof villages.$inferSelect;
 export type NewVillageModel = typeof villages.$inferInsert;
+
+export type ProfileModel = typeof profiles.$inferSelect;
+export type NewProfileModel = typeof profiles.$inferInsert;
 
 export type PermissionModel = typeof permissions.$inferSelect;
 export type NewPermissionModel = typeof permissions.$inferInsert;

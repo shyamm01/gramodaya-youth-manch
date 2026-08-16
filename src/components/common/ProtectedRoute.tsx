@@ -2,39 +2,50 @@
 
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Lock, Shield, UserCheck, KeyRound, MessageSquare } from 'lucide-react';
+import { Lock, Shield, KeyRound, MessageSquare, AlertTriangle } from 'lucide-react';
+import { PermissionCode, SystemRole } from '../../types';
+import { hasUserPermission, isSuperAdmin as checkIsSuperAdmin } from '../../lib/permissions';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'MEMBER' | 'ADMIN' | 'SUPER_ADMIN';
+  requiredRole?: SystemRole;
+  requiredPermission?: PermissionCode | string;
+  targetVillageId?: string;
   sectionTitle?: string;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredRole = 'MEMBER',
+  requiredPermission,
+  targetVillageId,
   sectionTitle = 'गोपनीय अनुभाग (Private Section)',
 }) => {
   const {
     authSession,
     currentMemberMobile,
-    members,
     setIsAdminLoginModalOpen,
-    setIsMemberLoginModalOpen,
     lang,
-    t,
   } = useApp();
 
   const isSuperAdmin = Boolean(
+    checkIsSuperAdmin(authSession) ||
     authSession.systemRole === 'SUPER_ADMIN' ||
     authSession.role === 'SUPER_ADMIN' ||
     authSession.adminMobile === '9506072678'
   );
-  const isAdminAuth = Boolean(authSession.isAdminLoggedIn || authSession.role === 'ADMIN' || isSuperAdmin);
 
-  // Check if member is authenticated (or is an admin/super admin, or has valid session token)
+  const isAdminAuth = Boolean(
+    isSuperAdmin ||
+    authSession.isAdminLoggedIn ||
+    authSession.role === 'ADMIN' ||
+    authSession.systemRole === 'ADMIN'
+  );
+
+  // Check if member is authenticated (or is an admin/super admin, or has valid session token/supabase session)
   const isMemberAuth = Boolean(
     authSession.isMemberLoggedIn ||
+    authSession.supabaseUserId ||
     isAdminAuth ||
     authSession.token ||
     authSession.currentMember ||
@@ -131,8 +142,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  // 2. MEMBER / AUTHENTICATED USER PROTECTION (e.g. Live Chat)
-  if (requiredRole === 'MEMBER' && !isMemberAuth && !isAdminAuth) {
+  // 2. MEMBER / AUTHENTICATED USER PROTECTION
+  if (requiredRole === 'MEMBER' && !isMemberAuth) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-12 animate-fade-in">
         <div className="bg-white dark:bg-[#131B2E] rounded-3xl border-2 border-emerald-600/30 dark:border-emerald-500/30 p-6 sm:p-8 shadow-xl text-center space-y-5 relative overflow-hidden transition-colors">
@@ -150,8 +161,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
             </h2>
             <p className="text-xs text-[#8C8675] dark:text-slate-400 font-medium mt-1">
               {lang === 'en'
-                ? `Live chat & discussion forum is exclusively available for verified village members.`
-                : `"${sectionTitle}" एवं लाइव संवाद केवल ग्राम पंचायत के स्वीकृत एवं सत्यापित सदस्यों के लिए है।`}
+                ? `"${sectionTitle}" is exclusively available for verified village members.`
+                : `"${sectionTitle}" केवल ग्राम पंचायत के स्वीकृत एवं सत्यापित सदस्यों के लिए है।`}
             </p>
           </div>
 
@@ -184,6 +195,41 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
         </div>
       </div>
     );
+  }
+
+  // 3. GRANULAR RBAC PERMISSION CHECK
+  if (requiredPermission) {
+    const hasPerm = hasUserPermission(authSession, requiredPermission, targetVillageId);
+    if (!hasPerm) {
+      return (
+        <div className="max-w-2xl mx-auto px-4 py-12 animate-fade-in">
+          <div className="bg-white dark:bg-[#131B2E] rounded-3xl border-2 border-amber-500/40 p-6 sm:p-8 shadow-xl text-center space-y-4">
+            <div className="w-16 h-16 rounded-3xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto shadow-sm">
+              <AlertTriangle className="w-8 h-8" />
+            </div>
+
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 text-xs font-bold uppercase tracking-wider mb-2 border border-amber-300 dark:border-amber-800">
+                <Lock className="w-3.5 h-3.5" />
+                <span>RBAC Permission Denied</span>
+              </div>
+              <h2 className="text-lg sm:text-xl font-bold text-stone-900 dark:text-white">
+                {lang === 'en' ? 'Permission Required' : 'विशिष्ट अनुमति आवश्यक'}
+              </h2>
+              <p className="text-xs text-stone-600 dark:text-stone-400 mt-1 font-mono">
+                {requiredPermission}
+              </p>
+            </div>
+
+            <p className="text-xs text-stone-500 dark:text-stone-400">
+              {lang === 'en'
+                ? 'Your current role or account permissions do not grant access to perform this operation.'
+                : 'आपकी वर्तमान भूमिका या खाते की अनुमतियों में यह कार्य करने का अधिकार शामिल नहीं है।'}
+            </p>
+          </div>
+        </div>
+      );
+    }
   }
 
   return <>{children}</>;
