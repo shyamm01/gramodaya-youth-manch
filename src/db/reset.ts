@@ -31,6 +31,8 @@ export async function resetDatabase() {
 
     const tableNames = [
       'chat_messages',
+      'chat_members',
+      'chat_rooms',
       'messages',
       'group_messages',
       'audit_logs',

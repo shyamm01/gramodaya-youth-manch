@@ -186,15 +186,42 @@ export interface Member {
   supabaseUserId?: string;
 }
 
+export interface ChatRoom {
+  id: string;
+  name: string;
+  type: 'group' | 'personal' | 'admin';
+  villageId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ChatRoomMember {
+  id: string;
+  roomId: string;
+  memberId: string;
+  mobile: string;
+  name: string;
+  role: 'admin' | 'member';
+  joinedAt?: string;
+  lastReadAt?: string;
+}
+
 export interface ChatMessage {
   id: string;
+  roomId?: string;
+  villageId?: string;
   senderMobile: string;
   senderName: string;
-  recipientMobile: string;
-  recipientName: string;
+  senderPhoto?: string;
+  senderMemberId?: string;
+  recipientMobile?: string;
+  recipientName?: string;
   text: string;
+  photoUrl?: string;
   createdAt: string;
-  read: boolean;
+  read?: boolean;
+  isRead?: boolean;
+  isDeleted?: boolean;
 }
 
 export type ComplaintCategory =

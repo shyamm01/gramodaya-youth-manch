@@ -13,6 +13,7 @@ import {
   gallery,
   elders,
   publicInfos,
+  chatRooms,
 } from './schema';
 import { loadStore } from '../lib/serverStore';
 import { eq } from 'drizzle-orm';
@@ -163,6 +164,17 @@ export async function seedDatabase() {
           },
         });
     }
+
+    // 5.1 Seed Default Chat Room (General Discussion)
+    await db
+      .insert(chatRooms)
+      .values({
+        id: 'general',
+        name: 'General Discussion',
+        type: 'group',
+        villageId,
+      })
+      .onConflictDoNothing();
 
     // 6. Seed Admins
     console.log(`Inserting ${store.admins.length} admins...`);

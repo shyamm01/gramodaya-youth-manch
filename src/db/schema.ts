@@ -192,13 +192,19 @@ export const villages = pgTable(
  * 3.0 PROFILES (Supabase Auth उपयोगकर्ता प्रोफाइल)
  * Implements PRD Section 19: User Profile Data Model
  */
-export const profiles = pgTable('profiles', {
-  id: uuid('id').primaryKey(),
-  fullName: text('full_name'),
-  avatarUrl: text('avatar_url'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const profiles = pgTable(
+  'profiles',
+  {
+    id: uuid('id').primaryKey(),
+    fullName: text('full_name'),
+    avatarUrl: text('avatar_url'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_profiles_created_at').on(table.createdAt),
+  ]
+);
 
 /**
  * 3.1 PERMISSIONS (सिस्टम अनुमतियां)
@@ -248,6 +254,7 @@ export const members = pgTable(
   (table) => [
     index('idx_members_village_id').on(table.villageId),
     uniqueIndex('idx_members_mobile').on(table.mobile),
+    index('idx_members_supabase_user_id').on(table.supabaseUserId),
     index('idx_members_status').on(table.status),
     index('idx_members_system_role').on(table.systemRole),
     index('idx_members_created_at').on(table.createdAt),
@@ -496,8 +503,84 @@ export const publicInfos = pgTable(
   ]
 );
 
+// ==============================================================================
+// 5. REALTIME CHAT SUBSYSTEM (Normalized Chat Architecture)
+// ==============================================================================
+
 /**
- * 4.8 GROUP MESSAGES TABLE (ग्राम लाइव चैट)
+ * 5.1 CHAT ROOMS (चैट रूम्स)
+ */
+export const chatRooms = pgTable(
+  'chat_rooms',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    type: text('type').notNull().default('group'), // 'group' | 'personal' | 'admin'
+    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_chat_rooms_village_id').on(table.villageId),
+    index('idx_chat_rooms_type').on(table.type),
+  ]
+);
+
+/**
+ * 5.2 CHAT MEMBERS (कमरे के सदस्य)
+ */
+export const chatMembers = pgTable(
+  'chat_members',
+  {
+    id: text('id').primaryKey(),
+    roomId: text('room_id')
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    memberId: text('member_id').notNull(),
+    mobile: text('mobile').notNull(),
+    name: text('name').notNull(),
+    role: text('role').default('member'),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+    lastReadAt: timestamp('last_read_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_chat_members_room_id').on(table.roomId),
+    index('idx_chat_members_member_id').on(table.memberId),
+    index('idx_chat_members_mobile').on(table.mobile),
+  ]
+);
+
+/**
+ * 5.3 CHAT MESSAGES (लाइव संदेश)
+ */
+export const chatMessages = pgTable(
+  'chat_messages',
+  {
+    id: text('id').primaryKey(),
+    roomId: text('room_id')
+      .notNull()
+      .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'cascade' }),
+    senderMobile: text('sender_mobile').notNull(),
+    senderName: text('sender_name').notNull(),
+    senderPhoto: text('sender_photo'),
+    senderMemberId: text('sender_member_id'),
+    text: text('text').notNull(),
+    photoUrl: text('photo_url'),
+    isRead: boolean('is_read').default(false),
+    isDeleted: boolean('is_deleted').default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_chat_messages_room_id').on(table.roomId),
+    index('idx_chat_messages_village_id').on(table.villageId),
+    index('idx_chat_messages_created_at').on(table.createdAt),
+    index('idx_chat_messages_sender_mobile').on(table.senderMobile),
+  ]
+);
+
+/**
+ * 5.4 GROUP MESSAGES TABLE (Legacy Live Chat)
  */
 export const groupMessages = pgTable(
   'group_messages',
@@ -521,7 +604,7 @@ export const groupMessages = pgTable(
 );
 
 /**
- * 4.9 DIRECT MESSAGES TABLE
+ * 5.5 DIRECT MESSAGES TABLE (Legacy Direct Messages)
  */
 export const messages = pgTable(
   'messages',
@@ -549,7 +632,7 @@ export const messages = pgTable(
 );
 
 /**
- * 4.10 AUDIT LOGS TABLE
+ * 5.6 AUDIT LOGS TABLE
  */
 export const auditLogs = pgTable(
   'audit_logs',
@@ -571,7 +654,7 @@ export const auditLogs = pgTable(
 );
 
 // ==============================================================================
-// 5. RELATIONS (3NF Relational Integrity & Graph Traversal)
+// 6. RELATIONS (3NF Relational Integrity & Graph Traversal)
 // ==============================================================================
 
 export const statesRelations = relations(states, ({ many }) => ({
@@ -607,8 +690,8 @@ export const villagesRelations = relations(villages, ({ one, many }) => ({
   elders: many(elders),
   announcements: many(announcements),
   publicInfos: many(publicInfos),
-  groupMessages: many(groupMessages),
-  messages: many(messages),
+  chatRooms: many(chatRooms),
+  chatMessages: many(chatMessages),
   userVillageRoles: many(userVillageRoles),
   auditLogs: many(auditLogs),
 }));
@@ -708,6 +791,33 @@ export const publicInfosRelations = relations(publicInfos, ({ one }) => ({
   }),
 }));
 
+export const chatRoomsRelations = relations(chatRooms, ({ one, many }) => ({
+  village: one(villages, {
+    fields: [chatRooms.villageId],
+    references: [villages.id],
+  }),
+  members: many(chatMembers),
+  messages: many(chatMessages),
+}));
+
+export const chatMembersRelations = relations(chatMembers, ({ one }) => ({
+  room: one(chatRooms, {
+    fields: [chatMembers.roomId],
+    references: [chatRooms.id],
+  }),
+}));
+
+export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
+  room: one(chatRooms, {
+    fields: [chatMessages.roomId],
+    references: [chatRooms.id],
+  }),
+  village: one(villages, {
+    fields: [chatMessages.villageId],
+    references: [villages.id],
+  }),
+}));
+
 export const groupMessagesRelations = relations(groupMessages, ({ one }) => ({
   village: one(villages, {
     fields: [groupMessages.villageId],
@@ -734,7 +844,7 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
 }));
 
 // ==============================================================================
-// 6. INFERRED TYPES
+// 7. INFERRED TYPES
 // ==============================================================================
 
 export type State = typeof states.$inferSelect;
@@ -784,6 +894,15 @@ export type NewAnnouncementModel = typeof announcements.$inferInsert;
 
 export type PublicInfoModel = typeof publicInfos.$inferSelect;
 export type NewPublicInfoModel = typeof publicInfos.$inferInsert;
+
+export type ChatRoomModel = typeof chatRooms.$inferSelect;
+export type NewChatRoomModel = typeof chatRooms.$inferInsert;
+
+export type ChatMemberModel = typeof chatMembers.$inferSelect;
+export type NewChatMemberModel = typeof chatMembers.$inferInsert;
+
+export type ChatMessageModel = typeof chatMessages.$inferSelect;
+export type NewChatMessageModel = typeof chatMessages.$inferInsert;
 
 export type GroupMessageModel = typeof groupMessages.$inferSelect;
 export type NewGroupMessageModel = typeof groupMessages.$inferInsert;
