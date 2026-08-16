@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { loadStore, saveStore, normalizeMobile, hashPassword, getOtpStore } from '@/src/lib/serverStore';
+import { getSqlClient, normalizeMobile } from '@/src/lib/authUtils';
+import { getOtpStore } from '@/src/lib/serverStore';
+import { getServerSupabase } from '@/src/lib/supabaseServer';
 
 export async function POST(req: Request) {
   try {
@@ -21,20 +23,31 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'अमान्य या समाप्त हो चुका ओटीपी।' }, { status: 400 });
     }
 
-    const store = loadStore();
-    const memberIndex = store.members.findIndex((m) => normalizeMobile(m.mobile) === digits);
-    if (memberIndex === -1) {
+    const sql = getSqlClient();
+    if (!sql) {
+      return NextResponse.json({ error: 'डेटाबेस कनेक्शन अनुपलब्ध है।' }, { status: 500 });
+    }
+
+    const rows = await sql`
+      SELECT id FROM public.profiles
+      WHERE REGEXP_REPLACE(mobile, '\\D', '', 'g') LIKE ${'%' + digits}
+      LIMIT 1;
+    `;
+    if (!rows || rows.length === 0) {
       return NextResponse.json({ error: 'यह मोबाइल नंबर पंजीकृत सदस्य सूची में नहीं मिला।' }, { status: 404 });
     }
 
-    const hash = hashPassword(newPassword);
-    if (!store.memberPasswords) {
-      store.memberPasswords = {};
+    const supabase = getServerSupabase();
+    if (!supabase) {
+      return NextResponse.json({ error: 'प्रमाणीकरण सेवा अनुपलब्ध है।' }, { status: 500 });
     }
-    store.memberPasswords[digits] = hash;
-    store.memberPasswords[store.members[memberIndex].id] = hash;
 
-    saveStore(store);
+    const { error } = await supabase.auth.admin.updateUserById(rows[0].id, { password: newPassword });
+    if (error) {
+      return NextResponse.json({ error: 'पासवर्ड रीसेट करने में त्रुटि हुई। कृपया पुनः प्रयास करें।' }, { status: 500 });
+    }
+
+    otpStore.delete(digits);
 
     return NextResponse.json({
       success: true,

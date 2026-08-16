@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { loadStore, saveStore, logAuditAction, normalizeMobile } from '@/src/lib/serverStore';
+import { logAuditAction, normalizeMobile, profileToMemberDTO, getSqlClient } from '@/src/lib/authUtils';
 import { deleteSupabaseObjectByUrl } from '@/src/lib/supabaseStorage';
+import { getServerSupabase } from '@/src/lib/supabaseServer';
 import { requireAuth } from '@/src/lib/jwtAuth';
 import { getDb } from '@/src/db';
 import * as schema from '@/src/db/schema';
@@ -89,70 +90,19 @@ export async function PUT(
       }
     }
 
-    const store = loadStore();
-    const index = store.members.findIndex((m) => m.id === id);
-
-    let updatedMember: any;
-    if (index !== -1) {
-      const prev = store.members[index];
-      const newRole = isSuperOrAdmin && role !== undefined ? role : (prev.role || 'MEMBER');
-      const newVillageId = villageId !== undefined ? villageId : (prev.villageId || 'vil_rasoolpur');
-      const cleanMobile = mobile !== undefined ? mobile.trim() : prev.mobile;
-      const cleanName = name !== undefined ? name.trim() : prev.name;
-      const cleanPhoto = photoUrl !== undefined ? photoUrl : prev.photoUrl;
-
-      updatedMember = {
-        ...prev,
-        name: cleanName,
-        mobile: cleanMobile,
-        status: status !== undefined ? status : prev.status,
-        role: newRole,
-        villageId: newVillageId,
-        photoUrl: cleanPhoto,
-        fatherName: fatherName !== undefined ? fatherName : prev.fatherName,
-        dob: dob !== undefined ? dob : prev.dob,
-        address: address !== undefined ? address : prev.address,
-        organizationName: organizationName !== undefined ? organizationName : prev.organizationName,
-      };
-
-      store.members[index] = updatedMember;
-
-      // Handle Admin synchronization when role changes
-      const normDigits = normalizeMobile(cleanMobile);
-      if (newRole === 'ADMIN' || newRole === 'SUPER_ADMIN') {
-        const villageObj = (store.villages || []).find((v) => v.id === newVillageId);
-        const existingAdminIdx = store.admins.findIndex(
-          (a) => a.id === id || normalizeMobile(a.mobile) === normDigits
-        );
-
-        const adminData = {
-          id: id,
-          name: cleanName,
-          mobile: cleanMobile,
-          role: newRole === 'SUPER_ADMIN' ? 'Super Admin' : 'Village Admin',
-          systemRole: newRole as 'ADMIN' | 'SUPER_ADMIN',
-          village: villageObj ? villageObj.nameHindi : 'रसूलपुर',
-          villageId: newVillageId,
-          gramPanchayat: villageObj ? (villageObj.gramPanchayatNameHindi || villageObj.gramPanchayatName || 'बहेरा') : 'बहेरा',
-          photoUrl: cleanPhoto || '',
-          isHead: newRole === 'SUPER_ADMIN',
-        };
-
-        if (existingAdminIdx >= 0) {
-          store.admins[existingAdminIdx] = {
-            ...store.admins[existingAdminIdx],
-            ...adminData,
-          };
-        } else {
-          store.admins.push(adminData);
-        }
-      } else if (newRole === 'MEMBER') {
-        store.admins = store.admins.filter(
-          (a) => a.id !== id && normalizeMobile(a.mobile) !== normDigits
-        );
+    let updatedMember: any = { id, name, mobile };
+    const sql = getSqlClient();
+    if (sql) {
+      const rows = await sql`
+        SELECT p.*, v.org_name, v.org_name_hindi
+        FROM public.profiles p
+        LEFT JOIN public.villages v ON p.village_id = v.id
+        WHERE p.id = ${id}
+        LIMIT 1;
+      `;
+      if (rows && rows.length > 0) {
+        updatedMember = profileToMemberDTO(rows[0]);
       }
-
-      saveStore(store);
     }
 
     logAuditAction(
@@ -162,7 +112,7 @@ export async function PUT(
       updatedMember?.name || id
     );
 
-    return NextResponse.json({ success: true, member: updatedMember || { id, name, mobile } });
+    return NextResponse.json({ success: true, member: updatedMember });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Error updating member' }, { status: 500 });
   }
@@ -190,17 +140,19 @@ export async function DELETE(
 
     const db = getDb();
     let photoToDelete: string | null = null;
+    let memberName: string | null = null;
 
     if (db) {
       try {
         const [existing] = await db
-          .select({ avatarUrl: schema.profiles.avatarUrl })
+          .select({ avatarUrl: schema.profiles.avatarUrl, fullName: schema.profiles.fullName })
           .from(schema.profiles)
           .where(eq(schema.profiles.id, id));
 
         if (existing?.avatarUrl) {
           photoToDelete = existing.avatarUrl;
         }
+        memberName = existing?.fullName || null;
 
         await db.delete(schema.profiles).where(eq(schema.profiles.id, id));
       } catch (delErr) {
@@ -208,26 +160,23 @@ export async function DELETE(
       }
     }
 
-    const store = loadStore();
-    const member = store.members.find((m) => m.id === id);
-    if (member?.photoUrl && !photoToDelete) {
-      photoToDelete = member.photoUrl;
+    // Best-effort: also remove the backing Supabase Auth identity so the
+    // mobile/email doesn't stay permanently unusable for re-registration.
+    const supabase = getServerSupabase();
+    if (supabase) {
+      supabase.auth.admin.deleteUser(id).catch(() => {});
     }
-
-    store.members = store.members.filter((m) => m.id !== id);
-    store.admins = store.admins.filter((a) => a.id !== id);
-    saveStore(store);
 
     if (photoToDelete) {
       deleteSupabaseObjectByUrl(photoToDelete).catch(() => {});
     }
 
-    if (member) {
+    if (memberName) {
       logAuditAction(
-        `Deleted Member (${member.name})`,
+        `Deleted Member (${memberName})`,
         adminName || currentUser.name || 'Admin',
         adminMobile || currentUser.mobile || '',
-        member.name
+        memberName
       );
     }
 

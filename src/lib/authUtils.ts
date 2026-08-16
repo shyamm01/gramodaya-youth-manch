@@ -43,6 +43,35 @@ export function hashPassword(password: string): string {
 }
 
 /**
+ * Maps a raw `public.profiles` row (joined with villages org_name/org_name_hindi)
+ * into the camelCase Member DTO shape consumed by the frontend.
+ */
+export function profileToMemberDTO(profile: Record<string, any>) {
+  const systemRole = profile.system_role || profile.role || 'MEMBER';
+  return {
+    id: String(profile.id),
+    name: profile.full_name || 'Member',
+    mobile: profile.mobile || '',
+    email: profile.email || '',
+    status: profile.status || 'active',
+    photoUrl: profile.avatar_url || '',
+    fatherName: profile.father_name || '',
+    dob: profile.dob || '',
+    gender: profile.gender || '',
+    address: profile.address || '',
+    villageId: profile.village_id ? String(profile.village_id) : '8',
+    occupation: profile.occupation || '',
+    designation: profile.designation || '',
+    politicalBackground: profile.political_background || '',
+    bloodGroup: profile.blood_group || '',
+    role: profile.role || 'MEMBER',
+    systemRole,
+    isAdmin: systemRole === 'SUPER_ADMIN' || systemRole === 'ADMIN',
+    organizationName: profile.org_name_hindi || profile.org_name || 'ग्रामोदय यूथ मंच',
+  };
+}
+
+/**
  * Logs an audit event directly into PostgreSQL public.audit_logs
  */
 export async function logAuditAction(

@@ -200,7 +200,7 @@ export const verifyOtpSchema = z.object({
 });
 
 export const authLoginSchema = z.object({
-  mobile: z.string().min(3, 'Mobile number or Email is required'),
+  identifier: z.string().min(3, 'Mobile number or Email is required'),
   password: z.string().min(1, 'Password is required').optional(),
   otp: z.string().optional(),
 });
