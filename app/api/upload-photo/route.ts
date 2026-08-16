@@ -17,14 +17,13 @@ export async function POST(req: Request) {
 
     // Fetch existing photo URL to auto-clean old file
     if (db && targetType === 'member') {
-      const numId = Number(targetId);
-      if (!isNaN(numId)) {
-        const existing = await db.query.members.findFirst({
-          where: eq(schema.members.id, numId),
+      try {
+        const existing = await db.query.profiles.findFirst({
+          where: eq(schema.profiles.id, targetId),
           columns: { photoUrl: true },
         });
         oldPhotoUrl = existing?.photoUrl || null;
-      }
+      } catch (e) {}
     }
 
     // 1. Resolve photo to Supabase Storage public CDN URL with auto-cleanup of old photo
@@ -52,10 +51,13 @@ export async function POST(req: Request) {
 
     // 3. Update PostgreSQL Database (Drizzle)
     if (db && targetType === 'member') {
-      const numId = Number(targetId);
-      if (!isNaN(numId)) {
-        await db.update(schema.members).set({ photoUrl: finalPhotoUrl }).where(eq(schema.members.id, numId));
-      }
+      try {
+        await db.update(schema.profiles).set({
+          photoUrl: finalPhotoUrl,
+          avatarUrl: finalPhotoUrl,
+          updatedAt: new Date(),
+        }).where(eq(schema.profiles.id, targetId));
+      } catch (e) {}
     }
 
     return NextResponse.json({ success: true, photoUrl: finalPhotoUrl });

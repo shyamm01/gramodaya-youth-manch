@@ -31,35 +31,11 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single();
 
-  // Fetch membership record from PostgreSQL database
-  let membershipStatus: 'active' | 'pending' | 'suspended' = 'pending';
-  let memberRole = 'MEMBER';
-  let memberVillage = '';
-
-  const db = getDb();
-  if (db) {
-    try {
-      const memberRecord = await db.query.members.findFirst({
-        where: or(
-          eq(schema.members.supabaseUserId, user.id),
-          user.email ? eq(schema.members.email, user.email) : undefined
-        ),
-      });
-
-      if (memberRecord) {
-        membershipStatus = memberRecord.status as any;
-        memberRole = memberRecord.systemRole || memberRecord.role || 'MEMBER';
-        memberVillage = memberRecord.address || '';
-      } else {
-        membershipStatus = (user.user_metadata?.status as any) || 'pending';
-      }
-    } catch (err) {
-      console.warn('Membership status query note:', err);
-      membershipStatus = (user.user_metadata?.status as any) || 'pending';
-    }
-  } else {
-    membershipStatus = (user.user_metadata?.status as any) || 'pending';
-  }
+  // Fetch membership record directly from unified profiles
+  const membershipStatus: 'active' | 'pending' | 'suspended' =
+    (profile?.status as any) || (user.user_metadata?.status as any) || 'pending';
+  const memberRole = profile?.system_role || profile?.role || 'MEMBER';
+  const memberVillage = profile?.village_name || profile?.address || '';
 
   const userAuthData = {
     id: user.id,
