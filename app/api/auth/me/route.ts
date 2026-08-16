@@ -30,7 +30,7 @@ export async function GET(req: Request) {
           payload = {
             sub: user.id,
             id: user.id,
-            name: meta.full_name || meta.name || user.email || 'Supabase User',
+            name: meta.full_name || user.email,
             mobile: meta.mobile || user.phone || '',
             email: user.email || '',
             role,
@@ -120,9 +120,7 @@ export async function GET(req: Request) {
     const rawSystemRole = profileRecord?.system_role || payload?.systemRole || 'MEMBER';
     const isSuper =
       rawSystemRole === 'SUPER_ADMIN' ||
-      payload?.isSuperAdmin ||
-      profileRecord?.email === 'shyamvaranpal95060@gmail.com' ||
-      payload?.email === 'admin@gramodayarasoolpur.org';
+      payload?.isSuperAdmin;
     const effectiveSystemRole: 'SUPER_ADMIN' | 'ADMIN' | 'MEMBER' = isSuper ? 'SUPER_ADMIN' : rawSystemRole === 'ADMIN' ? 'ADMIN' : 'MEMBER';
     const effectiveRole: 'ADMIN' | 'MEMBER' = (effectiveSystemRole === 'SUPER_ADMIN' || effectiveSystemRole === 'ADMIN' || profileRecord?.role === 'ADMIN') ? 'ADMIN' : 'MEMBER';
     const isAdm = effectiveSystemRole === 'SUPER_ADMIN' || effectiveSystemRole === 'ADMIN';
@@ -152,12 +150,6 @@ export async function GET(req: Request) {
     return NextResponse.json({
       authenticated: true,
       user,
-      member: user,
-      role: effectiveRole,
-      systemRole: effectiveSystemRole,
-      isAdmin: isAdm,
-      isSuperAdmin: isSuper,
-      permissions: allPermissions,
       token: token || null,
     });
   } catch (err: any) {

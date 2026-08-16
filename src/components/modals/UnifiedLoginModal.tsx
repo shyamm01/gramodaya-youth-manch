@@ -103,7 +103,7 @@ export const UnifiedLoginModal: React.FC = () => {
 
         // Update application auth state via userLogin if available
         if (userLogin) {
-          userLogin(data.user || data.member, data.token, data.role);
+          userLogin(data.user, data.token, data.user?.role);
         }
 
         setTimeout(() => {

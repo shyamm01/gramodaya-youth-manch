@@ -434,7 +434,7 @@ STATUS: ${member.status || 'Active'}`
               isBoth ? 'mx-0' : 'mx-auto'
             } ${isEn ? 'font-sans antialiased tracking-normal' : 'font-sans antialiased'}`}>
               
-              <div>
+              <div className="flex-1 flex flex-col">
                 {/* 1. TOP HEADER BANNER (EMBLEM & DYNAMIC ORGANIZATION TITLES) */}
                 <div className="bg-[#0B2E1C] text-white px-3 py-2.5 relative overflow-hidden border-b-2 border-amber-400">
                   <div className="flex items-center justify-between gap-2.5 relative z-10">
@@ -471,7 +471,7 @@ STATUS: ${member.status || 'Active'}`
                 </div>
 
                 {/* 2. CARD BODY (AADHAAR COMPOSITION: PHOTO LEFT, DETAILS CENTER, QR RIGHT) */}
-                <div className="p-3 sm:p-3.5 bg-gradient-to-b from-slate-50 via-white to-amber-50/20">
+                <div className="p-3 sm:p-3.5 bg-gradient-to-b from-slate-50 via-white to-amber-50/20 flex-1">
                   <div className="grid grid-cols-12 gap-3 items-start text-left">
                     
                     {/* LEFT COLUMN: DYNAMIC PHOTO & ROLE CAPSULE */}
@@ -621,7 +621,7 @@ STATUS: ${member.status || 'Active'}`
               isBoth ? 'mx-0' : 'mx-auto'
             } ${isEn ? 'font-sans antialiased tracking-normal' : 'font-sans antialiased'}`}>
               
-              <div>
+              <div className="flex-1 flex flex-col">
                 {/* 1. TOP HEADER BANNER */}
                 <div className="bg-[#0B2E1C] text-white px-3 py-2.5 relative overflow-hidden border-b-2 border-amber-400">
                   <div className="flex items-center justify-between gap-2.5 relative z-10">
@@ -644,7 +644,7 @@ STATUS: ${member.status || 'Active'}`
                 </div>
 
                 {/* 2. DYNAMIC ADDRESS & OBJECTIVE SECTION (AADHAAR BACK STYLE) */}
-                <div className="p-3 sm:p-3.5 space-y-2.5 text-left bg-gradient-to-b from-slate-50 via-white to-emerald-50/20">
+                <div className="p-3 sm:p-3.5 space-y-2.5 text-left bg-gradient-to-b from-slate-50 via-white to-emerald-50/20 flex-1">
                   
                   {/* Dynamic Address Box */}
                   <div className="p-2 bg-white rounded-lg border border-stone-300 shadow-2xs">
