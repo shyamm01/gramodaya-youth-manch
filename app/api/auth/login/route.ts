@@ -42,16 +42,20 @@ export async function POST(req: Request) {
     const cleanDigits = normalizeMobile(rawInput);
     const passwordHash = hashPassword(rawPassword);
 
-    // Query Member/Admin from PostgreSQL
+    // Query from public.profiles (unified table — legacy public.members was dropped)
     const rows = isEmail
       ? await sql`
-          SELECT * FROM public.members 
-          WHERE LOWER(email) = ${rawInput.toLowerCase()}
+          SELECT p.*, v.org_name, v.org_name_hindi
+          FROM public.profiles p
+          LEFT JOIN public.villages v ON p.village_id = v.id
+          WHERE LOWER(p.email) = ${rawInput.toLowerCase()}
           LIMIT 1;
         `
       : await sql`
-          SELECT * FROM public.members 
-          WHERE REGEXP_REPLACE(mobile, '\\D', '', 'g') LIKE ${'%' + cleanDigits}
+          SELECT p.*, v.org_name, v.org_name_hindi
+          FROM public.profiles p
+          LEFT JOIN public.villages v ON p.village_id = v.id
+          WHERE REGEXP_REPLACE(p.mobile, '\\D', '', 'g') LIKE ${'%' + cleanDigits}
           LIMIT 1;
         `;
 
@@ -65,11 +69,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const member = rows[0];
+    const profile = rows[0];
 
     // Password verification
-    if (member.password_hash) {
-      if (member.password_hash !== passwordHash) {
+    if (profile.password_hash) {
+      if (profile.password_hash !== passwordHash) {
         return NextResponse.json(
           { error: 'गलत पासवर्ड। कृपया सही पासवर्ड दर्ज करें (Incorrect Password)।' },
           { status: 401 }
@@ -78,25 +82,25 @@ export async function POST(req: Request) {
     } else {
       // First-time password assignment
       await sql`
-        UPDATE public.members 
+        UPDATE public.profiles
         SET password_hash = ${passwordHash}
-        WHERE id = ${member.id};
+        WHERE id = ${profile.id};
       `;
     }
 
-    const systemRole = member.system_role || member.role || 'MEMBER';
+    const systemRole = profile.system_role || profile.role || 'MEMBER';
     const isAdmin = systemRole === 'SUPER_ADMIN' || systemRole === 'ADMIN';
-    const memberName = member.name || 'Member';
-    const memberMobile = member.mobile || `+91 ${cleanDigits}`;
+    const memberName = profile.full_name || 'Member';
+    const memberMobile = profile.mobile || `+91 ${cleanDigits}`;
 
     const token = await signJwtToken({
-      id: String(member.id),
+      id: String(profile.id),
       name: memberName,
       mobile: memberMobile,
-      email: member.email || undefined,
+      email: profile.email || undefined,
       role: systemRole,
       systemRole: systemRole,
-      villageId: member.village_id ? String(member.village_id) : 'vil_rasoolpur',
+      villageId: profile.village_id ? String(profile.village_id) : '8',
       isAdmin,
     });
 
@@ -108,25 +112,25 @@ export async function POST(req: Request) {
     );
 
     const userObj = {
-      id: String(member.id),
+      id: String(profile.id),
       name: memberName,
       mobile: memberMobile,
-      email: member.email || '',
-      status: member.status || 'active',
-      photoUrl: member.photo_url || '',
-      fatherName: member.father_name || '',
-      dob: member.dob || '',
-      gender: member.gender || '',
-      address: member.address || '',
-      villageId: member.village_id ? String(member.village_id) : 'vil_rasoolpur',
-      occupation: member.occupation || '',
-      designation: member.designation || '',
-      politicalBackground: member.political_background || '',
-      bloodGroup: member.blood_group || '',
-      role: member.role || 'MEMBER',
+      email: profile.email || '',
+      status: profile.status || 'active',
+      photoUrl: profile.avatar_url || '',
+      fatherName: profile.father_name || '',
+      dob: profile.dob || '',
+      gender: profile.gender || '',
+      address: '',
+      villageId: profile.village_id ? String(profile.village_id) : '8',
+      occupation: profile.occupation || '',
+      designation: profile.designation || '',
+      politicalBackground: profile.political_background || '',
+      bloodGroup: profile.blood_group || '',
+      role: profile.role || 'MEMBER',
       systemRole: systemRole,
       isAdmin,
-      organizationName: member.organization_name || 'ग्रामोदय यूथ मंच',
+      organizationName: profile.org_name_hindi || profile.org_name || 'ग्रामोदय यूथ मंच',
     };
 
     const response = NextResponse.json({
