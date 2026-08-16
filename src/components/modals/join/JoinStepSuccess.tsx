@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { CheckCircle2, CreditCard, Share2 } from 'lucide-react';
+import { CheckCircle2, CreditCard, Share2, Clock, ShieldCheck } from 'lucide-react';
 import { Button } from '../../ui';
 import { Member } from '../../../types';
 import { useApp } from '../../../context/AppContext';
@@ -26,12 +26,19 @@ export const JoinStepSuccess: React.FC<JoinStepSuccessProps> = ({
   onClose,
 }) => {
   const { t, lang } = useApp();
+  const isPending = registeredMember?.status === 'pending';
 
   return (
     <div className="py-3 text-center space-y-4 animate-in fade-in duration-200">
-      {/* Success Badge */}
-      <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto ring-8 ring-emerald-50 dark:ring-emerald-950/30">
-        <CheckCircle2 className="w-6 h-6" />
+      {/* Success / Pending Badge */}
+      <div
+        className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto ring-8 ${
+          isPending
+            ? 'bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 ring-amber-50 dark:ring-amber-950/30'
+            : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 ring-emerald-50 dark:ring-emerald-950/30'
+        }`}
+      >
+        {isPending ? <Clock className="w-6 h-6 animate-pulse" /> : <CheckCircle2 className="w-6 h-6" />}
       </div>
 
       {/* Header Text */}
@@ -41,15 +48,23 @@ export const JoinStepSuccess: React.FC<JoinStepSuccessProps> = ({
             ? lang === 'en'
               ? `Welcome, ${registeredMember?.name}!`
               : `स्वागत है, ${registeredMember?.name}!`
+            : isPending
+            ? lang === 'en'
+              ? 'Registration Submitted (Pending Approval)'
+              : 'पंजीकरण प्राप्त (एडमिन स्वीकृति लंबित)'
             : lang === 'en'
-            ? `Registration Successful!`
-            : `आवेदन सफलतापूर्वक दर्ज हुआ!`}
+            ? 'Registration Successful!'
+            : 'आवेदन सफलतापूर्वक दर्ज हुआ!'}
         </h3>
         <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
           {alreadyRegistered
             ? lang === 'en'
               ? 'You are already registered with Gramodaya Youth Manch.'
               : 'आप पहले से ग्रामोदय यूथ मंच परिवार के पंजीकृत सदस्य हैं।'
+            : isPending
+            ? lang === 'en'
+              ? 'Your membership request has been submitted to the organization. An Admin or Super Admin will review and provide final approval.'
+              : 'आपका पंजीकरण संगठन में जमा हो गया है। सदस्यता पूर्ण होने के लिए एडमिन या सुपर-एडमिन द्वारा अंतिम स्वीकृति की जाएगी।'
             : lang === 'en'
             ? 'Your member record is created. Your Digital Identity Card is ready to view.'
             : 'आपकी सदस्यता दर्ज हो गई है। आपका डिजिटल सदस्य पहचान पत्र तैयार है।'}
@@ -75,6 +90,25 @@ export const JoinStepSuccess: React.FC<JoinStepSuccessProps> = ({
             <span className="text-slate-500 dark:text-slate-400">{t('join.villageUnit')}</span>
             <span className="font-semibold text-emerald-600 dark:text-emerald-400">
               {lang === 'en' ? selectedVillageObj.name : selectedVillageObj.nameHindi}
+            </span>
+          </div>
+          <div className="flex justify-between pb-1.5 border-b border-slate-200/60 dark:border-slate-800">
+            <span className="text-slate-500 dark:text-slate-400">
+              {lang === 'en' ? 'Membership Status:' : 'सदस्यता स्थिति:'}
+            </span>
+            <span
+              className={`inline-flex items-center gap-1 font-bold ${
+                isPending ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+              }`}
+            >
+              {isPending ? <Clock className="w-3 h-3" /> : <ShieldCheck className="w-3 h-3" />}
+              {isPending
+                ? lang === 'en'
+                  ? 'Pending Approval'
+                  : 'सत्यापन लंबित'
+                : lang === 'en'
+                ? 'Active'
+                : 'सक्रिय'}
             </span>
           </div>
           {(occupation || registeredMember.occupation) && (

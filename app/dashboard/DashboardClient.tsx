@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
@@ -26,6 +26,13 @@ import {
   Lock,
   Eye,
   EyeOff,
+  Camera,
+  UploadCloud,
+  ImageIcon,
+  Loader2,
+  Trash2,
+  Clock,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface ProfileData {
@@ -42,6 +49,9 @@ interface UserAuthData {
   provider: string;
   createdAt: string;
   lastSignInAt: string | null;
+  membershipStatus?: 'active' | 'pending' | 'suspended';
+  memberRole?: string;
+  memberVillage?: string;
 }
 
 interface DashboardClientProps {
@@ -56,12 +66,18 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
 
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const supabase = createClient();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const editFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [profile, setProfile] = useState<ProfileData | null>(initialProfile);
   const [fullName, setFullName] = useState(initialProfile?.fullName || '');
   const [avatarUrl, setAvatarUrl] = useState(initialProfile?.avatarUrl || '');
+  const [membershipStatus, setMembershipStatus] = useState<'active' | 'pending' | 'suspended'>(
+    user.membershipStatus || 'pending'
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -75,7 +91,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
 
   // Realtime subscription for public.profiles changes
   useEffect(() => {
-    const channel = supabase
+    const profileChannel = supabase
       .channel(`profile-${user.id}`)
       .on(
         'postgres_changes',
@@ -106,10 +122,111 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
       )
       .subscribe();
 
+    // Realtime subscription for public.members approval changes
+    const memberChannel = supabase
+      .channel(`member-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'members',
+        },
+        (payload) => {
+          if (payload.new && typeof payload.new === 'object') {
+            const updated = payload.new as any;
+            if (updated.supabase_user_id === user.id || (user.email && updated.email === user.email)) {
+              const newStatus = updated.status;
+              setMembershipStatus(newStatus);
+              if (newStatus === 'active') {
+                toastSuccess(
+                  isEn ? 'Your membership has been approved by the Admin!' : 'आपकी सदस्यता एडमिन द्वारा स्वीकृत कर दी गई है!',
+                  isEn ? 'Membership Approved' : 'सदस्यता स्वीकृत'
+                );
+              }
+            }
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(profileChannel);
+      supabase.removeChannel(memberChannel);
     };
-  }, [supabase, user.id, isEn, toastInfo]);
+  }, [supabase, user.id, user.email, isEn, toastInfo, toastSuccess]);
+
+  // Upload image handler via API route
+  const handleFileUpload = async (file: File, isQuickAvatarUpdate: boolean = false) => {
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      const err = isEn ? 'Please select a valid image file (PNG, JPG, WebP).' : 'कृपया एक मान्य छवि फ़ाइल (PNG, JPG, WebP) चुनें।';
+      toastError(err, isEn ? 'Invalid File' : 'अमान्य फ़ाइल');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      const err = isEn ? 'Image size must be less than 5MB.' : 'छवि का आकार 5MB से कम होना चाहिए।';
+      toastError(err, isEn ? 'File Too Large' : 'फ़ाइल बहुत बड़ी है');
+      return;
+    }
+
+    setUploadingImage(true);
+    toastInfo(isEn ? 'Uploading image...' : 'तस्वीर अपलोड हो रही है...', isEn ? 'Upload' : 'अपलोड');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('bucket', 'images');
+      formData.append('folder', 'avatars');
+      formData.append('filename', `user_${user.id}_${Date.now()}.${file.name.split('.').pop() || 'jpg'}`);
+
+      const res = await fetch('/api/upload/supabase', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.url) {
+        throw new Error(data.error || (isEn ? 'Failed to upload image.' : 'तस्वीर अपलोड करने में विफल।'));
+      }
+
+      const uploadedUrl = data.url;
+      setAvatarUrl(uploadedUrl);
+
+      // If user clicked quick avatar change directly on the banner
+      if (isQuickAvatarUpdate) {
+        const { error: profileErr } = await supabase
+          .from('profiles')
+          .upsert({
+            id: user.id,
+            avatar_url: uploadedUrl,
+            updated_at: new Date().toISOString(),
+          });
+
+        if (profileErr) throw profileErr;
+
+        await supabase.auth.updateUser({
+          data: { avatar_url: uploadedUrl },
+        });
+
+        setProfile((prev) => (prev ? { ...prev, avatarUrl: uploadedUrl } : null));
+        toastSuccess(isEn ? 'Profile photo updated!' : 'प्रोफ़ाइल फ़ोटो अपडेट हो गई!', isEn ? 'Success' : 'सफल');
+        router.refresh();
+      } else {
+        toastSuccess(isEn ? 'Image uploaded successfully.' : 'तस्वीर सफलतापूर्वक अपलोड हो गई।', isEn ? 'Uploaded' : 'अपलोड पूर्ण');
+      }
+    } catch (err: any) {
+      console.error('Image upload error:', err);
+      const errMsg = err?.message || (isEn ? 'Image upload failed.' : 'तस्वीर अपलोड विफल रही।');
+      toastError(errMsg, isEn ? 'Error' : 'त्रुटि');
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (editFileInputRef.current) editFileInputRef.current.value = '';
+    }
+  };
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,6 +363,18 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 sm:py-12 space-y-8 animate-in fade-in">
+      {/* Hidden file input for quick avatar upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleFileUpload(file, true);
+        }}
+      />
+
       {/* Global Status Message */}
       {statusMessage && (
         <div
@@ -272,6 +401,33 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
         </div>
       )}
 
+      {/* Pending Admin Approval Banner */}
+      {membershipStatus === 'pending' && (
+        <div className="p-5 rounded-3xl bg-amber-500/10 dark:bg-amber-950/30 border-2 border-amber-500/40 text-amber-900 dark:text-amber-200 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in">
+          <div className="flex items-start gap-3.5">
+            <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+              <Clock className="w-6 h-6 animate-pulse" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-sm font-extrabold flex items-center gap-2">
+                <span>{isEn ? 'Membership Pending Admin Approval' : 'सदस्यता सत्यापन लंबित (Admin Approval Pending)'}</span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                  {isEn ? 'Pending' : 'लंबित'}
+                </span>
+              </h3>
+              <p className="text-xs text-stone-600 dark:text-stone-300 leading-relaxed">
+                {isEn
+                  ? 'Your account was created successfully! An Admin or Super Admin will review your registration and grant final membership approval shortly.'
+                  : 'आपका पंजीकरण सफलतापूर्वक प्राप्त हो गया है। ग्रामोदय यूथ मंच के एडमिन या सुपर-एडमिन द्वारा समीक्षा के बाद आपकी सदस्यता को अंतिम रूप से स्वीकृत किया जाएगा।'}
+              </p>
+            </div>
+          </div>
+          <div className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-amber-500/20 border border-amber-500/30 text-amber-800 dark:text-amber-300 shrink-0">
+            {isEn ? 'Under Review' : 'समीक्षाधीन'}
+          </div>
+        </div>
+      )}
+
       {/* Hero Profile Banner */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-stone-900 via-stone-800 to-amber-950 text-white p-6 sm:p-10 shadow-2xl border border-stone-800">
         <div className="absolute -right-16 -top-16 w-72 h-72 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
@@ -279,26 +435,60 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
 
         <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-            {/* Avatar */}
+            {/* Avatar with Quick Upload Trigger */}
             <div className="relative group">
-              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-stone-800 border-2 border-amber-400/40 shadow-xl">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-stone-800 border-2 border-amber-400/40 shadow-xl relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={displayAvatar}
                   alt={displayName}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover transition-transform group-hover:scale-105"
                   onError={(e) => {
                     (e.target as HTMLImageElement).src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
                       displayName
                     )}`;
                   }}
                 />
+
+                {/* Upload Overlay on Hover / Click */}
+                <button
+                  type="button"
+                  disabled={uploadingImage}
+                  onClick={() => fileInputRef.current?.click()}
+                  title={isEn ? 'Click to change photo' : 'फ़ोटो बदलने के लिए क्लिक करें'}
+                  className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-all cursor-pointer backdrop-blur-[2px]"
+                >
+                  {uploadingImage ? (
+                    <Loader2 className="w-6 h-6 animate-spin text-amber-400" />
+                  ) : (
+                    <>
+                      <Camera className="w-5 h-5 text-amber-400 mb-0.5" />
+                      <span className="text-[10px] font-bold tracking-tight">
+                        {isEn ? 'Change' : 'बदलें'}
+                      </span>
+                    </>
+                  )}
+                </button>
               </div>
               <span
-                className="absolute -bottom-1 -right-1 p-1 bg-emerald-500 rounded-full border-2 border-stone-900 text-white"
-                title={isEn ? 'Active Verified Session' : 'सत्यापित सक्रिय सत्र'}
+                className={`absolute -bottom-1 -right-1 p-1 rounded-full border-2 border-stone-900 text-white shadow ${
+                  membershipStatus === 'active' ? 'bg-emerald-500' : 'bg-amber-500'
+                }`}
+                title={
+                  membershipStatus === 'active'
+                    ? isEn
+                      ? 'Active Verified Member'
+                      : 'सत्यापित सक्रिय सदस्य'
+                    : isEn
+                    ? 'Pending Admin Approval'
+                    : 'सत्यापन लंबित'
+                }
               >
-                <ShieldCheck className="w-3.5 h-3.5" />
+                {membershipStatus === 'active' ? (
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                ) : (
+                  <Clock className="w-3.5 h-3.5" />
+                )}
               </span>
             </div>
 
@@ -311,8 +501,20 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                   {user.provider === 'google' ? 'Google OAuth' : 'Email/Password'}
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  {isEn ? 'Active Session' : 'सत्यापित सत्र'}
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+                    membershipStatus === 'active'
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                  }`}
+                >
+                  {membershipStatus === 'active'
+                    ? isEn
+                      ? 'Active Member'
+                      : 'सत्यापित सदस्य'
+                    : isEn
+                    ? 'Pending Approval'
+                    : 'सत्यापन लंबित'}
                 </span>
               </div>
               <p className="text-sm text-stone-300 flex items-center gap-2">
@@ -364,14 +566,15 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
         </div>
       </div>
 
-      {/* Real-time Profile Editing Panel */}
+      {/* Real-time Profile Editing Panel with Integrated Image Uploader */}
       {isEditing && (
         <div className="bg-white dark:bg-stone-900 border border-amber-500/30 rounded-3xl p-6 sm:p-8 shadow-xl animate-in fade-in slide-in-from-top-2">
           <h2 className="text-lg font-bold text-stone-900 dark:text-white mb-4 flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-500" />
             <span>{isEn ? 'Live Profile Edit' : 'प्रोफ़ाइल विवरण अपडेट करें'}</span>
           </h2>
-          <form onSubmit={handleSaveProfile} className="space-y-5 max-w-2xl">
+          <form onSubmit={handleSaveProfile} className="space-y-6 max-w-2xl">
+            {/* Full Name */}
             <div>
               <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
                 {isEn ? 'Full Name' : 'पूरा नाम'}
@@ -389,28 +592,107 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
               </div>
             </div>
 
+            {/* Profile Image Uploader Zone */}
             <div>
               <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
-                {isEn ? 'Avatar Image URL' : 'अवतार / फ़ोटो URL'}
+                {isEn ? 'Profile Photo' : 'प्रोफ़ाइल फ़ोटो'}
               </label>
+
+              {/* Hidden file input */}
               <input
-                type="url"
-                value={avatarUrl}
-                onChange={(e) => setAvatarUrl(e.target.value)}
-                placeholder="https://example.com/avatar.jpg"
-                className="w-full px-4 py-3 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-2xl text-stone-900 dark:text-white text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                type="file"
+                ref={editFileInputRef}
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleFileUpload(file, false);
+                }}
               />
-              <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1">
-                {isEn
-                  ? 'If left blank, an avatar will be generated automatically.'
-                  : 'यदि खाली छोड़ते हैं, तो स्वतः अवतार उत्पन्न होगा।'}
-              </p>
+
+              <div className="space-y-3">
+                {/* Upload & Drop Card */}
+                <div
+                  onClick={() => editFileInputRef.current?.click()}
+                  className="border-2 border-dashed border-stone-300 dark:border-stone-700 hover:border-amber-500/70 dark:hover:border-amber-500/70 rounded-2xl p-5 text-center cursor-pointer transition-all bg-stone-50/50 dark:bg-stone-800/30 hover:bg-amber-50/20 dark:hover:bg-amber-950/20 group"
+                >
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
+                      {uploadingImage ? (
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                      ) : (
+                        <UploadCloud className="w-6 h-6" />
+                      )}
+                    </div>
+                    <div className="text-sm font-semibold text-stone-800 dark:text-stone-200">
+                      {uploadingImage
+                        ? isEn
+                          ? 'Uploading image...'
+                          : 'छवि अपलोड हो रही है...'
+                        : isEn
+                        ? 'Click to upload profile photo'
+                        : 'फ़ोटो अपलोड करने के लिए क्लिक करें'}
+                    </div>
+                    <p className="text-xs text-stone-500 dark:text-stone-400">
+                      {isEn
+                        ? 'Supports PNG, JPG, WebP up to 5MB'
+                        : 'PNG, JPG, WebP फ़ाइल (अधिकतम 5MB)'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Preview Thumbnail if image is set */}
+                {avatarUrl && avatarUrl.trim().length > 0 && (
+                  <div className="flex items-center justify-between p-3 rounded-2xl bg-stone-100/80 dark:bg-stone-800/80 border border-stone-200 dark:border-stone-700">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={avatarUrl}
+                        alt="Preview"
+                        className="w-12 h-12 rounded-xl object-cover border border-amber-500/40"
+                      />
+                      <div className="truncate">
+                        <div className="text-xs font-semibold text-stone-800 dark:text-stone-200 flex items-center gap-1.5">
+                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>{isEn ? 'Selected Image' : 'चयनित तस्वीर'}</span>
+                        </div>
+                        <p className="text-[11px] text-stone-500 dark:text-stone-400 truncate max-w-xs">
+                          {avatarUrl}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAvatarUrl('')}
+                      className="p-2 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                      title={isEn ? 'Remove image' : 'छवि हटाएं'}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Optional Manual URL Input */}
+                <div className="pt-1">
+                  <div className="relative">
+                    <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
+                    <input
+                      type="url"
+                      value={avatarUrl}
+                      onChange={(e) => setAvatarUrl(e.target.value)}
+                      placeholder={isEn ? 'Or paste an image URL (https://...)' : 'या तस्वीर का URL पेस्ट करें (https://...)'}
+                      className="w-full pl-11 pr-4 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-xl text-stone-900 dark:text-white text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
+            {/* Action Buttons */}
             <div className="flex items-center gap-3 pt-2">
               <button
                 type="submit"
-                disabled={saving}
+                disabled={saving || uploadingImage}
                 className="inline-flex items-center justify-center gap-2 py-3 px-6 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm shadow-md transition-all active:scale-95 disabled:opacity-60 cursor-pointer"
               >
                 {saving ? (
@@ -450,6 +732,33 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
               </div>
               <div className="font-mono text-xs text-stone-800 dark:text-stone-200 truncate mt-1 select-all">
                 {user.id}
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-800/50 border border-stone-100 dark:border-stone-800">
+              <div className="text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
+                {isEn ? 'Membership Status' : 'सदस्यता स्थिति'}
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold ${
+                    membershipStatus === 'active'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
+                      : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                  }`}
+                >
+                  {membershipStatus === 'active' ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>{isEn ? 'Approved & Active' : 'स्वीकृत व सक्रिय'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Clock className="w-3.5 h-3.5 animate-spin" />
+                      <span>{isEn ? 'Pending Admin Approval' : 'एडमिन स्वीकृति हेतु लंबित'}</span>
+                    </>
+                  )}
+                </span>
               </div>
             </div>
 

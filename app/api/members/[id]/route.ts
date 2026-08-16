@@ -46,7 +46,7 @@ export async function PUT(
     const db = getDb();
     const numId = Number(id);
 
-    if (db && !isNaN(numId)) {
+    if (db) {
       const updateData: any = {};
       if (name !== undefined) updateData.name = name.trim();
       if (mobile !== undefined) updateData.mobile = normalizeMobile(mobile);
@@ -57,7 +57,11 @@ export async function PUT(
       if (address !== undefined) updateData.address = address.trim();
       if (villageId !== undefined && !isNaN(Number(villageId))) updateData.villageId = Number(villageId);
 
-      await db.update(schema.members).set(updateData).where(eq(schema.members.id, numId));
+      if (!isNaN(numId)) {
+        await db.update(schema.members).set(updateData).where(eq(schema.members.id, numId));
+      } else {
+        await db.update(schema.members).set(updateData).where(eq(schema.members.supabaseUserId, id));
+      }
     }
 
     const store = loadStore();

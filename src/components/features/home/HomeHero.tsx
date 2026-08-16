@@ -2,8 +2,16 @@
 
 import React from "react";
 import Link from "next/link";
-import { Users, ShieldCheck, HeartHandshake, Calendar, CheckCircle2, ArrowRight } from "lucide-react";
-import { Button } from "../../ui";
+import {
+  Users,
+  ShieldCheck,
+  HeartHandshake,
+  Calendar,
+  CheckCircle2,
+  ArrowRight,
+  UserPlus,
+  MessageSquarePlus,
+} from "lucide-react";
 import { VillageBadge } from "../../common";
 import { useApp } from "../../../context/AppContext";
 
@@ -23,12 +31,13 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   eventsCount,
 }) => {
   const { villageSettings, t, lang } = useApp();
+  const isEn = lang === 'en';
 
-  const villageName = lang === 'en'
+  const villageName = isEn
     ? (villageSettings.name || 'Rasoolpur')
     : (villageSettings.nameHindi || 'रसूलपुर');
 
-  const panchayatName = lang === 'en'
+  const panchayatName = isEn
     ? (villageSettings.gramPanchayat || (villageSettings as any).panchayat || 'Bahera')
     : (villageSettings.gramPanchayatHindi || (villageSettings as any).panchayatHindi || 'बहेरा');
 
@@ -130,28 +139,36 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
           })}
         </div>
 
-        {/* CTA Action Buttons */}
-        <div className="flex flex-wrap items-center justify-center gap-3.5 pt-1">
-          <Button
-            variant="amber"
-            size="lg"
+        {/* Modern CTA Action Buttons */}
+        <div className="flex flex-wrap items-center justify-center gap-3.5 pt-2">
+          {/* Primary Join Button */}
+          <button
+            type="button"
             onClick={onJoinClick}
-            className="px-7 py-3 rounded-xl shadow-lg shadow-amber-500/20 hover:shadow-amber-500/35 border border-amber-400/40 text-sm font-bold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            className="group relative inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-sm font-bold shadow-xl shadow-amber-600/30 hover:shadow-amber-500/50 border border-amber-400/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
           >
-            <Users className="w-4 h-4 mr-2" />
-            <span>{t("hero.joinCta")}</span>
-          </Button>
+            <UserPlus className="w-4 h-4 transition-transform group-hover:scale-110" />
+            <span>{isEn ? 'Join Organization' : 'संगठन से जुड़ें'}</span>
+            <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 opacity-90" />
+          </button>
 
-          <Link href="/members">
-            <Button
-              variant="outline"
-              size="lg"
-              className="bg-white/10 hover:bg-white/20 text-white dark:bg-white/10 dark:hover:bg-white/20 dark:text-white border-white/25 hover:border-white/40 backdrop-blur-md px-6 py-3 rounded-xl text-sm font-bold shadow-md transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-            >
-              <ShieldCheck className="w-4 h-4 mr-2 text-emerald-400" />
-              <span>{t("hero.membersCta")}</span>
-              <ArrowRight className="w-3.5 h-3.5 ml-1.5 opacity-70" />
-            </Button>
+          {/* Secondary View Members Button */}
+          <Link
+            href="/members"
+            className="group inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 dark:bg-white/10 dark:hover:bg-white/20 text-white border border-white/25 hover:border-emerald-400/50 backdrop-blur-xl text-sm font-bold shadow-lg transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
+          >
+            <Users className="w-4 h-4 text-emerald-400 transition-transform group-hover:scale-110" />
+            <span>{isEn ? 'View Members' : 'सदस्य निर्देशिका'}</span>
+            <ArrowRight className="w-3.5 h-3.5 text-stone-300 transition-transform group-hover:translate-x-1" />
+          </Link>
+
+          {/* Tertiary Quick Report Grievance Button */}
+          <Link
+            href="/problems"
+            className="group inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-stone-900/60 hover:bg-stone-800/80 border border-stone-700/80 hover:border-amber-500/50 text-stone-200 hover:text-white backdrop-blur-xl text-xs sm:text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
+          >
+            <MessageSquarePlus className="w-4 h-4 text-amber-400 transition-transform group-hover:scale-110" />
+            <span>{isEn ? 'Report Problem' : 'समस्या दर्ज करें'}</span>
           </Link>
         </div>
       </div>

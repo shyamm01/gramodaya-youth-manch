@@ -1,5 +1,8 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { getDb } from '@/src/db';
+import * as schema from '@/src/db/schema';
+import { eq, or } from 'drizzle-orm';
 import { DashboardClient } from './DashboardClient';
 import type { Metadata } from 'next';
 
@@ -28,12 +31,45 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single();
 
+  // Fetch membership record from PostgreSQL database
+  let membershipStatus: 'active' | 'pending' | 'suspended' = 'pending';
+  let memberRole = 'MEMBER';
+  let memberVillage = '';
+
+  const db = getDb();
+  if (db) {
+    try {
+      const memberRecord = await db.query.members.findFirst({
+        where: or(
+          eq(schema.members.supabaseUserId, user.id),
+          user.email ? eq(schema.members.email, user.email) : undefined
+        ),
+      });
+
+      if (memberRecord) {
+        membershipStatus = memberRecord.status as any;
+        memberRole = memberRecord.systemRole || memberRecord.role || 'MEMBER';
+        memberVillage = memberRecord.address || '';
+      } else {
+        membershipStatus = (user.user_metadata?.status as any) || 'pending';
+      }
+    } catch (err) {
+      console.warn('Membership status query note:', err);
+      membershipStatus = (user.user_metadata?.status as any) || 'pending';
+    }
+  } else {
+    membershipStatus = (user.user_metadata?.status as any) || 'pending';
+  }
+
   const userAuthData = {
     id: user.id,
     email: user.email || null,
     provider: user.app_metadata?.provider || (user.identities && user.identities[0]?.provider) || 'email',
     createdAt: user.created_at,
     lastSignInAt: user.last_sign_in_at || null,
+    membershipStatus,
+    memberRole,
+    memberVillage,
   };
 
   return (

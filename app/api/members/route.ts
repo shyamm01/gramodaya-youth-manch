@@ -99,7 +99,7 @@ export async function POST(req: Request) {
       designation,
       politicalBackground,
       bloodGroup,
-      status = "active",
+      status = "pending",
       role = "MEMBER",
       systemRole = "MEMBER",
     } = validation.data;

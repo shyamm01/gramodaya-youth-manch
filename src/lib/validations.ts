@@ -50,7 +50,7 @@ export const memberCreateSchema = z.object({
   bloodGroup: z.string().max(10).optional(),
   role: z.string().default('MEMBER'),
   systemRole: z.string().default('MEMBER'),
-  status: z.string().default('active'),
+  status: z.string().default('pending'),
   adminName: z.string().optional(),
   adminMobile: z.string().optional(),
 });
