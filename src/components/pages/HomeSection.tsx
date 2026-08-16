@@ -107,12 +107,6 @@ export const HomeSection: React.FC = () => {
 
   return (
     <div className="space-y-8 sm:space-y-12 pb-16 transition-colors duration-200">
-      {/* Join Organization Modal for non-logged in users */}
-      <JoinModal
-        isOpen={isJoinModalOpen}
-        onClose={() => setIsJoinModalOpen(false)}
-      />
-
       {/* Invite / Add Member Modal for logged in users */}
       <InviteMemberModal
         isOpen={isInviteModalOpen}
@@ -122,7 +116,6 @@ export const HomeSection: React.FC = () => {
       {/* 1. Hero Section - Full width dynamic banner & live stats */}
       <HomeHero
         isLoggedIn={isLoggedIn}
-        onJoinClick={() => setIsJoinModalOpen(true)}
         onAddMemberClick={() => setIsInviteModalOpen(true)}
         activeMembersCount={activeMembersCount}
         resolvedComplaintsCount={resolvedComplaintsCount}

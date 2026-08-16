@@ -8,7 +8,6 @@ import {
   JoinModalHeader,
   JoinStepCredentials,
   JoinStepPersonal,
-  JoinStepBackground,
   JoinStepSuccess,
 } from './join';
 
@@ -22,37 +21,33 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
     addMember,
     villageSettings,
     villages,
-    activeVillageId,
     setSelectedIdCardMember,
     t,
     lang,
   } = useApp();
+  const isEn = lang === 'en';
 
-  // Wizard Step: 1 = Account Credentials, 2 = Personal Details, 3 = Background & Pledge, 4 = Success
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3 | 4>(1);
+  // Wizard Step: 1 = Registration (Credentials), 2 = Fill Basic Details, 3 = Success
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
-  // Step 1: Account Credentials State
-  const [mobile, setMobile] = useState('');
+  // Step 1: Registration State
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Step 2: Personal Details State
-  const [name, setName] = useState('');
+  // Step 2: Basic Details State (Includes Mobile Number)
+  const [mobile, setMobile] = useState('');
   const [fatherName, setFatherName] = useState('');
   const [dob, setDob] = useState('');
-  const [gender, setGender] = useState('');
-  const [selectedVillageId, setSelectedVillageId] = useState<string>(
-    activeVillageId || 'vil_rasoolpur'
-  );
-  const [address, setAddress] = useState('');
+  const [gender, setGender] = useState('Male');
   const [photoUrl, setPhotoUrl] = useState('');
-
-  // Step 3: Optional Background State
+  const [pincode, setPincode] = useState('241125');
+  const [selectedState, setSelectedState] = useState('Uttar Pradesh');
+  const [selectedDistrict, setSelectedDistrict] = useState('Hardoi');
+  const [selectedPanchayat, setSelectedPanchayat] = useState('Bahera');
+  const [selectedVillage, setSelectedVillage] = useState('Rasoolpur');
   const [occupation, setOccupation] = useState('');
-  const [designation, setDesignation] = useState('');
-  const [politicalBackground, setPoliticalBackground] = useState('');
-  const [bloodGroup, setBloodGroup] = useState('');
   const [pledgeAccepted, setPledgeAccepted] = useState(true);
 
   // Submission & Confirmation State
@@ -68,40 +63,44 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
   // Selected Village Information
   const selectedVillageObj = useMemo(() => {
     return (
-      (villages || []).find((v) => v.id === selectedVillageId) ||
+      (villages || []).find((v) => v.name === selectedVillage) ||
       villages[0] || {
-        nameHindi: villageSettings.nameHindi || 'रसूलपुर',
-        name: villageSettings.name || 'Rasoolpur',
-        gramPanchayatName: villageSettings.gramPanchayat || 'Bahera',
-        gramPanchayatNameHindi: villageSettings.gramPanchayatHindi || 'बहेरा',
-        districtName: villageSettings.district || 'Jaunpur',
-        districtNameHindi: villageSettings.districtHindi || 'जौनपुर',
+        nameHindi: 'रसूलपुर',
+        name: 'Rasoolpur',
+        gramPanchayatName: 'Bahera',
+        gramPanchayatNameHindi: 'बहेरा',
+        districtName: 'Hardoi',
+        districtNameHindi: 'हरदोई',
       }
     );
-  }, [villages, selectedVillageId, villageSettings]);
+  }, [villages, selectedVillage]);
 
-  // Step 1 Next Handler
+  // Step 1 Next Handler (Validate Registration Credentials)
   const handleNextFromStep1 = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isMobileValid) {
+    if (!name.trim()) {
+      setError(isEn ? 'Please enter member full name.' : 'कृपया सदस्य का पूरा नाम दर्ज करें।');
+      return;
+    }
+    if (!email.trim() || !email.includes('@')) {
       setError(
-        lang === 'en'
-          ? 'Please enter a valid 10-digit mobile number.'
-          : 'कृपया वैध 10-अंकीय मोबाइल नंबर दर्ज करें।'
+        isEn
+          ? 'Please enter a valid email address.'
+          : 'कृपया एक मान्य ईमेल पता दर्ज करें।'
       );
       return;
     }
-    if (password.length < 6) {
+    if (password.length < 8) {
       setError(
-        lang === 'en'
-          ? 'Password must be at least 6 characters.'
-          : 'पासवर्ड कम से कम ६ अक्षरों का होना चाहिए।'
+        isEn
+          ? 'Password must be at least 8 characters.'
+          : 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए।'
       );
       return;
     }
     if (password !== confirmPassword) {
       setError(
-        lang === 'en'
+        isEn
           ? 'Password and Confirm Password do not match.'
           : 'पासवर्ड और पुष्टि पासवर्ड मेल नहीं खा रहे हैं।'
       );
@@ -112,50 +111,23 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
     setCurrentStep(2);
   };
 
-  // Handle Photo Picker
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setError(
-          lang === 'en'
-            ? 'Photo size must be under 5MB.'
-            : 'फ़ोटो का आकार 5MB से कम होना चाहिए।'
-        );
-        return;
-      }
-      setError('');
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setPhotoUrl(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Step 2 Next Validation
-  const handleNextFromStep2 = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      setError(lang === 'en' ? 'Please enter member full name.' : 'कृपया सदस्य का पूरा नाम दर्ज करें।');
-      return;
-    }
-    setError('');
-    setCurrentStep(3);
-  };
-
-  // Step 3 Submit
+  // Step 2 Submit Handler (Submit Basic Details)
   const handleSubmitFinal = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) {
-      setError(lang === 'en' ? 'Please enter member name.' : 'कृपया सदस्य का नाम भरें।');
-      setCurrentStep(2);
+    if (!isMobileValid) {
+      setError(
+        isEn
+          ? 'Please enter a valid 10-digit mobile number.'
+          : 'कृपया वैध 10-अंकीय मोबाइल नंबर दर्ज करें।'
+      );
+      return;
+    }
+    if (!fatherName.trim()) {
+      setError(isEn ? "Please enter father's/guardian's name." : 'कृपया पिता या अभिभावक का नाम दर्ज करें।');
       return;
     }
     if (!pledgeAccepted) {
-      setError(lang === 'en' ? 'Please accept the membership pledge.' : 'कृपया सदस्यता संकल्प पत्र स्वीकार करें।');
+      setError(isEn ? 'Please accept the membership pledge.' : 'कृपया सदस्यता संकल्प पत्र स्वीकार करें।');
       return;
     }
 
@@ -164,6 +136,7 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
     setAlreadyRegistered(false);
 
     const formattedMobile = `+91 ${cleanMobileDigits.slice(0, 5)} ${cleanMobileDigits.slice(5)}`;
+    const fullAddress = `${selectedVillage || 'Rasoolpur'}, ग्राम पंचायत ${selectedPanchayat || 'Bahera'}, जिला ${selectedDistrict || 'Hardoi'}`;
 
     const res = await addMember({
       name: name.trim(),
@@ -174,14 +147,9 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
       fatherName: fatherName.trim(),
       dob: dob.trim(),
       gender: gender.trim(),
-      address:
-        address.trim() ||
-        `${lang === 'en' ? 'Village ' + (selectedVillageObj.name || 'Rasoolpur') : 'ग्राम ' + (selectedVillageObj.nameHindi || 'रसूलपुर')}`,
-      villageId: selectedVillageId,
+      address: fullAddress,
+      villageId: '1',
       occupation: occupation.trim(),
-      designation: designation.trim(),
-      politicalBackground: politicalBackground.trim(),
-      bloodGroup: bloodGroup.trim(),
       organizationName: villageSettings.orgNameHindi || 'ग्रामोदय यूथ मंच',
       joiningDate: new Date().toISOString().split('T')[0],
     });
@@ -190,21 +158,21 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
 
     if (res.success && res.member) {
       setRegisteredMember(res.member);
-      setCurrentStep(4);
+      setCurrentStep(3);
     } else if (res.alreadyRegistered && res.member) {
       setRegisteredMember(res.member);
       setAlreadyRegistered(true);
       setError(
         res.error ||
-          (lang === 'en'
+          (isEn
             ? 'This mobile number is already registered.'
             : 'यह मोबाइल नंबर पहले से पंजीकृत है।')
       );
-      setCurrentStep(4);
+      setCurrentStep(3);
     } else {
       setError(
         res.error ||
-          (lang === 'en'
+          (isEn
             ? 'Error during registration. Please try again.'
             : 'पंजीकरण करने में त्रुटि हुई। कृपया पुनः प्रयास करें।')
       );
@@ -213,20 +181,21 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
 
   const handleResetForm = () => {
     setCurrentStep(1);
-    setMobile('');
+    setName('');
     setEmail('');
     setPassword('');
     setConfirmPassword('');
-    setName('');
+    setMobile('');
     setFatherName('');
     setDob('');
-    setGender('');
-    setAddress('');
+    setGender('Male');
     setPhotoUrl('');
+    setPincode('241125');
+    setSelectedState('Uttar Pradesh');
+    setSelectedDistrict('Hardoi');
+    setSelectedPanchayat('Bahera');
+    setSelectedVillage('Rasoolpur');
     setOccupation('');
-    setDesignation('');
-    setPoliticalBackground('');
-    setBloodGroup('');
     setError('');
     setRegisteredMember(null);
     setAlreadyRegistered(false);
@@ -245,10 +214,10 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
     const text = encodeURIComponent(
       `🌱 *${villageSettings.orgNameHindi || 'ग्रामोदय यूथ मंच'} — ${t('join.tag')}*\n\n` +
         `👤 *${t('join.applicantName')}* ${registeredMember.name}\n` +
-        `📍 *${t('join.villageUnit')}* ${lang === 'en' ? selectedVillageObj.name : selectedVillageObj.nameHindi}\n` +
+        `📍 *${t('join.villageUnit')}* ${selectedVillage}\n` +
         `📞 *${t('join.registeredMobile')}* ${registeredMember.mobile}\n` +
         (occupation ? `💼 *पेशा/व्यवसाय:* ${occupation}\n` : '') +
-        `✅ ${lang === 'en' ? 'I have joined Gramodaya Youth Manch! Connect for village development.' : 'मैंने ग्रामोदय यूथ मंच की सदस्यता ले ली है। आप भी जुड़ें!'}\n\n` +
+        `✅ ${isEn ? 'I have submitted my membership request for Gramodaya Youth Manch!' : 'मैंने ग्रामोदय यूथ मंच की सदस्यता के लिए आवेदन किया है। आप भी जुड़ें!'}\n\n` +
         `🌐 ${typeof window !== 'undefined' ? window.location.origin : 'https://gramodaya.org'}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
@@ -265,25 +234,25 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
       />
 
       {/* ── MODERN CONTAINER ── */}
-      <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800/80 shadow-2xl z-10 my-8 overflow-hidden transition-all text-slate-900 dark:text-slate-50 animate-in zoom-in-95 duration-200">
-        {/* Header & Step Indicator */}
+      <div className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 shadow-2xl z-10 my-8 overflow-hidden transition-all text-stone-900 dark:text-white animate-in zoom-in-95 duration-200">
+        {/* Header & 2-Step Indicator */}
         <JoinModalHeader currentStep={currentStep} onClose={handleResetForm} />
 
         {/* Dialog Content */}
         <div className="p-6 max-h-[75vh] overflow-y-auto space-y-4">
           {/* Error Banner */}
-          {error && currentStep !== 4 && (
-            <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-300 text-xs font-medium rounded-xl flex items-center gap-2.5">
+          {error && currentStep !== 3 && (
+            <div className="p-3.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-rose-700 dark:text-rose-300 text-xs font-medium rounded-2xl flex items-center gap-2.5">
               <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-500" />
               <span>{error}</span>
             </div>
           )}
 
-          {/* Step 1: Account Setup (Mobile / Email + Password) */}
+          {/* Phase 1: Registration (Name + Email + Password) */}
           {currentStep === 1 && (
             <JoinStepCredentials
-              mobile={mobile}
-              setMobile={setMobile}
+              name={name}
+              setName={setName}
               email={email}
               setEmail={setEmail}
               password={password}
@@ -294,52 +263,41 @@ export const JoinModal: React.FC<JoinModalProps> = ({ isOpen, onClose }) => {
             />
           )}
 
-          {/* Step 2: Personal Details */}
+          {/* Phase 2: Fill Basic Details (Mobile Number + Father's Name + Gender + DatePicker for DOB + Top-to-Down Village Selector + Photo + Pledge) */}
           {currentStep === 2 && (
             <JoinStepPersonal
-              name={name}
-              setName={setName}
-              cleanMobileDigits={cleanMobileDigits}
+              mobile={mobile}
+              setMobile={setMobile}
               fatherName={fatherName}
               setFatherName={setFatherName}
               dob={dob}
               setDob={setDob}
               gender={gender}
               setGender={setGender}
-              selectedVillageId={selectedVillageId}
-              setSelectedVillageId={setSelectedVillageId}
-              address={address}
-              setAddress={setAddress}
-              photoUrl={photoUrl}
-              setPhotoUrl={setPhotoUrl}
-              selectedVillageObj={selectedVillageObj}
-              onPhotoSelect={handlePhotoSelect}
-              onBack={() => setCurrentStep(1)}
-              onNext={handleNextFromStep2}
-            />
-          )}
-
-          {/* Step 3: Optional Background & Pledge */}
-          {currentStep === 3 && (
-            <JoinStepBackground
+              pincode={pincode}
+              setPincode={setPincode}
+              selectedState={selectedState}
+              setSelectedState={setSelectedState}
+              selectedDistrict={selectedDistrict}
+              setSelectedDistrict={setSelectedDistrict}
+              selectedPanchayat={selectedPanchayat}
+              setSelectedPanchayat={setSelectedPanchayat}
+              selectedVillage={selectedVillage}
+              setSelectedVillage={setSelectedVillage}
               occupation={occupation}
               setOccupation={setOccupation}
-              designation={designation}
-              setDesignation={setDesignation}
-              politicalBackground={politicalBackground}
-              setPoliticalBackground={setPoliticalBackground}
-              bloodGroup={bloodGroup}
-              setBloodGroup={setBloodGroup}
+              photoUrl={photoUrl}
+              setPhotoUrl={setPhotoUrl}
               pledgeAccepted={pledgeAccepted}
               setPledgeAccepted={setPledgeAccepted}
               isSubmitting={isSubmitting}
-              onBack={() => setCurrentStep(2)}
+              onBack={() => setCurrentStep(1)}
               onSubmit={handleSubmitFinal}
             />
           )}
 
-          {/* Step 4: Success & Confirmation */}
-          {currentStep === 4 && (
+          {/* Phase 3: Completion & Success */}
+          {currentStep === 3 && (
             <JoinStepSuccess
               registeredMember={registeredMember}
               alreadyRegistered={alreadyRegistered}

@@ -10,7 +10,6 @@ import {
   CheckCircle2,
   ArrowRight,
   UserPlus,
-  MessageSquarePlus,
   Send,
 } from "lucide-react";
 import { VillageBadge } from "../../common";
@@ -18,7 +17,7 @@ import { useApp } from "../../../context/AppContext";
 
 interface HomeHeroProps {
   isLoggedIn?: boolean;
-  onJoinClick: () => void;
+  onJoinClick?: () => void;
   onAddMemberClick?: () => void;
   activeMembersCount: number;
   resolvedComplaintsCount: number;
@@ -158,16 +157,15 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
               <Send className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 opacity-90" />
             </button>
           ) : (
-            /* If Not Logged In: Show "Join Organization" button */
-            <button
-              type="button"
-              onClick={onJoinClick}
+            /* If Not Logged In: Show "Join Organization" button linking directly to /auth/signup */
+            <Link
+              href="/auth/signup"
               className="group relative inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-sm font-bold shadow-xl shadow-amber-600/30 hover:shadow-amber-500/50 border border-amber-400/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
             >
               <UserPlus className="w-4 h-4 transition-transform group-hover:scale-110" />
               <span>{isEn ? 'Join Organization' : 'संगठन से जुड़ें'}</span>
               <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 opacity-90" />
-            </button>
+            </Link>
           )}
 
           {/* Secondary View Members Button */}
@@ -178,15 +176,6 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
             <Users className="w-4 h-4 text-emerald-400 transition-transform group-hover:scale-110" />
             <span>{isEn ? 'View Members' : 'सदस्य निर्देशिका'}</span>
             <ArrowRight className="w-3.5 h-3.5 text-stone-300 transition-transform group-hover:translate-x-1" />
-          </Link>
-
-          {/* Tertiary Quick Report Grievance Button */}
-          <Link
-            href="/problems"
-            className="group inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-2xl bg-stone-900/60 hover:bg-stone-800/80 border border-stone-700/80 hover:border-amber-500/50 text-stone-200 hover:text-white backdrop-blur-xl text-xs sm:text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
-          >
-            <MessageSquarePlus className="w-4 h-4 text-amber-400 transition-transform group-hover:scale-110" />
-            <span>{isEn ? 'Report Problem' : 'समस्या दर्ज करें'}</span>
           </Link>
         </div>
       </div>

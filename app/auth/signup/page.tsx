@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/src/context/ToastContext';
 import { useApp } from '@/src/context/AppContext';
 import { INDIAN_STATES, DEFAULT_PANCHAYATS } from '@/src/data/geoData';
+import { DatePicker } from '@/src/components/ui/DatePicker';
 import {
   UserPlus,
   Mail,
@@ -14,14 +15,16 @@ import {
   User,
   AlertCircle,
   ArrowRight,
+  ArrowLeft,
   Check,
   Phone,
-  MapPin,
   Eye,
   EyeOff,
-  Building,
   Navigation,
   Loader2,
+  Calendar,
+  Sparkles,
+  ShieldCheck,
 } from 'lucide-react';
 
 function SignupForm() {
@@ -36,13 +39,21 @@ function SignupForm() {
 
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
 
-  // Form State: Basic Personal Details
+  // Wizard Step: 1 = Registration (Credentials), 2 = Fill Basic Details
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+
+  // Step 1: Account Registration State
   const [fullName, setFullName] = useState(inviteName);
+  const [email, setEmail] = useState(inviteEmail);
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Step 2: Basic Personal & Location Details State (Includes Mobile Number)
   const [mobile, setMobile] = useState('');
   const [fatherName, setFatherName] = useState('');
+  const [dob, setDob] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other'>('Male');
-
-  // Form State: Cascading Geographic Details
   const [pincode, setPincode] = useState('241125');
   const [pincodeLoading, setPincodeLoading] = useState(false);
   const [selectedState, setSelectedState] = useState('Uttar Pradesh');
@@ -53,12 +64,6 @@ function SignupForm() {
   const [customVillage, setCustomVillage] = useState('');
   const [dynamicPanchayats, setDynamicPanchayats] = useState<string[]>(['Bahera', 'Kachhauna', 'Sandila']);
   const [dynamicVillages, setDynamicVillages] = useState<string[]>(['Rasoolpur', 'Bahera Khas', 'Shivpur', 'Durgapur']);
-
-  // Form State: Credentials
-  const [email, setEmail] = useState(inviteEmail);
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
 
   // Status State
   const [loading, setLoading] = useState(false);
@@ -90,7 +95,6 @@ function SignupForm() {
 
       if (res.ok && data.success) {
         if (data.state) {
-          // Find matching state name in INDIAN_STATES
           const matchState = INDIAN_STATES.find(
             (s) => s.name.toLowerCase() === data.state.toLowerCase() || s.nameHindi === data.state
           );
@@ -116,13 +120,12 @@ function SignupForm() {
         );
       }
     } catch (err) {
-      console.warn('Pincode auto lookup note:', err);
+      console.warn('Pincode lookup error:', err);
     } finally {
       setPincodeLoading(false);
     }
   }, [isEn, toastSuccess]);
 
-  // When Pincode changes to 6 digits, auto trigger lookup
   const handlePincodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value.replace(/\D/g, '').slice(0, 6);
     setPincode(val);
@@ -131,7 +134,6 @@ function SignupForm() {
     }
   };
 
-  // When State changes, update available districts
   const handleStateChange = (stateName: string) => {
     setSelectedState(stateName);
     const stateObj = INDIAN_STATES.find((s) => s.name === stateName);
@@ -140,7 +142,6 @@ function SignupForm() {
     }
   };
 
-  // When District changes, update default panchayats & villages
   const handleDistrictChange = (distName: string) => {
     setSelectedDistrict(distName);
     const matchPanchayats = DEFAULT_PANCHAYATS.filter(
@@ -157,7 +158,6 @@ function SignupForm() {
     }
   };
 
-  // When Panchayat changes, update available villages
   const handlePanchayatChange = (panchayatName: string) => {
     setSelectedPanchayat(panchayatName);
     if (panchayatName === '__other__') return;
@@ -172,43 +172,23 @@ function SignupForm() {
     }
   };
 
-  const finalPanchayat = selectedPanchayat === '__other__' ? customPanchayat.trim() : selectedPanchayat;
-  const finalVillage = selectedVillage === '__other__' ? customVillage.trim() : selectedVillage;
-
   const currentDistricts =
     INDIAN_STATES.find((s) => s.name === selectedState)?.districts || [
       { name: selectedDistrict, nameHindi: selectedDistrict },
     ];
 
-  const handleSignup = async (e: React.FormEvent) => {
+  // Step 1: Validate Registration & Proceed to Step 2
+  const handleNextToStep2 = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
     const cleanName = fullName.trim();
-    const cleanMobile = mobile.replace(/\D/g, '').slice(-10);
-    const cleanFatherName = fatherName.trim();
     const cleanEmail = email.trim().toLowerCase();
-    const cleanPincode = pincode.trim();
-    const resolvedVillage = finalVillage || 'Rasoolpur';
-    const resolvedPanchayat = finalPanchayat || 'Bahera';
 
-    // Validations
     if (!cleanName) {
       const msg = isEn ? 'Please enter your full name' : 'कृपया अपना पूरा नाम दर्ज करें';
       setErrorMessage(msg);
-      toastError(msg, isEn ? 'Name Required' : 'नाम आवश्यक है');
-      return;
-    }
-    if (cleanMobile.length !== 10) {
-      const msg = isEn ? 'Please enter a valid 10-digit mobile number' : 'कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें';
-      setErrorMessage(msg);
-      toastError(msg, isEn ? 'Invalid Mobile' : 'अमान्य मोबाइल');
-      return;
-    }
-    if (!cleanFatherName) {
-      const msg = isEn ? "Please enter father's/guardian's name" : 'कृपया पिता या अभिभावक का नाम दर्ज करें';
-      setErrorMessage(msg);
-      toastError(msg, isEn ? 'Father Name Required' : 'पिता का नाम आवश्यक');
+      toastError(msg, isEn ? 'Name Required' : 'नाम आवश्यक');
       return;
     }
     if (!cleanEmail || !cleanEmail.includes('@')) {
@@ -230,6 +210,36 @@ function SignupForm() {
       return;
     }
 
+    setCurrentStep(2);
+  };
+
+  // Step 2: Submit Final Registration
+  const handleFinalSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    const cleanName = fullName.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanMobile = mobile.replace(/\D/g, '').slice(-10);
+    const cleanFatherName = fatherName.trim();
+    const cleanPincode = pincode.replace(/\D/g, '').slice(0, 6);
+
+    const resolvedPanchayat = selectedPanchayat === '__other__' ? customPanchayat.trim() : selectedPanchayat;
+    const resolvedVillage = selectedVillage === '__other__' ? customVillage.trim() : selectedVillage;
+
+    if (cleanMobile.length !== 10) {
+      const msg = isEn ? 'Please enter a valid 10-digit mobile number' : 'कृपया 10 अंकों का वैध मोबाइल नंबर दर्ज करें';
+      setErrorMessage(msg);
+      toastError(msg, isEn ? 'Invalid Mobile' : 'अमान्य मोबाइल');
+      return;
+    }
+    if (!cleanFatherName) {
+      const msg = isEn ? "Please enter father's/guardian's name" : 'कृपया पिता या अभिभावक का नाम दर्ज करें';
+      setErrorMessage(msg);
+      toastError(msg, isEn ? 'Father Name Required' : 'पिता का नाम आवश्यक');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -243,6 +253,7 @@ function SignupForm() {
             name: cleanName,
             mobile: cleanMobile,
             father_name: cleanFatherName,
+            dob: dob.trim(),
             gender,
             state: selectedState,
             district: selectedDistrict,
@@ -276,6 +287,7 @@ function SignupForm() {
             name: cleanName,
             mobile: cleanMobile,
             fatherName: cleanFatherName,
+            dob: dob.trim(),
             gender,
             email: cleanEmail,
             state: selectedState,
@@ -357,25 +369,55 @@ function SignupForm() {
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-xl space-y-8 animate-in fade-in zoom-in-95 duration-200">
+      <div className="w-full max-w-xl space-y-6 animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shadow-inner mb-2">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 shadow-inner mb-1">
             <UserPlus className="w-7 h-7" />
           </div>
           <h1 className="text-3xl font-extrabold text-stone-900 dark:text-white tracking-tight">
             {isEn ? 'Create an Account' : 'नया खाता बनाएं'}
           </h1>
-          <p className="text-sm text-stone-600 dark:text-stone-400 max-w-md mx-auto">
-            {isEn
-              ? 'Join Gramodaya Youth Manch portal to access village services and connect with the community'
-              : 'ग्रामोदय यूथ मंच से जुड़कर ग्राम सेवाओं व सामुदायिक सुविधाओं का लाभ उठाएं'}
+          <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400 max-w-md mx-auto">
+            {currentStep === 1
+              ? isEn
+                ? 'Step 1: Account Registration & Login Credentials'
+                : 'चरण १: खाता पंजीकरण एवं लॉगिन विवरण'
+              : isEn
+              ? 'Step 2: Basic Personal, Mobile & Village Details'
+              : 'चरण २: मूल व्यक्तिगत, मोबाइल व ग्राम विवरण'}
           </p>
         </div>
 
-        {/* Card */}
-        <div className="bg-white/80 dark:bg-stone-900/80 backdrop-blur-xl border border-stone-200/80 dark:border-stone-800/80 rounded-3xl p-6 sm:p-8 shadow-xl">
-          {/* Notifications */}
+        {/* 2-Step Progress Indicator */}
+        {!isSuccess && (
+          <div className="grid grid-cols-2 gap-2 px-2">
+            <div className="space-y-1">
+              <div
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  currentStep >= 1 ? 'bg-amber-600' : 'bg-stone-200 dark:bg-stone-800'
+                }`}
+              />
+              <span className="text-[10px] font-bold uppercase tracking-wider block text-center text-stone-500">
+                {isEn ? '1. Registration' : '१. पंजीकरण'}
+              </span>
+            </div>
+            <div className="space-y-1">
+              <div
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  currentStep >= 2 ? 'bg-amber-600' : 'bg-stone-200 dark:bg-stone-800'
+                }`}
+              />
+              <span className="text-[10px] font-bold uppercase tracking-wider block text-center text-stone-500">
+                {isEn ? '2. Basic Details' : '२. मूल विवरण'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Card Box */}
+        <div className="bg-white dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+          {/* Error Message */}
           {errorMessage && (
             <div className="mb-6 p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 flex items-start gap-3 text-rose-700 dark:text-rose-300 text-sm animate-in fade-in">
               <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
@@ -406,41 +448,51 @@ function SignupForm() {
             </div>
           ) : (
             <>
-              {/* Invitation Welcome Banner */}
+              {/* Special Invitation Banner */}
               {inviteEmail && (
-            <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30 flex items-start gap-3 text-amber-900 dark:text-amber-200 text-xs animate-in fade-in">
-              <div className="p-1.5 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
-                <UserPlus className="w-4 h-4" />
-              </div>
-              <div className="space-y-0.5">
-                <span className="font-bold text-sm block text-amber-800 dark:text-amber-300">
-                  {isEn ? 'Special Membership Invitation' : 'विशेष सदस्यता निमंत्रण'}
-                </span>
-                <p className="leading-relaxed">
-                  {isEn
-                    ? `Welcome ${fullName || inviteName || 'friend'}! You have received an invitation to join Gramodaya Youth Manch. Please complete your basic details and set your password to finish registration.`
-                    : `स्वागत है ${fullName || inviteName || 'मित्र'}! आपको ग्रामोदय यूथ मंच से जुड़ने का निमंत्रण प्राप्त हुआ है। कृपया नीचे अपना विवरण व पासवर्ड दर्ज कर सदस्यता पूर्ण करें।`}
-                </p>
-              </div>
-            </div>
-          )}
+                <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30 flex items-start gap-3 text-amber-900 dark:text-amber-200 text-xs animate-in fade-in">
+                  <div className="p-1.5 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-sm block text-amber-800 dark:text-amber-300">
+                      {isEn ? 'Special Membership Invitation' : 'विशेष सदस्यता निमंत्रण'}
+                    </span>
+                    <p className="leading-relaxed">
+                      {isEn
+                        ? `Welcome ${fullName || inviteName || 'friend'}! You have received an invitation to join Gramodaya Youth Manch. Complete registration below to finish joining.`
+                        : `स्वागत है ${fullName || inviteName || 'मित्र'}! आपको ग्रामोदय यूथ मंच से जुड़ने का निमंत्रण प्राप्त हुआ है। कृपया नीचे पंजीकरण पूर्ण करें।`}
+                    </p>
+                  </div>
+                </div>
+              )}
 
-          {/* Form */}
-          <form onSubmit={handleSignup} className="space-y-5">
-                {/* ============================================================== */}
-                {/* 1. Basic Personal Details Section */}
-                {/* ============================================================== */}
-                <div className="space-y-3.5">
-                  <div className="pb-1 border-b border-stone-100 dark:border-stone-800">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                      {isEn ? '1. Basic Personal Details' : '1. मूल व्यक्तिगत विवरण'}
-                    </h3>
+              {/* ================================================================ */}
+              {/* PHASE 1: REGISTRATION (NAME, EMAIL, PASSWORD) */}
+              {/* ================================================================ */}
+              {currentStep === 1 && (
+                <form onSubmit={handleNextToStep2} className="space-y-4">
+                  {/* Informational Banner */}
+                  <div className="p-3.5 rounded-2xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/25 flex items-center gap-3 text-amber-900 dark:text-amber-200">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0 shadow-xs">
+                      <ShieldCheck className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold">
+                        {isEn ? '1. Account & Login Credentials' : '1. खाता व लॉगिन विवरण'}
+                      </h4>
+                      <p className="text-[11px] text-stone-600 dark:text-stone-300">
+                        {isEn
+                          ? 'Enter your name, email, and password to begin registration.'
+                          : 'पंजीकरण प्रारंभ करने हेतु अपना नाम, ईमेल व पासवर्ड दर्ज करें।'}
+                      </p>
+                    </div>
                   </div>
 
                   {/* Full Name */}
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                      {isEn ? 'Full Name' : 'पूरा नाम'}
+                      {isEn ? 'Full Name' : 'पूरा नाम'} <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
                       <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-stone-500" />
@@ -451,231 +503,15 @@ function SignupForm() {
                         onChange={(e) => setFullName(e.target.value)}
                         placeholder={isEn ? 'e.g. Ramesh Kumar' : 'उदा. रमेश कुमार'}
                         className="w-full pl-11 pr-4 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-xs sm:text-sm"
+                        autoFocus
                       />
                     </div>
                   </div>
 
-                  {/* Mobile & Father Name Row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                        {isEn ? 'Mobile Number' : 'मोबाइल नंबर'}
-                      </label>
-                      <div className="relative">
-                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-stone-500" />
-                        <input
-                          type="tel"
-                          required
-                          maxLength={10}
-                          value={mobile}
-                          onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
-                          placeholder="9876543210"
-                          className="w-full pl-11 pr-4 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-xs sm:text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                        {isEn ? "Father's Name" : 'पिता का नाम'}
-                      </label>
-                      <div className="relative">
-                        <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-stone-500" />
-                        <input
-                          type="text"
-                          required
-                          value={fatherName}
-                          onChange={(e) => setFatherName(e.target.value)}
-                          placeholder={isEn ? 'e.g. Ram Charan' : 'उदा. राम चरन'}
-                          className="w-full pl-11 pr-4 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-xs sm:text-sm"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Gender Selector */}
+                  {/* Email Address */}
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                      {isEn ? 'Gender' : 'लिंग'}
-                    </label>
-                    <div className="flex items-center gap-1.5 bg-stone-50 dark:bg-stone-800/50 p-1 rounded-2xl border border-stone-200 dark:border-stone-700/80">
-                      {(['Male', 'Female', 'Other'] as const).map((g) => (
-                        <button
-                          key={g}
-                          type="button"
-                          onClick={() => setGender(g)}
-                          className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                            gender === g
-                              ? 'bg-amber-600 text-white shadow-sm'
-                              : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
-                          }`}
-                        >
-                          {g === 'Male'
-                            ? isEn
-                              ? 'Male'
-                              : 'पुरुष'
-                            : g === 'Female'
-                            ? isEn
-                              ? 'Female'
-                              : 'महिला'
-                            : isEn
-                            ? 'Other'
-                            : 'अन्य'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                {/* ============================================================== */}
-                {/* 2. Top-to-Down Village & Location Selectors (Auto-filled by Pincode) */}
-                {/* ============================================================== */}
-                <div className="space-y-3.5 pt-2">
-                  <div className="pb-1 border-b border-stone-100 dark:border-stone-800 flex items-center justify-between">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                      {isEn ? '2. Village & Address Details (Top-to-Down)' : '2. ग्राम एवं पता विवरण (क्रमशः चयन)'}
-                    </h3>
-                    <span className="text-[10px] text-stone-500 dark:text-stone-400">
-                      {isEn ? 'Auto-filled via Pincode' : 'पिनकोड से स्वतः भरा जाएगा'}
-                    </span>
-                  </div>
-
-                  {/* Pincode with Auto-lookup */}
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                      {isEn ? 'Pincode (Auto-fills State & District)' : 'पिनकोड (राज्य व जिला स्वतः भरेगा)'}
-                    </label>
-                    <div className="relative">
-                      <Navigation className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-stone-500" />
-                      <input
-                        type="text"
-                        maxLength={6}
-                        value={pincode}
-                        onChange={handlePincodeChange}
-                        placeholder="241125"
-                        className="w-full pl-11 pr-10 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-xs sm:text-sm font-mono"
-                      />
-                      {pincodeLoading && (
-                        <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-600 animate-spin" />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* State & District Selectors Row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* State Selector */}
-                    <div>
-                      <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                        {isEn ? 'State' : 'राज्य'}
-                      </label>
-                      <select
-                        value={selectedState}
-                        onChange={(e) => handleStateChange(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all cursor-pointer"
-                      >
-                        {INDIAN_STATES.map((st) => (
-                          <option key={st.code} value={st.name}>
-                            {isEn ? st.name : st.nameHindi}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* District Selector */}
-                    <div>
-                      <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                        {isEn ? 'District' : 'जनपद / जिला'}
-                      </label>
-                      <select
-                        value={selectedDistrict}
-                        onChange={(e) => handleDistrictChange(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all cursor-pointer"
-                      >
-                        {currentDistricts.map((d) => (
-                          <option key={d.name} value={d.name}>
-                            {isEn ? d.name : d.nameHindi || d.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Gram Panchayat & Village Selectors Row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {/* Gram Panchayat Selector */}
-                    <div>
-                      <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                        {isEn ? 'Gram Panchayat' : 'ग्राम पंचायत'}
-                      </label>
-                      <select
-                        value={selectedPanchayat}
-                        onChange={(e) => handlePanchayatChange(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all cursor-pointer"
-                      >
-                        {dynamicPanchayats.map((gp) => (
-                          <option key={gp} value={gp}>
-                            {gp}
-                          </option>
-                        ))}
-                        <option value="__other__">{isEn ? 'Other (Type Custom)' : 'अन्य (खुद लिखें)'}</option>
-                      </select>
-                      {selectedPanchayat === '__other__' && (
-                        <input
-                          type="text"
-                          required
-                          value={customPanchayat}
-                          onChange={(e) => setCustomPanchayat(e.target.value)}
-                          placeholder={isEn ? 'Enter Gram Panchayat name' : 'ग्राम पंचायत का नाम लिखें'}
-                          className="w-full mt-2 px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-amber-500/60 rounded-xl text-xs text-stone-900 dark:text-white focus:outline-none"
-                        />
-                      )}
-                    </div>
-
-                    {/* Village / Gram Selector */}
-                    <div>
-                      <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                        {isEn ? 'Village' : 'ग्राम / गांव'}
-                      </label>
-                      <select
-                        value={selectedVillage}
-                        onChange={(e) => setSelectedVillage(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all cursor-pointer"
-                      >
-                        {dynamicVillages.map((v) => (
-                          <option key={v} value={v}>
-                            {v}
-                          </option>
-                        ))}
-                        <option value="__other__">{isEn ? 'Other (Type Custom)' : 'अन्य (खुद लिखें)'}</option>
-                      </select>
-                      {selectedVillage === '__other__' && (
-                        <input
-                          type="text"
-                          required
-                          value={customVillage}
-                          onChange={(e) => setCustomVillage(e.target.value)}
-                          placeholder={isEn ? 'Enter Village name' : 'गांव का नाम लिखें'}
-                          className="w-full mt-2 px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-amber-500/60 rounded-xl text-xs text-stone-900 dark:text-white focus:outline-none"
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* ============================================================== */}
-                {/* 3. Account Credentials Section */}
-                {/* ============================================================== */}
-                <div className="space-y-3.5 pt-2">
-                  <div className="pb-1 border-b border-stone-100 dark:border-stone-800">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                      {isEn ? '3. Account Credentials' : '3. खाता सुरक्षा व लॉगिन विवरण'}
-                    </h3>
-                  </div>
-
-                  {/* Email */}
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                      {isEn ? 'Email Address' : 'ईमेल पता'}
+                      {isEn ? 'Email Address' : 'ईमेल पता'} <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative">
                       <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-stone-500" />
@@ -684,131 +520,390 @@ function SignupForm() {
                         required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="yourname@domain.com"
+                        placeholder="name@example.com"
                         className="w-full pl-11 pr-4 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-xs sm:text-sm"
                       />
                     </div>
                   </div>
 
-                  {/* Password & Confirm Password Row */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                        {isEn ? 'Password' : 'पासवर्ड'}
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-stone-500" />
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          required
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="w-full pl-11 pr-9 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-xs sm:text-sm"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 cursor-pointer"
-                        >
-                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                      {password.length > 0 && password.length < 8 && (
-                        <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 pl-1">
-                          {isEn ? 'Minimum 8 characters' : 'कम से कम 8 अक्षर'}
-                        </p>
-                      )}
+                  {/* Password Field */}
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                      {isEn ? 'Create Password' : 'पासवर्ड बनाएं'} <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-stone-500" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        minLength={8}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full pl-11 pr-11 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-xs sm:text-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition-colors cursor-pointer"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {password.length > 0 && password.length < 8 && (
+                      <p className="mt-1 text-[11px] text-stone-500 dark:text-stone-400 pl-1">
+                        {isEn ? 'Minimum 8 characters' : 'कम से कम 8 अक्षर'}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Confirm Password Field */}
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                      {isEn ? 'Confirm Password' : 'पासवर्ड पुष्टि'} <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-stone-500" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full pl-11 pr-4 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-xs sm:text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Submit Step 1 Button */}
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      className="w-full py-3 px-6 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer"
+                    >
+                      <span>{isEn ? 'Next: Fill Basic Details →' : 'आगे बढ़ें: मूल विवरण भरें →'}</span>
+                    </button>
+                  </div>
+
+                  {/* Google OAuth Option */}
+                  <div className="relative my-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-stone-200 dark:border-stone-700/80"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-white dark:bg-stone-900 px-3 text-stone-500 dark:text-stone-400">
+                        {isEn ? 'Or continue with' : 'अथवा इसके साथ जारी रखें'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleGoogleSignup}
+                    disabled={oauthLoading}
+                    className="w-full py-2.5 px-4 bg-stone-50 dark:bg-stone-800/60 hover:bg-stone-100 dark:hover:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-2xl text-stone-700 dark:text-stone-200 text-xs font-semibold transition-all flex items-center justify-center gap-3 cursor-pointer shadow-xs disabled:opacity-50"
+                  >
+                    <svg className="w-4 h-4" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>{isEn ? 'Sign up with Google' : 'गूगल के साथ खाता बनाएं'}</span>
+                  </button>
+                </form>
+              )}
+
+              {/* ================================================================ */}
+              {/* PHASE 2: FILL BASIC DETAILS (MOBILE, FATHER, GENDER, DOB, VILLAGE) */}
+              {/* ================================================================ */}
+              {currentStep === 2 && (
+                <form onSubmit={handleFinalSignup} className="space-y-4">
+                  {/* 1. Basic Personal & Contact Details Section */}
+                  <div className="space-y-3.5">
+                    <div className="pb-1 border-b border-stone-100 dark:border-stone-800">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                        {isEn ? 'Personal & Contact Details' : 'व्यक्तिगत एवं संपर्क विवरण'}
+                      </h3>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
-                        {isEn ? 'Confirm Password' : 'पासवर्ड पुष्टि'}
-                      </label>
-                      <div className="relative">
-                        <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-stone-500" />
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          required
-                          value={confirmPassword}
-                          onChange={(e) => setConfirmPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="w-full pl-11 pr-4 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-xs sm:text-sm"
-                        />
+                    {/* Mobile & Father Name Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                          {isEn ? 'Mobile Number' : 'मोबाइल नंबर'} <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-stone-500 select-none pointer-events-none">
+                            +91
+                          </span>
+                          <input
+                            type="tel"
+                            required
+                            maxLength={10}
+                            value={mobile}
+                            onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
+                            placeholder="9876543210"
+                            className="w-full pl-12 pr-4 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white font-mono placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-xs sm:text-sm"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                          {isEn ? "Father's / Guardian's Name" : 'पिता या अभिभावक का नाम'} <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-stone-500" />
+                          <input
+                            type="text"
+                            required
+                            value={fatherName}
+                            onChange={(e) => setFatherName(e.target.value)}
+                            placeholder={isEn ? 'e.g. Ram Charan' : 'उदा. राम चरन'}
+                            className="w-full pl-11 pr-4 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-xs sm:text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Gender & Date of Birth Row with DatePicker Component */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Gender Selector */}
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                          {isEn ? 'Gender' : 'लिंग'}
+                        </label>
+                        <div className="flex items-center gap-1.5 bg-stone-50 dark:bg-stone-800/50 p-1 rounded-2xl border border-stone-200 dark:border-stone-700/80">
+                          {(['Male', 'Female', 'Other'] as const).map((g) => (
+                            <button
+                              key={g}
+                              type="button"
+                              onClick={() => setGender(g)}
+                              className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                                gender === g
+                                  ? 'bg-amber-600 text-white shadow-sm'
+                                  : 'text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white'
+                              }`}
+                            >
+                              {g === 'Male'
+                                ? isEn
+                                  ? 'Male'
+                                  : 'पुरुष'
+                                : g === 'Female'
+                                ? isEn
+                                  ? 'Female'
+                                  : 'महिला'
+                                : isEn
+                                ? 'Other'
+                                : 'अन्य'}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Date of Birth Selector with DatePicker */}
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                          {isEn ? 'Date of Birth (DOB)' : 'जन्म तिथि (DOB)'}
+                        </label>
+                        <div className="relative">
+                          <DatePicker
+                            value={dob}
+                            onChange={setDob}
+                            placeholder={isEn ? 'Select date of birth' : 'जन्म तिथि चुनें'}
+                            lang={isEn ? 'en' : 'hi'}
+                            minYear={1940}
+                            maxYear={new Date().getFullYear()}
+                            className="h-10 text-xs sm:text-sm rounded-2xl bg-stone-50 dark:bg-stone-800/50 border-stone-200 dark:border-stone-700/80"
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Submit Button */}
-                <button
-                  type="submit"
-                  disabled={loading || oauthLoading}
-                  className="w-full mt-4 flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-semibold shadow-lg shadow-amber-600/25 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  {loading ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <span>{isEn ? 'Complete Registration' : 'पंजीकरण पूरा करें'}</span>
-                      <UserPlus className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </form>
+                  {/* 2. Top-to-Down Village & Location Selectors */}
+                  <div className="space-y-3.5 pt-2">
+                    <div className="pb-1 border-b border-stone-100 dark:border-stone-800 flex items-center justify-between">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                        {isEn ? 'Village & Address Details' : 'ग्राम एवं पता विवरण'}
+                      </h3>
+                      <span className="text-[10px] text-stone-500 dark:text-stone-400">
+                        {isEn ? 'Auto-filled via Pincode' : 'पिनकोड से स्वतः भरा जाएगा'}
+                      </span>
+                    </div>
 
-              {/* Divider */}
-              <div className="relative flex py-6 items-center">
-                <div className="flex-grow border-t border-stone-200 dark:border-stone-800"></div>
-                <span className="flex-shrink mx-4 text-xs uppercase font-semibold text-stone-400 dark:text-stone-500 tracking-wider">
-                  {isEn ? 'OR' : 'या'}
-                </span>
-                <div className="flex-grow border-t border-stone-200 dark:border-stone-800"></div>
-              </div>
+                    {/* Pincode Lookup Field */}
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                        {isEn ? 'Pincode (Auto-fills State & District)' : 'पिनकोड (राज्य व जिला स्वतः भरेगा)'}
+                      </label>
+                      <div className="relative">
+                        <Navigation className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-stone-500" />
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={pincode}
+                          onChange={handlePincodeChange}
+                          placeholder="241125"
+                          className="w-full pl-11 pr-10 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white font-mono placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-xs sm:text-sm"
+                        />
+                        {pincodeLoading && (
+                          <Loader2 className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-600 animate-spin" />
+                        )}
+                      </div>
+                    </div>
 
-              {/* Google OAuth Signup */}
-              <button
-                type="button"
-                onClick={handleGoogleSignup}
-                disabled={oauthLoading || loading}
-                className="w-full flex items-center justify-center gap-3 px-4 py-3.5 border border-stone-300 dark:border-stone-700 hover:border-amber-500 dark:hover:border-amber-500/70 bg-white dark:bg-stone-800/80 hover:bg-stone-50 dark:hover:bg-stone-800 text-stone-700 dark:text-stone-200 font-semibold rounded-2xl transition-all shadow-sm active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
-              >
-                {oauthLoading ? (
-                  <div className="w-5 h-5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                    />
-                  </svg>
-                )}
-                <span>{isEn ? 'Continue with Google' : 'गूगल के साथ जारी रखें'}</span>
-              </button>
+                    {/* State & District Dropdowns Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                          {isEn ? 'State' : 'राज्य'}
+                        </label>
+                        <select
+                          value={selectedState}
+                          onChange={(e) => handleStateChange(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 cursor-pointer"
+                        >
+                          {INDIAN_STATES.map((st) => (
+                            <option key={st.code} value={st.name}>
+                              {isEn ? st.name : st.nameHindi}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                          {isEn ? 'District' : 'जनपद / जिला'}
+                        </label>
+                        <select
+                          value={selectedDistrict}
+                          onChange={(e) => handleDistrictChange(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 cursor-pointer"
+                        >
+                          {currentDistricts.map((d) => (
+                            <option key={d.name} value={d.name}>
+                              {isEn ? d.name : d.nameHindi || d.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Gram Panchayat & Village Dropdowns Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                          {isEn ? 'Gram Panchayat' : 'ग्राम पंचायत'}
+                        </label>
+                        <select
+                          value={selectedPanchayat}
+                          onChange={(e) => handlePanchayatChange(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 cursor-pointer"
+                        >
+                          {dynamicPanchayats.map((gp) => (
+                            <option key={gp} value={gp}>
+                              {gp}
+                            </option>
+                          ))}
+                          <option value="__other__">{isEn ? 'Other (Custom)' : 'अन्य (खुद लिखें)'}</option>
+                        </select>
+                        {selectedPanchayat === '__other__' && (
+                          <input
+                            type="text"
+                            required
+                            value={customPanchayat}
+                            onChange={(e) => setCustomPanchayat(e.target.value)}
+                            placeholder={isEn ? 'Gram Panchayat Name' : 'ग्राम पंचायत का नाम'}
+                            className="w-full mt-2 px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-xs"
+                          />
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-1.5">
+                          {isEn ? 'Village' : 'ग्राम / गांव'}
+                        </label>
+                        <select
+                          value={selectedVillage}
+                          onChange={(e) => setSelectedVillage(e.target.value)}
+                          className="w-full px-4 py-2.5 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 cursor-pointer"
+                        >
+                          {dynamicVillages.map((v) => (
+                            <option key={v} value={v}>
+                              {v}
+                            </option>
+                          ))}
+                          <option value="__other__">{isEn ? 'Other (Custom)' : 'अन्य (खुद लिखें)'}</option>
+                        </select>
+                        {selectedVillage === '__other__' && (
+                          <input
+                            type="text"
+                            required
+                            value={customVillage}
+                            onChange={(e) => setCustomVillage(e.target.value)}
+                            placeholder={isEn ? 'Village Name' : 'गांव का नाम'}
+                            className="w-full mt-2 px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-xs"
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Navigation Buttons for Step 2 */}
+                  <div className="pt-4 flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(1)}
+                      className="py-3 px-5 rounded-2xl border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 text-xs sm:text-sm font-semibold hover:bg-stone-100 dark:hover:bg-stone-800 transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                      <span>{isEn ? 'Back' : 'पीछे'}</span>
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="flex-1 py-3 px-6 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold text-xs sm:text-sm shadow-md transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      {loading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <span>{isEn ? 'Complete Registration' : 'पंजीकरण पूर्ण करें'}</span>
+                          <Check className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
             </>
           )}
 
-          {/* Footer link */}
-          <div className="mt-8 text-center pt-6 border-t border-stone-100 dark:border-stone-800/80">
-            <p className="text-sm text-stone-600 dark:text-stone-400">
-              {isEn ? 'Already have an account?' : 'पहले से खाता है?'}{' '}
+          {/* Footer */}
+          <div className="mt-6 pt-5 border-t border-stone-100 dark:border-stone-800 text-center">
+            <p className="text-xs sm:text-sm text-stone-600 dark:text-stone-400">
+              {isEn ? 'Already have an account?' : 'क्या आपके पास पहले से खाता है?'}{' '}
               <Link
                 href={`/auth/login?next=${encodeURIComponent(next)}`}
-                className="font-bold text-amber-600 dark:text-amber-400 hover:text-amber-500 inline-flex items-center gap-1 hover:underline ml-1"
+                className="font-bold text-amber-600 dark:text-amber-400 hover:underline inline-flex items-center gap-1"
               >
-                {isEn ? 'Sign In' : 'साइन इन करें'}
+                <span>{isEn ? 'Sign in' : 'लॉगिन करें'}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </p>
@@ -823,8 +918,8 @@ export default function SignupPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-[70vh] flex items-center justify-center">
-          <div className="w-8 h-8 border-3 border-amber-600 border-t-transparent rounded-full animate-spin" />
+        <div className="min-h-[85vh] flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-amber-500/20 border-t-amber-500 rounded-full animate-spin" />
         </div>
       }
     >
