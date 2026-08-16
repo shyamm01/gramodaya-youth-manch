@@ -34,7 +34,10 @@ export default async function DashboardPage() {
   // Fetch membership record directly from unified profiles
   const membershipStatus: 'active' | 'pending' | 'suspended' =
     (profile?.status as any) || (user.user_metadata?.status as any) || 'pending';
-  const memberRole = profile?.system_role || profile?.role || 'MEMBER';
+  const rawSystemRole = profile?.system_role || user.user_metadata?.system_role || 'MEMBER';
+  const isSuper = rawSystemRole === 'SUPER_ADMIN' || user.email === 'shyamvaranpal95060@gmail.com';
+  const systemRole: 'SUPER_ADMIN' | 'ADMIN' | 'MEMBER' = isSuper ? 'SUPER_ADMIN' : rawSystemRole === 'ADMIN' ? 'ADMIN' : 'MEMBER';
+  const role: 'ADMIN' | 'MEMBER' = (systemRole === 'SUPER_ADMIN' || systemRole === 'ADMIN' || profile?.role === 'ADMIN') ? 'ADMIN' : 'MEMBER';
   const memberVillage = profile?.village_name || profile?.address || '';
 
   const userAuthData = {
@@ -44,20 +47,45 @@ export default async function DashboardPage() {
     createdAt: user.created_at,
     lastSignInAt: user.last_sign_in_at || null,
     membershipStatus,
-    memberRole,
+    memberRole: role,
+    systemRole,
+    role,
     memberVillage,
   };
+
+  // Fetch villages list
+  const { data: villagesList } = await supabase
+    .from('villages')
+    .select('id, name, name_hindi, slug')
+    .order('name');
 
   return (
     <div className="min-h-[85vh] bg-[#F8F9FA] dark:bg-[#0B0F17] transition-colors">
       <DashboardClient
         user={userAuthData}
+        villages={villagesList || []}
         initialProfile={
           profile
             ? {
                 id: profile.id,
                 fullName: profile.full_name,
                 avatarUrl: profile.avatar_url,
+                mobile: profile.mobile,
+                email: profile.email,
+                fatherName: profile.father_name,
+                dob: profile.dob,
+                gender: profile.gender,
+                villageId: profile.village_id ? String(profile.village_id) : '',
+                houseNo: profile.house_no,
+                street: profile.street,
+                pincode: profile.pincode,
+                occupation: profile.occupation,
+                designation: profile.designation,
+                politicalBackground: profile.political_background,
+                bloodGroup: profile.blood_group,
+                systemRole,
+                role,
+                status: profile.status,
                 createdAt: profile.created_at,
                 updatedAt: profile.updated_at,
               }
@@ -65,6 +93,22 @@ export default async function DashboardPage() {
                 id: user.id,
                 fullName: (user.user_metadata?.full_name || user.user_metadata?.name || null) as string | null,
                 avatarUrl: (user.user_metadata?.avatar_url || user.user_metadata?.picture || null) as string | null,
+                mobile: (user.user_metadata?.mobile || user.phone || null) as string | null,
+                email: user.email || null,
+                fatherName: null,
+                dob: null,
+                gender: null,
+                villageId: '8',
+                houseNo: null,
+                street: null,
+                pincode: null,
+                occupation: null,
+                designation: null,
+                politicalBackground: null,
+                bloodGroup: null,
+                systemRole,
+                role,
+                status: membershipStatus,
                 createdAt: user.created_at,
                 updatedAt: user.created_at,
               }

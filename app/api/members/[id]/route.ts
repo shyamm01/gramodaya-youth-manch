@@ -68,9 +68,18 @@ export async function PUT(
       if (photoUrl !== undefined) {
         profileUpdateData.avatarUrl = photoUrl;
       }
-      if (fatherName !== undefined) profileUpdateData.fatherName = fatherName.trim();
-      if (dob !== undefined) profileUpdateData.dob = dob;
+      if (body.email !== undefined) profileUpdateData.email = body.email ? body.email.trim() : null;
+      if (fatherName !== undefined) profileUpdateData.fatherName = fatherName ? fatherName.trim() : null;
+      if (dob !== undefined) profileUpdateData.dob = dob || null;
+      if (body.gender !== undefined) profileUpdateData.gender = body.gender || null;
       if (villageId !== undefined && !isNaN(Number(villageId))) profileUpdateData.villageId = Number(villageId);
+      if (body.houseNo !== undefined) profileUpdateData.houseNo = body.houseNo ? body.houseNo.trim() : null;
+      if (body.street !== undefined) profileUpdateData.street = body.street ? body.street.trim() : null;
+      if (body.pincode !== undefined) profileUpdateData.pincode = body.pincode ? body.pincode.trim() : null;
+      if (body.occupation !== undefined) profileUpdateData.occupation = body.occupation ? body.occupation.trim() : null;
+      if (body.designation !== undefined) profileUpdateData.designation = body.designation ? body.designation.trim() : null;
+      if (body.politicalBackground !== undefined) profileUpdateData.politicalBackground = body.politicalBackground ? body.politicalBackground.trim() : null;
+      if (body.bloodGroup !== undefined) profileUpdateData.bloodGroup = body.bloodGroup ? body.bloodGroup.trim() : null;
 
       // Update profiles
       try {

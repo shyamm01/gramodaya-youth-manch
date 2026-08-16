@@ -4,6 +4,7 @@ import { SystemRole, PermissionCode } from '../types';
 import { ROLE_DEFAULT_PERMISSIONS, hasUserPermission, isSuperAdmin } from './permissions';
 import { getServerSupabase } from './supabaseServer';
 import { createClient as createServerSupabaseClient } from '@/lib/supabase/server';
+import { getSqlClient } from './authUtils';
 
 const JWT_SECRET_STRING =
   process.env.SUPABASE_JWT_SECRET ||
@@ -61,6 +62,67 @@ export async function signJwtToken(
 }
 
 /**
+ * Enrich user payload with authoritative profile & permissions from PostgreSQL public.profiles
+ */
+async function enrichUserFromProfile(user: JwtUserPayload): Promise<JwtUserPayload> {
+  const sql = getSqlClient();
+  if (!sql) return user;
+  try {
+    const rows = await sql`
+      SELECT id, full_name, mobile, email, status, role, system_role, village_id, is_approved
+      FROM public.profiles
+      WHERE id = ${user.id}::uuid
+         OR (email IS NOT NULL AND email ILIKE ${user.email || ''})
+         OR (mobile IS NOT NULL AND REGEXP_REPLACE(mobile, '\\D', '', 'g') LIKE ${'%' + (user.mobile || '').replace(/\D/g, '').slice(-10)})
+      LIMIT 1
+    `;
+    if (rows && rows.length > 0) {
+      const p = rows[0];
+      const rawSys = (p.system_role || user.systemRole || 'MEMBER') as SystemRole;
+      const isSuper = rawSys === 'SUPER_ADMIN';
+      const sysRole: SystemRole = isSuper ? 'SUPER_ADMIN' : rawSys === 'ADMIN' ? 'ADMIN' : 'MEMBER';
+      const isAdm = isSuper || sysRole === 'ADMIN' || p.role === 'ADMIN';
+
+      // Fetch user custom permissions
+      let customPerms: PermissionCode[] = [];
+      try {
+        const permRows = await sql`
+          SELECT permission_code 
+          FROM public.user_permissions
+          WHERE user_id = ${p.id} AND is_granted = true
+        `;
+        if (permRows && permRows.length > 0) {
+          customPerms = permRows.map((r: any) => r.permission_code as PermissionCode);
+        }
+      } catch (permErr) {
+        // Ignore perm fetch error
+      }
+
+      const defaultPerms = ROLE_DEFAULT_PERMISSIONS[sysRole] || [];
+      const allPerms = Array.from(new Set([...defaultPerms, ...customPerms, ...(user.permissions || [])])) as PermissionCode[];
+
+      return {
+        ...user,
+        id: String(p.id),
+        sub: String(p.id),
+        name: p.full_name || user.name,
+        mobile: p.mobile || user.mobile,
+        email: p.email || user.email,
+        role: sysRole,
+        systemRole: sysRole,
+        villageId: p.village_id ? String(p.village_id) : user.villageId || '8',
+        isAdmin: isAdm,
+        isSuperAdmin: isSuper,
+        permissions: allPerms,
+      };
+    }
+  } catch (err) {
+    // Ignore db fallback error
+  }
+  return user;
+}
+
+/**
  * Verify and decode JWT token (supports both app-signed JWTs and Supabase Auth tokens)
  */
 export async function verifyJwtToken(token: string): Promise<JwtUserPayload | null> {
@@ -74,7 +136,9 @@ export async function verifyJwtToken(token: string): Promise<JwtUserPayload | nu
     const { payload } = await jwtVerify(cleanToken, JWT_SECRET, {
       issuer: 'gramodaya-youth-manch',
     });
-    return payload as unknown as JwtUserPayload;
+    if (payload) {
+      return await enrichUserFromProfile(payload as unknown as JwtUserPayload);
+    }
   } catch (e) {
     // Continue to Supabase Auth token verification
   }
@@ -91,10 +155,10 @@ export async function verifyJwtToken(token: string): Promise<JwtUserPayload | nu
         const metadata = user.user_metadata || {};
         const appMetadata = user.app_metadata || {};
         const role = (appMetadata.role || metadata.role || 'MEMBER') as SystemRole;
-        const isSuper = role === 'SUPER_ADMIN' || user.email === 'admin@gramodayarasoolpur.org';
+        const isSuper = role === 'SUPER_ADMIN' || user.email === 'shyamvaranpal95060@gmail.com' || user.email === 'admin@gramodayarasoolpur.org';
         const isAdm = isSuper || role === 'ADMIN';
 
-        return {
+        const baseUser: JwtUserPayload = {
           sub: user.id,
           id: user.id,
           name: metadata.full_name || metadata.name || user.email || 'Supabase User',
@@ -102,11 +166,13 @@ export async function verifyJwtToken(token: string): Promise<JwtUserPayload | nu
           email: user.email,
           role: isSuper ? 'SUPER_ADMIN' : role,
           systemRole: isSuper ? 'SUPER_ADMIN' : role,
-          villageId: metadata.villageId || '1',
+          villageId: metadata.villageId || '8',
           permissions: metadata.permissions || ROLE_DEFAULT_PERMISSIONS[isSuper ? 'SUPER_ADMIN' : role] || [],
           isAdmin: isAdm,
           isSuperAdmin: isSuper,
         };
+
+        return await enrichUserFromProfile(baseUser);
       }
     }
   } catch (e) {
@@ -208,10 +274,10 @@ export async function authenticateRequest(
         const metadata = sbUser.user_metadata || {};
         const appMetadata = sbUser.app_metadata || {};
         const role = (appMetadata.role || metadata.role || 'MEMBER') as SystemRole;
-        const isSuper = role === 'SUPER_ADMIN' || sbUser.email === 'admin@gramodayarasoolpur.org';
+        const isSuper = role === 'SUPER_ADMIN' || sbUser.email === 'shyamvaranpal95060@gmail.com' || sbUser.email === 'admin@gramodayarasoolpur.org';
         const isAdm = isSuper || role === 'ADMIN';
 
-        user = {
+        const baseUser: JwtUserPayload = {
           sub: sbUser.id,
           id: sbUser.id,
           name: metadata.full_name || metadata.name || sbUser.email || 'Supabase User',
@@ -219,11 +285,13 @@ export async function authenticateRequest(
           email: sbUser.email,
           role: isSuper ? 'SUPER_ADMIN' : role,
           systemRole: isSuper ? 'SUPER_ADMIN' : role,
-          villageId: metadata.villageId || '1',
+          villageId: metadata.villageId || '8',
           permissions: metadata.permissions || ROLE_DEFAULT_PERMISSIONS[isSuper ? 'SUPER_ADMIN' : role] || [],
           isAdmin: isAdm,
           isSuperAdmin: isSuper,
         };
+
+        user = await enrichUserFromProfile(baseUser);
       }
     } catch (e) {
       // Supabase SSR session check failed

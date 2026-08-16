@@ -324,20 +324,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (res.ok) {
           const data = await res.json();
           if (data?.authenticated && data.user) {
-            const isAdm = Boolean(data.isAdmin || data.role === 'SUPER_ADMIN' || data.role === 'ADMIN');
+            const isSuper = data.isSuperAdmin || data.systemRole === 'SUPER_ADMIN';
+            const isAdm = Boolean(isSuper || data.isAdmin || data.role === 'ADMIN' || data.systemRole === 'ADMIN');
             setAuthSession((prev) => ({
               ...prev,
               isAdminLoggedIn: isAdm,
               isMemberLoggedIn: true,
               supabaseUserId: data.user.supabaseUserId || prev.supabaseUserId,
-              role: data.role || prev.role,
-              systemRole: data.role || prev.systemRole,
+              role: data.role || (isAdm ? 'ADMIN' : 'MEMBER'),
+              systemRole: data.systemRole || (isSuper ? 'SUPER_ADMIN' : isAdm ? 'ADMIN' : 'MEMBER'),
               adminMobile: isAdm ? data.user.mobile : prev.adminMobile,
               adminName: isAdm ? data.user.name : prev.adminName,
               adminId: isAdm ? data.user.id : prev.adminId,
               adminVillageId: data.user.villageId || prev.adminVillageId,
               currentMemberMobile: data.user.mobile || prev.currentMemberMobile,
-              currentMember: data.user,
+              currentMember: {
+                ...data.user,
+                systemRole: data.systemRole || (isSuper ? 'SUPER_ADMIN' : isAdm ? 'ADMIN' : 'MEMBER'),
+                role: data.role || (isAdm ? 'ADMIN' : 'MEMBER'),
+              },
               email: data.user.email || prev.email,
               permissions: data.user.permissions || prev.permissions || [],
               token: data.token || prev.token,
@@ -421,18 +426,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data?.authenticated && data.user) {
-            const isAdm = Boolean(data.isAdmin || data.role === "SUPER_ADMIN" || data.role === "ADMIN");
+            const isSuper = data.isSuperAdmin || data.systemRole === "SUPER_ADMIN";
+            const isAdm = Boolean(isSuper || data.isAdmin || data.role === "ADMIN" || data.systemRole === "ADMIN");
             const newSession: AuthSession = {
               isAdminLoggedIn: isAdm,
               isMemberLoggedIn: true,
-              role: data.role,
-              systemRole: data.role,
+              role: data.role || (isAdm ? "ADMIN" : "MEMBER"),
+              systemRole: data.systemRole || (isSuper ? "SUPER_ADMIN" : isAdm ? "ADMIN" : "MEMBER"),
               adminMobile: isAdm ? data.user.mobile : undefined,
               adminName: isAdm ? data.user.name : undefined,
               adminId: isAdm ? data.user.id : undefined,
               adminVillageId: data.user.villageId || undefined,
               currentMemberMobile: data.user.mobile,
-              currentMember: data.user,
+              currentMember: {
+                ...data.user,
+                systemRole: data.systemRole || (isSuper ? "SUPER_ADMIN" : isAdm ? "ADMIN" : "MEMBER"),
+                role: data.role || (isAdm ? "ADMIN" : "MEMBER"),
+              },
               email: data.user.email,
               permissions: data.user.permissions || [],
               token: data.token,
