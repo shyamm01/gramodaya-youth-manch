@@ -259,9 +259,11 @@ function SignupForm() {
                       className="w-full pl-12 pr-4 py-3 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-sm"
                     />
                   </div>
-                  <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1 pl-1">
-                    {isEn ? 'Minimum 8 characters' : 'कम से कम 8 अक्षर'}
-                  </p>
+                  {password.length < 8 && (
+                    <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1 pl-1 transition-all">
+                      {isEn ? 'Minimum 8 characters' : 'कम से कम 8 अक्षर'}
+                    </p>
+                  )}
                 </div>
 
                 <div>

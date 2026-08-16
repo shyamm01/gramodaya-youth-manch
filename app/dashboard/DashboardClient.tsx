@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/src/context/AppContext';
+import { useToast } from '@/src/context/ToastContext';
 import {
   User,
   Mail,
@@ -22,12 +23,9 @@ import {
   Building2,
   ExternalLink,
   ShieldCheck,
-  Smartphone,
   Lock,
-  RefreshCw,
   Eye,
   EyeOff,
-  UserCheck,
 } from 'lucide-react';
 
 interface ProfileData {
@@ -51,11 +49,11 @@ interface DashboardClientProps {
   initialProfile: ProfileData | null;
 }
 
-import { useToast } from '@/src/context/ToastContext';
-
 export function DashboardClient({ user, initialProfile }: DashboardClientProps) {
   const router = useRouter();
-  const { lang, t, setAuthSession, memberLogout } = useApp();
+  const { lang, setAuthSession } = useApp();
+  const isEn = lang === 'en';
+
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const supabase = createClient();
 
@@ -99,7 +97,10 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
             });
             if (updated.full_name) setFullName(updated.full_name);
             if (updated.avatar_url) setAvatarUrl(updated.avatar_url);
-            toastInfo('प्रोफ़ाइल डेटा वास्तविक समय में अद्यतन हुआ (Realtime Sync)', 'सिंक');
+            toastInfo(
+              isEn ? 'Profile updated in realtime' : 'प्रोफ़ाइल डेटा वास्तविक समय में अद्यतन हुआ',
+              isEn ? 'Sync' : 'सिंक'
+            );
           }
         }
       )
@@ -108,7 +109,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, user.id, toastInfo]);
+  }, [supabase, user.id, isEn, toastInfo]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,7 +120,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
       const cleanName = fullName.trim();
       const cleanAvatar = avatarUrl.trim();
 
-      // 1. Update public.profiles via Supabase client (RLS enforces (select auth.uid()) = id)
+      // 1. Update public.profiles via Supabase client
       const { data, error } = await supabase
         .from('profiles')
         .upsert({
@@ -133,7 +134,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
 
       if (error) throw error;
 
-      // 2. Also sync auth user metadata
+      // 2. Sync auth user metadata
       await supabase.auth.updateUser({
         data: {
           full_name: cleanName,
@@ -146,20 +147,20 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
         setProfile(data as ProfileData);
       }
       setIsEditing(false);
-      const succMsg = 'प्रोफ़ाइल सफलतापूर्वक अपडेट की गई! (Profile updated successfully)';
+      const succMsg = isEn ? 'Profile updated successfully!' : 'प्रोफ़ाइल सफलतापूर्वक अपडेट की गई!';
       setStatusMessage({
         type: 'success',
         text: succMsg,
       });
-      toastSuccess(succMsg, 'प्रोफ़ाइल अपडेट');
+      toastSuccess(succMsg, isEn ? 'Profile' : 'प्रोफ़ाइल');
       router.refresh();
     } catch (err: any) {
-      const errMsg = err?.message || 'प्रोफ़ाइल सहेजने में त्रुटि। (Failed to update profile)';
+      const errMsg = err?.message || (isEn ? 'Failed to update profile.' : 'प्रोफ़ाइल सहेजने में त्रुटि।');
       setStatusMessage({
         type: 'error',
         text: errMsg,
       });
-      toastError(errMsg, 'त्रुटि');
+      toastError(errMsg, isEn ? 'Error' : 'त्रुटि');
     } finally {
       setSaving(false);
     }
@@ -171,15 +172,15 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
     setPasswordSuccess(null);
 
     if (newPassword.length < 8) {
-      const msg = 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए (Password must be at least 8 characters)';
+      const msg = isEn ? 'Password must be at least 8 characters' : 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए';
       setPasswordError(msg);
-      toastError(msg, 'कमजोर पासवर्ड');
+      toastError(msg, isEn ? 'Weak Password' : 'कमजोर पासवर्ड');
       return;
     }
     if (newPassword !== confirmPassword) {
-      const msg = 'पासवर्ड और पुष्टि पासवर्ड मेल नहीं खाते (Passwords do not match)';
+      const msg = isEn ? 'Passwords do not match' : 'पासवर्ड और पुष्टि पासवर्ड मेल नहीं खाते';
       setPasswordError(msg);
-      toastError(msg, 'पासवर्ड बेमेल');
+      toastError(msg, isEn ? 'Password Mismatch' : 'पासवर्ड बेमेल');
       return;
     }
 
@@ -192,15 +193,15 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
 
       if (error) throw error;
 
-      const succ = 'पासवर्ड सफलतापूर्वक अपडेट किया गया! (Password updated successfully)';
+      const succ = isEn ? 'Password updated successfully!' : 'पासवर्ड सफलतापूर्वक अपडेट किया गया!';
       setPasswordSuccess(succ);
-      toastSuccess(succ, 'सफल');
+      toastSuccess(succ, isEn ? 'Success' : 'सफल');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      const msg = err?.message || 'पासवर्ड बदलने में त्रुटि। (Failed to update password)';
+      const msg = err?.message || (isEn ? 'Failed to update password.' : 'पासवर्ड बदलने में त्रुटि।');
       setPasswordError(msg);
-      toastError(msg, 'त्रुटि');
+      toastError(msg, isEn ? 'Error' : 'त्रुटि');
     } finally {
       setUpdatingPassword(false);
     }
@@ -208,7 +209,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
 
   const handleLogout = async () => {
     setLoggingOut(true);
-    toastInfo('सत्र समाप्त किया जा रहा है...', 'लॉग आउट');
+    toastInfo(isEn ? 'Signing out...' : 'सत्र समाप्त किया जा रहा है...', isEn ? 'Logout' : 'लॉग आउट');
     try {
       await supabase.auth.signOut();
       if (typeof window !== 'undefined') {
@@ -222,7 +223,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
         email: null,
         supabaseUserId: null,
       });
-      toastSuccess('आप सफलतापूर्वक लॉग आउट हो चुके हैं।', 'अलविदा');
+      toastSuccess(isEn ? 'You have logged out successfully.' : 'आप सफलतापूर्वक लॉग आउट हो चुके हैं।', isEn ? 'Goodbye' : 'अलविदा');
       router.refresh();
       router.replace('/auth/login');
     } catch (err) {
@@ -231,13 +232,13 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
     }
   };
 
-  const displayName = profile?.fullName || user.email?.split('@')[0] || 'ग्राम सदस्य';
+  const displayName = profile?.fullName || user.email?.split('@')[0] || (isEn ? 'Community Member' : 'ग्राम सदस्य');
   const displayAvatar =
     profile?.avatarUrl && profile.avatarUrl.trim().length > 0
       ? profile.avatarUrl
       : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}&backgroundColor=059669,d97706`;
 
-  const formattedCreatedDate = new Date(user.createdAt).toLocaleDateString('hi-IN', {
+  const formattedCreatedDate = new Date(user.createdAt).toLocaleDateString(isEn ? 'en-US' : 'hi-IN', {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -264,9 +265,9 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
           </div>
           <button
             onClick={() => setStatusMessage(null)}
-            className="text-xs font-bold underline opacity-70 hover:opacity-100"
+            className="text-xs font-bold underline opacity-70 hover:opacity-100 cursor-pointer"
           >
-            हटाएं
+            {isEn ? 'Dismiss' : 'हटाएं'}
           </button>
         </div>
       )}
@@ -295,7 +296,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
               </div>
               <span
                 className="absolute -bottom-1 -right-1 p-1 bg-emerald-500 rounded-full border-2 border-stone-900 text-white"
-                title="Active Verified Session"
+                title={isEn ? 'Active Verified Session' : 'सत्यापित सक्रिय सत्र'}
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
               </span>
@@ -311,16 +312,18 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
                   {user.provider === 'google' ? 'Google OAuth' : 'Email/Password'}
                 </span>
                 <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  सत्यापित सत्र (Active)
+                  {isEn ? 'Active Session' : 'सत्यापित सत्र'}
                 </span>
               </div>
               <p className="text-sm text-stone-300 flex items-center gap-2">
                 <Mail className="w-4 h-4 text-stone-400" />
-                <span>{user.email || 'ईमेल अनुपलब्ध'}</span>
+                <span>{user.email || (isEn ? 'No email' : 'ईमेल अनुपलब्ध')}</span>
               </p>
               <p className="text-xs text-stone-400 flex items-center gap-1.5 pt-0.5">
                 <Calendar className="w-3.5 h-3.5" />
-                <span>सदस्यता तिथि (Member since): {formattedCreatedDate}</span>
+                <span>
+                  {isEn ? 'Member since' : 'सदस्यता तिथि'}: {formattedCreatedDate}
+                </span>
               </p>
             </div>
           </div>
@@ -332,7 +335,15 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
               className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-sm font-semibold backdrop-blur-sm transition-all active:scale-95 cursor-pointer"
             >
               <Edit3 className="w-4 h-4" />
-              <span>{isEditing ? 'रद्द करें (Cancel)' : 'प्रोफ़ाइल बदलें (Edit Profile)'}</span>
+              <span>
+                {isEditing
+                  ? isEn
+                    ? 'Cancel'
+                    : 'रद्द करें'
+                  : isEn
+                  ? 'Edit Profile'
+                  : 'प्रोफ़ाइल बदलें'}
+              </span>
             </button>
 
             <button
@@ -345,7 +356,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
               ) : (
                 <>
                   <LogOut className="w-4 h-4" />
-                  <span>लॉग आउट (Logout)</span>
+                  <span>{isEn ? 'Logout' : 'लॉग आउट'}</span>
                 </>
               )}
             </button>
@@ -358,12 +369,12 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
         <div className="bg-white dark:bg-stone-900 border border-amber-500/30 rounded-3xl p-6 sm:p-8 shadow-xl animate-in fade-in slide-in-from-top-2">
           <h2 className="text-lg font-bold text-stone-900 dark:text-white mb-4 flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-amber-500" />
-            <span>प्रोफ़ाइल विवरण अपडेट करें (Live Profile Edit)</span>
+            <span>{isEn ? 'Live Profile Edit' : 'प्रोफ़ाइल विवरण अपडेट करें'}</span>
           </h2>
           <form onSubmit={handleSaveProfile} className="space-y-5 max-w-2xl">
             <div>
               <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
-                पूरा नाम (Full Name)
+                {isEn ? 'Full Name' : 'पूरा नाम'}
               </label>
               <div className="relative">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400" />
@@ -372,7 +383,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. Ramesh Kumar"
+                  placeholder={isEn ? 'e.g. Ramesh Kumar' : 'उदा. रमेश कुमार'}
                   className="w-full pl-11 pr-4 py-3 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-2xl text-stone-900 dark:text-white text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
                 />
               </div>
@@ -380,7 +391,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
 
             <div>
               <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
-                अवतार / फ़ोटो URL (Avatar Image URL)
+                {isEn ? 'Avatar Image URL' : 'अवतार / फ़ोटो URL'}
               </label>
               <input
                 type="url"
@@ -390,7 +401,9 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
                 className="w-full px-4 py-3 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700 rounded-2xl text-stone-900 dark:text-white text-sm focus:ring-2 focus:ring-amber-500 focus:outline-none"
               />
               <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1">
-                यदि खाली छोड़ते हैं, तो स्वतः अवतार उत्पन्न होगा।
+                {isEn
+                  ? 'If left blank, an avatar will be generated automatically.'
+                  : 'यदि खाली छोड़ते हैं, तो स्वतः अवतार उत्पन्न होगा।'}
               </p>
             </div>
 
@@ -405,7 +418,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
                 ) : (
                   <>
                     <Check className="w-4 h-4" />
-                    <span>सहेजें (Save Changes)</span>
+                    <span>{isEn ? 'Save Changes' : 'सहेजें'}</span>
                   </>
                 )}
               </button>
@@ -414,7 +427,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
                 onClick={() => setIsEditing(false)}
                 className="py-3 px-5 rounded-2xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-stone-700 dark:text-stone-300 font-semibold text-sm hover:bg-stone-100 dark:hover:bg-stone-700 transition-all cursor-pointer"
               >
-                रद्द करें (Cancel)
+                {isEn ? 'Cancel' : 'रद्द करें'}
               </button>
             </div>
           </form>
@@ -427,13 +440,13 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
         <div className="bg-white/80 dark:bg-stone-900/80 backdrop-blur-xl border border-stone-200/80 dark:border-stone-800/80 rounded-3xl p-6 shadow-sm space-y-5">
           <h2 className="text-base font-bold text-stone-900 dark:text-white flex items-center gap-2">
             <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-            <span>खाता सुरक्षा (Account Security)</span>
+            <span>{isEn ? 'Account Security' : 'खाता सुरक्षा'}</span>
           </h2>
 
           <div className="space-y-3 text-sm">
             <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-800/50 border border-stone-100 dark:border-stone-800">
               <div className="text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                उपयोगकर्ता ID (User ID)
+                {isEn ? 'User ID' : 'उपयोगकर्ता ID'}
               </div>
               <div className="font-mono text-xs text-stone-800 dark:text-stone-200 truncate mt-1 select-all">
                 {user.id}
@@ -442,7 +455,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
 
             <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-800/50 border border-stone-100 dark:border-stone-800">
               <div className="text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                प्रमाणीकरण प्रदाता (Auth Provider)
+                {isEn ? 'Auth Provider' : 'प्रमाणीकरण प्रदाता'}
               </div>
               <div className="text-xs font-bold text-stone-800 dark:text-stone-200 mt-1 capitalize">
                 {user.provider}
@@ -451,10 +464,14 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
 
             <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-stone-800/50 border border-stone-100 dark:border-stone-800">
               <div className="text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-                अंतिम साइन इन (Last Sign-In)
+                {isEn ? 'Last Sign-In' : 'अंतिम साइन इन'}
               </div>
               <div className="text-xs font-medium text-stone-800 dark:text-stone-200 mt-1">
-                {user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleString('hi-IN') : 'वर्तमान में सक्रिय'}
+                {user.lastSignInAt
+                  ? new Date(user.lastSignInAt).toLocaleString(isEn ? 'en-US' : 'hi-IN')
+                  : isEn
+                  ? 'Currently Active'
+                  : 'वर्तमान में सक्रिय'}
               </div>
             </div>
 
@@ -462,7 +479,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
             <div className="pt-2 border-t border-stone-100 dark:border-stone-800">
               <h3 className="text-xs font-bold text-stone-800 dark:text-stone-200 mb-2 flex items-center gap-1.5">
                 <KeyRound className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                <span>पासवर्ड अपडेट (Change Password)</span>
+                <span>{isEn ? 'Change Password' : 'पासवर्ड अपडेट'}</span>
               </h3>
 
               {passwordSuccess && (
@@ -486,24 +503,29 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
                     required
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="नया पासवर्ड (min 8 chars)"
+                    placeholder={isEn ? 'New password' : 'नया पासवर्ड'}
                     className="w-full px-3 py-2 pr-9 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-xs text-stone-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 cursor-pointer"
                   >
                     {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
                 </div>
+                {newPassword.length > 0 && newPassword.length < 8 && (
+                  <p className="text-[10px] text-stone-500 dark:text-stone-400 pl-1">
+                    {isEn ? 'Minimum 8 characters' : 'कम से कम 8 अक्षर'}
+                  </p>
+                )}
 
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="नए पासवर्ड की पुष्टि करें"
+                  placeholder={isEn ? 'Confirm new password' : 'नए पासवर्ड की पुष्टि करें'}
                   className="w-full px-3 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl text-xs text-stone-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500"
                 />
 
@@ -517,7 +539,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
                   ) : (
                     <>
                       <Lock className="w-3.5 h-3.5" />
-                      <span>पासवर्ड बदलें (Update)</span>
+                      <span>{isEn ? 'Update Password' : 'पासवर्ड बदलें'}</span>
                     </>
                   )}
                 </button>
@@ -530,7 +552,7 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
         <div className="md:col-span-2 bg-white/80 dark:bg-stone-900/80 backdrop-blur-xl border border-stone-200/80 dark:border-stone-800/80 rounded-3xl p-6 shadow-sm space-y-4">
           <h2 className="text-base font-bold text-stone-900 dark:text-white flex items-center gap-2">
             <Layers className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            <span>ग्रामोदय पोर्टल सेवाएं (Village Services & Navigation)</span>
+            <span>{isEn ? 'Village Services & Navigation' : 'ग्रामोदय पोर्टल सेवाएं'}</span>
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Link
@@ -543,8 +565,12 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
                     <MessageSquareQuote className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-stone-900 dark:text-white">ग्राम समस्याएं</h4>
-                    <p className="text-xs text-stone-500 dark:text-stone-400">शिकायत दर्ज व ट्रैक करें</p>
+                    <h4 className="text-sm font-bold text-stone-900 dark:text-white">
+                      {isEn ? 'Grievances & Problems' : 'ग्राम समस्याएं'}
+                    </h4>
+                    <p className="text-xs text-stone-500 dark:text-stone-400">
+                      {isEn ? 'Report and track issues' : 'शिकायत दर्ज व ट्रैक करें'}
+                    </p>
                   </div>
                 </div>
                 <ExternalLink className="w-4 h-4 text-stone-400 group-hover:text-amber-500 transition-colors" />
@@ -561,8 +587,12 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
                     <HeartHandshake className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-stone-900 dark:text-white">सामाजिक कार्य</h4>
-                    <p className="text-xs text-stone-500 dark:text-stone-400">विकास एवं सेवा अभियान</p>
+                    <h4 className="text-sm font-bold text-stone-900 dark:text-white">
+                      {isEn ? 'Social Initiatives' : 'सामाजिक कार्य'}
+                    </h4>
+                    <p className="text-xs text-stone-500 dark:text-stone-400">
+                      {isEn ? 'Development missions' : 'विकास एवं सेवा अभियान'}
+                    </p>
                   </div>
                 </div>
                 <ExternalLink className="w-4 h-4 text-stone-400 group-hover:text-emerald-500 transition-colors" />
@@ -579,8 +609,12 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
                     <Building2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-stone-900 dark:text-white">ग्राम सूचनाएं</h4>
-                    <p className="text-xs text-stone-500 dark:text-stone-400">आधिकारिक घोषणाएं</p>
+                    <h4 className="text-sm font-bold text-stone-900 dark:text-white">
+                      {isEn ? 'Announcements' : 'ग्राम सूचनाएं'}
+                    </h4>
+                    <p className="text-xs text-stone-500 dark:text-stone-400">
+                      {isEn ? 'Official announcements' : 'आधिकारिक घोषणाएं'}
+                    </p>
                   </div>
                 </div>
                 <ExternalLink className="w-4 h-4 text-stone-400 group-hover:text-blue-500 transition-colors" />
@@ -597,8 +631,12 @@ export function DashboardClient({ user, initialProfile }: DashboardClientProps) 
                     <User className="w-5 h-5" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-stone-900 dark:text-white">सदस्य निर्देशिका</h4>
-                    <p className="text-xs text-stone-500 dark:text-stone-400">ग्राम पंचायत सदस्य सूची</p>
+                    <h4 className="text-sm font-bold text-stone-900 dark:text-white">
+                      {isEn ? 'Member Directory' : 'सदस्य निर्देशिका'}
+                    </h4>
+                    <p className="text-xs text-stone-500 dark:text-stone-400">
+                      {isEn ? 'Gram Panchayat members list' : 'ग्राम पंचायत सदस्य सूची'}
+                    </p>
                   </div>
                 </div>
                 <ExternalLink className="w-4 h-4 text-stone-400 group-hover:text-purple-500 transition-colors" />
