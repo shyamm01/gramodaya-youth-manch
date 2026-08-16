@@ -101,6 +101,7 @@ export async function POST(req: Request) {
     const {
       name,
       mobile,
+      password,
       photoUrl,
       fatherName,
       dob,
@@ -182,18 +183,49 @@ export async function POST(req: Request) {
     }
 
     const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : null;
-    const profileId = crypto.randomUUID();
 
     const { ensureSupabaseUrl } = await import("@/src/lib/supabaseStorage");
     const cdnPhotoUrl = photoUrl ? await ensureSupabaseUrl(photoUrl, "profiles", "member") : null;
 
-    // Insert into unified profiles table
+    // profiles.id is a foreign key to auth.users(id), so a profile can only be created
+    // through a real Supabase Auth user — mobile-only members get a synthetic <mobile>@gym.org identity.
+    const { getServerSupabase } = await import("@/src/lib/supabaseServer");
+    const supabase = getServerSupabase();
+    if (!supabase) {
+      return NextResponse.json({ success: false, error: "प्रमाणीकरण सेवा अनुपलब्ध है।" }, { status: 500 });
+    }
+
+    const syntheticEmail = email ? email.trim().toLowerCase() : `${cleanMobileDigits}@gym.org`;
+    const finalPassword = password && password.length >= 4 ? password : crypto.randomBytes(24).toString("hex");
+
+    const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+      email: syntheticEmail,
+      password: finalPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: name.trim(),
+        mobile: cleanMobileDigits,
+        status,
+        system_role: systemRole,
+        role,
+      },
+    });
+
+    if (createErr || !created?.user) {
+      return NextResponse.json(
+        { success: false, error: "यह खाता पहले से पंजीकृत हो सकता है अथवा खाता बनाने में त्रुटि हुई।" },
+        { status: 409 }
+      );
+    }
+
+    const profileId = created.user.id;
+
+    // Trigger inserts a base row from user_metadata; fill in the rest authoritatively.
     let insertedRecord: any = null;
     try {
       const [prof] = await db
-        .insert(schema.profiles)
-        .values({
-          id: profileId,
+        .update(schema.profiles)
+        .set({
           fullName: name.trim(),
           avatarUrl: cdnPhotoUrl || photoUrl || null,
           mobile: formattedMobile,
@@ -214,10 +246,11 @@ export async function POST(req: Request) {
           systemRole: systemRole as any,
           isApproved: status === 'active',
         })
+        .where(eq(schema.profiles.id, profileId))
         .returning();
       insertedRecord = prof;
-    } catch (profInsertErr) {
-      console.warn("Profiles insert error:", profInsertErr);
+    } catch (profUpdateErr) {
+      console.warn("Profiles update-after-create error:", profUpdateErr);
     }
 
     const formatted = {
