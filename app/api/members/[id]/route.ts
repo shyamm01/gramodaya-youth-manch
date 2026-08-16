@@ -44,47 +44,32 @@ export async function PUT(
     } = body;
 
     const db = getDb();
-    const numId = Number(id);
 
     if (db) {
-      const updateData: any = { updatedAt: new Date() };
-      if (name !== undefined) {
-        updateData.fullName = name.trim();
-        updateData.name = name.trim();
-      }
-      if (mobile !== undefined) updateData.mobile = normalizeMobile(mobile);
+      const profileUpdateData: any = { updatedAt: new Date() };
+      if (name !== undefined) profileUpdateData.fullName = name.trim();
+      if (mobile !== undefined) profileUpdateData.mobile = normalizeMobile(mobile);
       if (status !== undefined) {
-        updateData.status = status;
-        updateData.isApproved = status === 'active';
+        profileUpdateData.status = status;
+        profileUpdateData.isApproved = status === 'active';
       }
       if (role !== undefined) {
-        updateData.role = role;
-        updateData.systemRole = role;
+        profileUpdateData.role = role;
+        profileUpdateData.systemRole = role;
       }
       if (photoUrl !== undefined) {
-        updateData.photoUrl = photoUrl;
-        updateData.avatarUrl = photoUrl;
+        profileUpdateData.avatarUrl = photoUrl;
       }
-      if (fatherName !== undefined) updateData.fatherName = fatherName.trim();
-      if (dob !== undefined) updateData.dob = dob;
-      if (address !== undefined) updateData.address = address.trim();
-      if (villageId !== undefined && !isNaN(Number(villageId))) updateData.villageId = Number(villageId);
+      if (fatherName !== undefined) profileUpdateData.fatherName = fatherName.trim();
+      if (dob !== undefined) profileUpdateData.dob = dob;
+      if (villageId !== undefined && !isNaN(Number(villageId))) profileUpdateData.villageId = Number(villageId);
 
-      // Try updating profiles first
+      // Update profiles
       try {
-        await db.update(schema.profiles).set(updateData).where(eq(schema.profiles.id, id));
+        await db.update(schema.profiles).set(profileUpdateData).where(eq(schema.profiles.id, id));
       } catch (profUpdateErr) {
         console.warn("Profile update note:", profUpdateErr);
       }
-
-      // Fallback update on legacy members table
-      try {
-        if (!isNaN(numId)) {
-          await db.update(schema.members).set(updateData).where(eq(schema.members.id, numId));
-        } else {
-          await db.update(schema.members).set(updateData).where(eq(schema.members.supabaseUserId, id));
-        }
-      } catch (memErr) {}
     }
 
     const store = loadStore();
@@ -187,20 +172,23 @@ export async function DELETE(
     const { adminName, adminMobile } = body;
 
     const db = getDb();
-    const numId = Number(id);
     let photoToDelete: string | null = null;
 
-    if (db && !isNaN(numId)) {
-      const [existing] = await db
-        .select({ photoUrl: schema.members.photoUrl })
-        .from(schema.members)
-        .where(eq(schema.members.id, numId));
+    if (db) {
+      try {
+        const [existing] = await db
+          .select({ avatarUrl: schema.profiles.avatarUrl })
+          .from(schema.profiles)
+          .where(eq(schema.profiles.id, id));
 
-      if (existing?.photoUrl) {
-        photoToDelete = existing.photoUrl;
+        if (existing?.avatarUrl) {
+          photoToDelete = existing.avatarUrl;
+        }
+
+        await db.delete(schema.profiles).where(eq(schema.profiles.id, id));
+      } catch (delErr) {
+        console.warn("Profiles delete note:", delErr);
       }
-
-      await db.delete(schema.members).where(eq(schema.members.id, numId));
     }
 
     const store = loadStore();

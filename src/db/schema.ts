@@ -196,24 +196,21 @@ export const profiles = pgTable(
   'profiles',
   {
     id: uuid('id').primaryKey(),
-    fullName: text('full_name'),
+    fullName: text('full_name').notNull(),
     avatarUrl: text('avatar_url'),
-    photoUrl: text('photo_url'),
     mobile: text('mobile'),
     email: text('email'),
     fatherName: text('father_name'),
     dob: text('dob'),
     gender: text('gender'),
+    // 3NF Normalized foreign key to villages hierarchy (villages -> gram_panchayats -> districts -> states)
     villageId: bigint('village_id', { mode: 'number' })
       .references(() => villages.id, { onDelete: 'set null' }),
-    villageName: text('village_name'),
-    gramPanchayat: text('gram_panchayat'),
-    district: text('district'),
-    state: text('state'),
-    pincode: text('pincode').default('241125'),
-    address: text('address'),
+    // Specific Address / House details
     houseNo: text('house_no'),
     street: text('street'),
+    pincode: text('pincode'),
+    // Membership & Governance
     occupation: text('occupation'),
     designation: text('designation'),
     politicalBackground: text('political_background'),

@@ -45,25 +45,29 @@ export async function GET() {
         const dist = gp?.district;
         const st = dist?.state;
 
+        const fullAddress = p.houseNo
+          ? `${p.houseNo}, ${p.street ? p.street + ', ' : ''}${v?.nameHindi || v?.name || 'रसूलपुर'}`
+          : `${v?.nameHindi || v?.name || 'रसूलपुर'}, ग्राम पंचायत ${gp?.nameHindi || gp?.name || 'बहेरा'}, जिला ${dist?.nameHindi || dist?.name || 'हरदोई'}`;
+
         return {
           id: String(p.id),
-          villageId: p.villageId ? String(p.villageId) : "1",
+          villageId: p.villageId ? String(p.villageId) : "8",
           name: p.fullName || "Member",
           mobile: p.mobile || "",
           email: p.email || "",
           status: p.status || "pending",
-          photoUrl: p.photoUrl || p.avatarUrl || "",
+          photoUrl: p.avatarUrl || "",
           organizationName: v?.orgNameHindi || v?.orgName || "ग्रामोदय यूथ मंच",
           fatherName: p.fatherName || "",
           dob: p.dob || "",
           gender: p.gender || "",
-          address: p.address || (p.villageName ? `${p.villageName}, ग्राम पंचायत ${p.gramPanchayat || 'बहेरा'}` : "ग्राम रसूलपुर, ग्राम पंचायत बहेरा"),
+          address: fullAddress,
           pincode: p.pincode || v?.pincode || "241125",
-          state: p.state || st?.name || "Uttar Pradesh",
-          district: p.district || dist?.name || "Hardoi",
-          block: v?.blockName || "Hardoi",
-          gramPanchayat: p.gramPanchayat || gp?.name || "Bahera",
-          villageName: p.villageName || v?.name || "Rasoolpur",
+          state: st?.nameHindi || st?.name || "Uttar Pradesh",
+          district: dist?.nameHindi || dist?.name || "Hardoi",
+          block: v?.blockNameHindi || v?.blockName || "Hardoi",
+          gramPanchayat: gp?.nameHindi || gp?.name || "Bahera",
+          villageName: v?.nameHindi || v?.name || "Rasoolpur",
           postOffice: v?.postOffice || gp?.postOffice || "Bahera Rasoolpur",
           houseNo: p.houseNo || "",
           street: p.street || "",
@@ -250,20 +254,14 @@ export async function POST(req: Request) {
         .values({
           id: profileId,
           fullName: name.trim(),
-          photoUrl: cdnPhotoUrl || photoUrl || null,
           avatarUrl: cdnPhotoUrl || photoUrl || null,
           mobile: formattedMobile,
           email: email ? email.trim().toLowerCase() : null,
           fatherName: fatherName ? fatherName.trim() : null,
           dob: dob || null,
           gender: gender || null,
-          villageId: numericVillageId,
-          villageName: villageName || "Rasoolpur",
-          gramPanchayat: gramPanchayat || "Bahera",
-          district: district || "Hardoi",
-          state: state || "Uttar Pradesh",
+          villageId: numericVillageId || 8,
           pincode: pincode || "241125",
-          address: address || `${villageName || 'Rasoolpur'}, ग्राम पंचायत ${gramPanchayat || 'बहेरा'}`,
           houseNo: houseNo || null,
           street: street || null,
           occupation: occupation || null,
@@ -278,7 +276,7 @@ export async function POST(req: Request) {
         .returning();
       insertedRecord = prof;
     } catch (profInsertErr) {
-      console.warn("Profiles insert error, attempting members insert:", profInsertErr);
+      console.warn("Profiles insert error:", profInsertErr);
     }
 
     const formatted = {

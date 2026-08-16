@@ -20,9 +20,9 @@ export async function POST(req: Request) {
       try {
         const existing = await db.query.profiles.findFirst({
           where: eq(schema.profiles.id, targetId),
-          columns: { photoUrl: true },
+          columns: { avatarUrl: true },
         });
-        oldPhotoUrl = existing?.photoUrl || null;
+        oldPhotoUrl = existing?.avatarUrl || null;
       } catch (e) {}
     }
 
@@ -53,7 +53,6 @@ export async function POST(req: Request) {
     if (db && targetType === 'member') {
       try {
         await db.update(schema.profiles).set({
-          photoUrl: finalPhotoUrl,
           avatarUrl: finalPhotoUrl,
           updatedAt: new Date(),
         }).where(eq(schema.profiles.id, targetId));
