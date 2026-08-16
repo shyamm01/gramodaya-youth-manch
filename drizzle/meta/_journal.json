@@ -141,6 +141,13 @@
       "when": 1786731959000,
       "tag": "0019_seed_initial_data",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786731960000,
+      "tag": "0020_create_profiles_table",
+      "breakpoints": true
     }
   ]
 }
