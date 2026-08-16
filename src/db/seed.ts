@@ -260,6 +260,7 @@ export async function seedDatabase() {
           caption: item.caption || '',
           photoUrl: item.photoUrl,
           uploadedBy: item.uploadedBy || 'Admin',
+          date: (item as any).date || new Date().toISOString().split('T')[0],
           status: item.status || 'published',
         })
         .onConflictDoNothing();
