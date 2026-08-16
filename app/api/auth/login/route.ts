@@ -1,6 +1,7 @@
 import { validateRequestBody, authLoginSchema } from '@/src/lib/validations';
 import { NextResponse } from 'next/server';
-import { getSqlClient, normalizeMobile, hashPassword, logAuditAction } from '@/src/lib/authUtils';
+import { getSqlClient, normalizeMobile, logAuditAction, profileToMemberDTO } from '@/src/lib/authUtils';
+import { getServerSupabase } from '@/src/lib/supabaseServer';
 import { signJwtToken, setAuthCookie } from '@/src/lib/jwtAuth';
 
 export async function POST(req: Request) {
@@ -9,11 +10,9 @@ export async function POST(req: Request) {
     if (!validation.success) {
       return validation.response;
     }
-    const { mobile, password } = validation.data;
-    const identifier = mobile;
-    const emailOrMobile = mobile;
-    const email = mobile.includes("@") ? mobile : undefined;
-    const rawInput = String(identifier || emailOrMobile || mobile || email || '').trim();
+    const { identifier, password } = validation.data;
+
+    const rawInput = String(identifier || '').trim();
     const rawPassword = String(password || '');
 
     if (!rawInput) {
@@ -30,6 +29,32 @@ export async function POST(req: Request) {
       );
     }
 
+    const supabase = getServerSupabase();
+    if (!supabase) {
+      return NextResponse.json(
+        { error: 'प्रमाणीकरण सेवा अनुपलब्ध है (Auth service unavailable)।' },
+        { status: 500 }
+      );
+    }
+
+    // Members/Admins registered by mobile alone use a synthetic <mobile>@gym.org
+    // Supabase Auth identity (see AppContext.memberLogin) since Supabase Auth requires an email.
+    const isEmail = rawInput.includes('@');
+    const cleanDigits = normalizeMobile(rawInput);
+    const targetEmail = isEmail ? rawInput.toLowerCase() : `${cleanDigits}@gym.org`;
+
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: targetEmail,
+      password: rawPassword,
+    });
+
+    if (authError || !authData?.user) {
+      return NextResponse.json(
+        { error: 'गलत मोबाइल/ईमेल या पासवर्ड। कृपया पुनः प्रयास करें (Incorrect credentials)।' },
+        { status: 401 }
+      );
+    }
+
     const sql = getSqlClient();
     if (!sql) {
       return NextResponse.json(
@@ -38,121 +63,47 @@ export async function POST(req: Request) {
       );
     }
 
-    const isEmail = rawInput.includes('@');
-    const cleanDigits = normalizeMobile(rawInput);
-    const passwordHash = hashPassword(rawPassword);
-
-    // Query Member/Admin from PostgreSQL
-    const rows = isEmail
-      ? await sql`
-          SELECT * FROM public.members 
-          WHERE LOWER(email) = ${rawInput.toLowerCase()}
-          LIMIT 1;
-        `
-      : await sql`
-          SELECT * FROM public.members 
-          WHERE REGEXP_REPLACE(mobile, '\\D', '', 'g') LIKE ${'%' + cleanDigits}
-          LIMIT 1;
-        `;
+    const rows = await sql`
+      SELECT p.*, v.org_name, v.org_name_hindi
+      FROM public.profiles p
+      LEFT JOIN public.villages v ON p.village_id = v.id
+      WHERE p.id = ${authData.user.id}
+      LIMIT 1;
+    `;
 
     if (!rows || rows.length === 0) {
       return NextResponse.json(
-        {
-          error:
-            'यह मोबाइल नंबर या ईमेल पंजीकृत नहीं है। कृपया पहले "नया खाता बनाएं" पर क्लिक करें। (Account not found. Please sign up.)',
-        },
+        { error: 'खाता प्रोफ़ाइल नहीं मिली (Account profile not found)।' },
         { status: 404 }
       );
     }
 
-    const member = rows[0];
-
-    // Password verification
-    if (member.password_hash) {
-      if (member.password_hash !== passwordHash) {
-        return NextResponse.json(
-          { error: 'गलत पासवर्ड। कृपया सही पासवर्ड दर्ज करें (Incorrect Password)।' },
-          { status: 401 }
-        );
-      }
-    } else {
-      // First-time password assignment
-      await sql`
-        UPDATE public.members 
-        SET password_hash = ${passwordHash}
-        WHERE id = ${member.id};
-      `;
-    }
-
-    const systemRole = member.system_role || member.role || 'MEMBER';
-    const isAdmin = systemRole === 'SUPER_ADMIN' || systemRole === 'ADMIN';
-    const memberName = member.name || 'Member';
-    const memberMobile = member.mobile || `+91 ${cleanDigits}`;
+    const profile = rows[0];
+    const userObj = profileToMemberDTO(profile);
 
     const token = await signJwtToken({
-      id: String(member.id),
-      name: memberName,
-      mobile: memberMobile,
-      email: member.email || undefined,
-      role: systemRole,
-      systemRole: systemRole,
-      villageId: member.village_id ? String(member.village_id) : 'vil_rasoolpur',
-      isAdmin,
+      id: userObj.id,
+      name: userObj.name,
+      mobile: userObj.mobile,
+      email: userObj.email || undefined,
+      role: userObj.systemRole,
+      systemRole: userObj.systemRole,
+      villageId: userObj.villageId,
+      isAdmin: userObj.isAdmin,
     });
 
     logAuditAction(
-      isAdmin ? 'Admin Password Login Success' : 'Member Password Login Success',
-      memberName,
-      memberMobile,
-      isAdmin ? 'Admin Dashboard' : 'Unified Portal'
+      userObj.isAdmin ? 'Admin Password Login Success' : 'Member Password Login Success',
+      userObj.name,
+      userObj.mobile,
+      userObj.isAdmin ? 'Admin Dashboard' : 'Unified Portal'
     );
 
     const response = NextResponse.json({
       success: true,
-      isAdmin,
-      role: systemRole,
-      user: {
-        id: String(member.id),
-        name: memberName,
-        mobile: memberMobile,
-        email: member.email || '',
-        status: member.status || 'active',
-        photoUrl: member.photo_url || '',
-        fatherName: member.father_name || '',
-        dob: member.dob || '',
-        gender: member.gender || '',
-        address: member.address || '',
-        villageId: member.village_id ? String(member.village_id) : 'vil_rasoolpur',
-        occupation: member.occupation || '',
-        designation: member.designation || '',
-        politicalBackground: member.political_background || '',
-        bloodGroup: member.blood_group || '',
-        role: member.role || 'MEMBER',
-        systemRole: systemRole,
-        organizationName: member.organization_name || 'ग्रामोदय यूथ मंच',
-      },
-      member: {
-        id: String(member.id),
-        name: memberName,
-        mobile: memberMobile,
-        email: member.email || '',
-        status: member.status || 'active',
-        photoUrl: member.photo_url || '',
-        fatherName: member.father_name || '',
-        dob: member.dob || '',
-        gender: member.gender || '',
-        address: member.address || '',
-        villageId: member.village_id ? String(member.village_id) : 'vil_rasoolpur',
-        occupation: member.occupation || '',
-        designation: member.designation || '',
-        politicalBackground: member.political_background || '',
-        bloodGroup: member.blood_group || '',
-        role: member.role || 'MEMBER',
-        systemRole: systemRole,
-        organizationName: member.organization_name || 'ग्रामोदय यूथ मंच',
-      },
+      user: userObj,
       token,
-      message: isAdmin ? 'प्रशासक लॉगिन सफल! (Admin login successful)' : 'सदस्य लॉगिन सफल! (Member login successful)',
+      message: userObj.isAdmin ? 'प्रशासक लॉगिन सफल! (Admin login successful)' : 'सदस्य लॉगिन सफल! (Member login successful)',
     });
 
     setAuthCookie(response, token);

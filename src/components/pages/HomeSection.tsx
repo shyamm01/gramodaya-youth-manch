@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { JoinModal } from '../modals/JoinModal';
+import { InviteMemberModal } from '../modals/InviteMemberModal';
 import {
   HomeHero,
   HomeMemberSearch,
@@ -23,12 +24,18 @@ export const HomeSection: React.FC = () => {
     activeVillageId,
     isJoinModalOpen,
     setIsJoinModalOpen,
+    authSession,
   } = useApp();
 
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [homeData, setHomeData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const inFlightControllerRef = useRef<AbortController | null>(null);
   const lastFetchedIdRef = useRef<string | null>(null);
+
+  const isLoggedIn = Boolean(
+    authSession.isMemberLoggedIn || authSession.isAdminLoggedIn || authSession.supabaseUserId
+  );
 
   // Fetch dynamic page-specific data from /api/home (deduplicated & abort-safe)
   useEffect(() => {
@@ -62,8 +69,8 @@ export const HomeSection: React.FC = () => {
           }
         }
       } catch (err: any) {
-        if (err?.name !== 'AbortError') {
-          console.warn('Could not fetch home API feed, using context fallback:', err);
+        if (err.name !== 'AbortError') {
+          console.warn('Home data fetch notice:', err);
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -77,16 +84,17 @@ export const HomeSection: React.FC = () => {
     return () => {
       controller.abort();
     };
-  }, [activeVillageId]);
+  }, [activeVillageId, homeData]);
 
-  // Merge dynamic API feeds with fallback context datasets
   const activeMembersCount =
-    homeData?.stats?.activeMembers ?? members.filter((m) => m.status === 'active').length;
+    homeData?.stats?.activeMembers ??
+    members.filter((m) => m.status === 'active').length;
   const resolvedComplaintsCount =
     homeData?.stats?.resolvedComplaints ??
     complaints.filter((c) => c.status === 'RESOLVED').length;
+
   const socialWorksList =
-    homeData?.recentSocialWorks ??
+    homeData?.featuredSocialWorks ??
     socialWorks.filter((s) => s.status === 'approved' || s.status === 'published');
   const eventsList =
     homeData?.upcomingEvents ??
@@ -99,15 +107,16 @@ export const HomeSection: React.FC = () => {
 
   return (
     <div className="space-y-8 sm:space-y-12 pb-16 transition-colors duration-200">
-      {/* Join Organization Modal */}
-      <JoinModal
-        isOpen={isJoinModalOpen}
-        onClose={() => setIsJoinModalOpen(false)}
+      {/* Invite / Add Member Modal for logged in users */}
+      <InviteMemberModal
+        isOpen={isInviteModalOpen}
+        onClose={() => setIsInviteModalOpen(false)}
       />
 
       {/* 1. Hero Section - Full width dynamic banner & live stats */}
       <HomeHero
-        onJoinClick={() => setIsJoinModalOpen(true)}
+        isLoggedIn={isLoggedIn}
+        onAddMemberClick={() => setIsInviteModalOpen(true)}
         activeMembersCount={activeMembersCount}
         resolvedComplaintsCount={resolvedComplaintsCount}
         socialWorksCount={socialWorksList.length}

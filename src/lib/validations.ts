@@ -50,7 +50,7 @@ export const memberCreateSchema = z.object({
   bloodGroup: z.string().max(10).optional(),
   role: z.string().default('MEMBER'),
   systemRole: z.string().default('MEMBER'),
-  status: z.string().default('active'),
+  status: z.string().default('pending'),
   adminName: z.string().optional(),
   adminMobile: z.string().optional(),
 });
@@ -200,7 +200,7 @@ export const verifyOtpSchema = z.object({
 });
 
 export const authLoginSchema = z.object({
-  mobile: z.string().min(3, 'Mobile number or Email is required'),
+  identifier: z.string().min(3, 'Mobile number or Email is required'),
   password: z.string().min(1, 'Password is required').optional(),
   otp: z.string().optional(),
 });

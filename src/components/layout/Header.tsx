@@ -375,13 +375,24 @@ export const Header: React.FC = () => {
 
                     {/* Menu Links */}
                     <div className="py-1.5 px-1.5 space-y-0.5">
+                      <Link
+                        href="/dashboard"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl transition cursor-pointer text-left"
+                      >
+                        <Shield className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                        <span>
+                          {lang === "en" ? "Dashboard & Profile" : "डैशबोर्ड व प्रोफ़ाइल"}
+                        </span>
+                      </Link>
+
                       <button
                         onClick={handleOpenProfile}
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl transition cursor-pointer text-left"
                       >
                         <User className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                         <span>
-                          {lang === "en" ? "My Profile" : "मेरी प्रोफाइल"}
+                          {lang === "en" ? "Member Details" : "मेरी प्रोफाइल"}
                         </span>
                       </button>
 
@@ -412,14 +423,16 @@ export const Header: React.FC = () => {
                 )}
               </div>
             ) : (
-              <button
-                onClick={() => setIsAdminLoginModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white shadow-2xs active:scale-95"
-                title={lang === "en" ? "Portal Login" : "पोर्टल लॉगिन"}
-              >
-                <User className="w-3.5 h-3.5" />
-                <span>{lang === "en" ? "Login" : "लॉगिन"}</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <Link
+                  href="/auth/login"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white shadow-2xs active:scale-95"
+                  title={lang === "en" ? "Sign In" : "लॉगिन करें"}
+                >
+                  <User className="w-3.5 h-3.5" />
+                  <span>{lang === "en" ? "Sign In" : "लॉगिन"}</span>
+                </Link>
+              </div>
             )}
 
             {/* Mobile hamburger */}

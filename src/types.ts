@@ -1,6 +1,9 @@
-export type RoleScope = 'GLOBAL' | 'VILLAGE';
+export type RoleScope = 'GLOBAL' | 'STATE' | 'DISTRICT' | 'GRAM_PANCHAYAT' | 'VILLAGE';
 
 export type SystemRole = 'SUPER_ADMIN' | 'ADMIN' | 'MEMBER';
+
+export type MemberRole = 'MEMBER' | 'ADMIN';
+export type MemberStatus = 'active' | 'pending' | 'suspended';
 
 export type PermissionCode =
   | 'village:manage'
@@ -186,15 +189,42 @@ export interface Member {
   supabaseUserId?: string;
 }
 
+export interface ChatRoom {
+  id: string;
+  name: string;
+  type: 'group' | 'personal' | 'admin';
+  villageId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ChatRoomMember {
+  id: string;
+  roomId: string;
+  memberId: string;
+  mobile: string;
+  name: string;
+  role: 'admin' | 'member';
+  joinedAt?: string;
+  lastReadAt?: string;
+}
+
 export interface ChatMessage {
   id: string;
+  roomId?: string;
+  villageId?: string;
   senderMobile: string;
   senderName: string;
-  recipientMobile: string;
-  recipientName: string;
+  senderPhoto?: string;
+  senderMemberId?: string;
+  recipientMobile?: string;
+  recipientName?: string;
   text: string;
+  photoUrl?: string;
   createdAt: string;
-  read: boolean;
+  read?: boolean;
+  isRead?: boolean;
+  isDeleted?: boolean;
 }
 
 export type ComplaintCategory =

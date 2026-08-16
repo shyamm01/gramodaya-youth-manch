@@ -14,8 +14,8 @@ export async function GET() {
 
     const formatted = rows.map((c) => ({
       id: String(c.id),
-      villageId: c.villageId ? String(c.villageId) : "1",
-      memberId: c.memberId ? String(c.memberId) : undefined,
+      villageId: c.villageId ? String(c.villageId) : "8",
+      memberId: c.userId ? String(c.userId) : undefined,
       title: c.title,
       category: c.category,
       description: c.description,
@@ -64,23 +64,23 @@ export async function POST(req: Request) {
     }
 
     let resolvedVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : undefined;
-    let resolvedMemberId: number | undefined = undefined;
+    let resolvedUserId: string | undefined = undefined;
 
-    // Automatically resolve village_id and member_id from logged-in / reporting user
+    // Automatically resolve village_id and user_id from logged-in / reporting user
     if (reporterMobile) {
       const cleanMob = reporterMobile.replace(/\D/g, "").slice(-10);
-      const matchedMember = await db.query.members.findFirst({
+      const matchedMember = await db.query.profiles.findFirst({
         where: (m, { sql }) => sql`RIGHT(REGEXP_REPLACE(${m.mobile}, '\\D', '', 'g'), 10) = ${cleanMob}`,
       });
       if (matchedMember) {
-        resolvedMemberId = matchedMember.id;
+        resolvedUserId = matchedMember.id;
         if (!resolvedVillageId && matchedMember.villageId) {
           resolvedVillageId = matchedMember.villageId;
         }
       }
     }
 
-    const numericVillageId = resolvedVillageId || 1;
+    const numericVillageId = resolvedVillageId || 8;
     const { ensureSupabaseUrl } = await import("@/src/lib/supabaseStorage");
     const cdnPhotoUrl = photoUrl ? await ensureSupabaseUrl(photoUrl, "grievances", "complaint") : null;
 
@@ -88,7 +88,7 @@ export async function POST(req: Request) {
       .insert(schema.complaints)
       .values({
         villageId: numericVillageId,
-        memberId: resolvedMemberId,
+        userId: resolvedUserId || null,
         title: title.trim(),
         category: (category as any) || "Other",
         description: description.trim(),
@@ -105,7 +105,7 @@ export async function POST(req: Request) {
     const formatted = {
       id: String(inserted.id),
       villageId: inserted.villageId ? String(inserted.villageId) : "1",
-      memberId: inserted.memberId ? String(inserted.memberId) : undefined,
+      memberId: (inserted as any).userId ? String((inserted as any).userId) : undefined,
       title: inserted.title,
       category: inserted.category,
       description: inserted.description,

@@ -27,7 +27,7 @@ export async function GET() {
           },
         },
       }),
-      db.select().from(schema.members),
+      db.select().from(schema.profiles),
       db.select().from(schema.socialWorks),
     ]);
 

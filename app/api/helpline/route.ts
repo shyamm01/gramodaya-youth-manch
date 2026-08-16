@@ -25,12 +25,12 @@ export async function GET() {
       }),
       db
         .select()
-        .from(schema.members)
+        .from(schema.profiles)
         .where(
           or(
-            eq(schema.members.role, 'ADMIN'),
-            eq(schema.members.systemRole, 'ADMIN'),
-            eq(schema.members.systemRole, 'SUPER_ADMIN')
+            eq(schema.profiles.role, 'ADMIN'),
+            eq(schema.profiles.systemRole, 'ADMIN'),
+            eq(schema.profiles.systemRole, 'SUPER_ADMIN')
           )
         ),
     ]);
@@ -46,9 +46,9 @@ export async function GET() {
         district: gp?.district?.name || 'Hardoi',
         pincode: activeVillage?.pincode || '241125',
       },
-      villageAdmins: adminsData.map((a) => ({
+      villageAdmins: adminsData.map((a: any) => ({
         id: String(a.id),
-        name: a.name,
+        name: a.fullName || a.name || 'Admin',
         mobile: a.mobile,
         designation: a.designation || (a.systemRole === 'SUPER_ADMIN' ? 'केंद्रीय हेल्पलाइन (Head Admin)' : 'ग्राम प्रतिनिधि'),
         role: a.systemRole,

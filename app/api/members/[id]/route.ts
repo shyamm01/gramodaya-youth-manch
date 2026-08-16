@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { loadStore, saveStore, logAuditAction, normalizeMobile } from '@/src/lib/serverStore';
+import { logAuditAction, normalizeMobile, profileToMemberDTO, getSqlClient } from '@/src/lib/authUtils';
 import { deleteSupabaseObjectByUrl } from '@/src/lib/supabaseStorage';
+import { getServerSupabase } from '@/src/lib/supabaseServer';
 import { requireAuth } from '@/src/lib/jwtAuth';
 import { getDb } from '@/src/db';
 import * as schema from '@/src/db/schema';
@@ -44,86 +45,64 @@ export async function PUT(
     } = body;
 
     const db = getDb();
-    const numId = Number(id);
 
-    if (db && !isNaN(numId)) {
-      const updateData: any = {};
-      if (name !== undefined) updateData.name = name.trim();
-      if (mobile !== undefined) updateData.mobile = normalizeMobile(mobile);
-      if (status !== undefined) updateData.status = status;
-      if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
-      if (fatherName !== undefined) updateData.fatherName = fatherName.trim();
-      if (dob !== undefined) updateData.dob = dob;
-      if (address !== undefined) updateData.address = address.trim();
-      if (villageId !== undefined && !isNaN(Number(villageId))) updateData.villageId = Number(villageId);
+    if (db) {
+      const profileUpdateData: any = { updatedAt: new Date() };
+      if (name !== undefined) profileUpdateData.fullName = name.trim();
+      if (mobile !== undefined) profileUpdateData.mobile = normalizeMobile(mobile);
+      if (status !== undefined) {
+        profileUpdateData.status = status;
+        profileUpdateData.isApproved = status === 'active';
+      }
+      if (body.systemRole !== undefined) {
+        profileUpdateData.systemRole = body.systemRole;
+        profileUpdateData.role = (body.systemRole === 'SUPER_ADMIN' || body.systemRole === 'ADMIN') ? 'ADMIN' : 'MEMBER';
+      } else if (role !== undefined) {
+        if (role === 'SUPER_ADMIN' || role === 'DISTRICT_ADMIN' || role === 'PANCHAYAT_ADMIN' || role === 'VILLAGE_ADMIN' || role === 'VILLAGE_MODERATOR' || role === 'ADMIN' || role === 'GUEST') {
+          profileUpdateData.systemRole = role;
+          profileUpdateData.role = (role === 'SUPER_ADMIN' || role === 'ADMIN') ? 'ADMIN' : 'MEMBER';
+        } else {
+          profileUpdateData.role = role;
+          profileUpdateData.systemRole = role;
+        }
+      }
+      if (photoUrl !== undefined) {
+        profileUpdateData.avatarUrl = photoUrl;
+      }
+      if (body.email !== undefined) profileUpdateData.email = body.email ? body.email.trim() : null;
+      if (fatherName !== undefined) profileUpdateData.fatherName = fatherName ? fatherName.trim() : null;
+      if (dob !== undefined) profileUpdateData.dob = dob || null;
+      if (body.gender !== undefined) profileUpdateData.gender = body.gender || null;
+      if (villageId !== undefined && !isNaN(Number(villageId))) profileUpdateData.villageId = Number(villageId);
+      if (body.houseNo !== undefined) profileUpdateData.houseNo = body.houseNo ? body.houseNo.trim() : null;
+      if (body.street !== undefined) profileUpdateData.street = body.street ? body.street.trim() : null;
+      if (body.pincode !== undefined) profileUpdateData.pincode = body.pincode ? body.pincode.trim() : null;
+      if (body.occupation !== undefined) profileUpdateData.occupation = body.occupation ? body.occupation.trim() : null;
+      if (body.designation !== undefined) profileUpdateData.designation = body.designation ? body.designation.trim() : null;
+      if (body.politicalBackground !== undefined) profileUpdateData.politicalBackground = body.politicalBackground ? body.politicalBackground.trim() : null;
+      if (body.bloodGroup !== undefined) profileUpdateData.bloodGroup = body.bloodGroup ? body.bloodGroup.trim() : null;
 
-      await db.update(schema.members).set(updateData).where(eq(schema.members.id, numId));
+      // Update profiles
+      try {
+        await db.update(schema.profiles).set(profileUpdateData).where(eq(schema.profiles.id, id));
+      } catch (profUpdateErr) {
+        console.warn("Profile update note:", profUpdateErr);
+      }
     }
 
-    const store = loadStore();
-    const index = store.members.findIndex((m) => m.id === id);
-
-    let updatedMember: any;
-    if (index !== -1) {
-      const prev = store.members[index];
-      const newRole = isSuperOrAdmin && role !== undefined ? role : (prev.role || 'MEMBER');
-      const newVillageId = villageId !== undefined ? villageId : (prev.villageId || 'vil_rasoolpur');
-      const cleanMobile = mobile !== undefined ? mobile.trim() : prev.mobile;
-      const cleanName = name !== undefined ? name.trim() : prev.name;
-      const cleanPhoto = photoUrl !== undefined ? photoUrl : prev.photoUrl;
-
-      updatedMember = {
-        ...prev,
-        name: cleanName,
-        mobile: cleanMobile,
-        status: status !== undefined ? status : prev.status,
-        role: newRole,
-        villageId: newVillageId,
-        photoUrl: cleanPhoto,
-        fatherName: fatherName !== undefined ? fatherName : prev.fatherName,
-        dob: dob !== undefined ? dob : prev.dob,
-        address: address !== undefined ? address : prev.address,
-        organizationName: organizationName !== undefined ? organizationName : prev.organizationName,
-      };
-
-      store.members[index] = updatedMember;
-
-      // Handle Admin synchronization when role changes
-      const normDigits = normalizeMobile(cleanMobile);
-      if (newRole === 'ADMIN' || newRole === 'SUPER_ADMIN') {
-        const villageObj = (store.villages || []).find((v) => v.id === newVillageId);
-        const existingAdminIdx = store.admins.findIndex(
-          (a) => a.id === id || normalizeMobile(a.mobile) === normDigits
-        );
-
-        const adminData = {
-          id: id,
-          name: cleanName,
-          mobile: cleanMobile,
-          role: newRole === 'SUPER_ADMIN' ? 'Super Admin' : 'Village Admin',
-          systemRole: newRole as 'ADMIN' | 'SUPER_ADMIN',
-          village: villageObj ? villageObj.nameHindi : 'रसूलपुर',
-          villageId: newVillageId,
-          gramPanchayat: villageObj ? (villageObj.gramPanchayatNameHindi || villageObj.gramPanchayatName || 'बहेरा') : 'बहेरा',
-          photoUrl: cleanPhoto || '',
-          isHead: newRole === 'SUPER_ADMIN',
-        };
-
-        if (existingAdminIdx >= 0) {
-          store.admins[existingAdminIdx] = {
-            ...store.admins[existingAdminIdx],
-            ...adminData,
-          };
-        } else {
-          store.admins.push(adminData);
-        }
-      } else if (newRole === 'MEMBER') {
-        store.admins = store.admins.filter(
-          (a) => a.id !== id && normalizeMobile(a.mobile) !== normDigits
-        );
+    let updatedMember: any = { id, name, mobile };
+    const sql = getSqlClient();
+    if (sql) {
+      const rows = await sql`
+        SELECT p.*, v.org_name, v.org_name_hindi
+        FROM public.profiles p
+        LEFT JOIN public.villages v ON p.village_id = v.id
+        WHERE p.id = ${id}
+        LIMIT 1;
+      `;
+      if (rows && rows.length > 0) {
+        updatedMember = profileToMemberDTO(rows[0]);
       }
-
-      saveStore(store);
     }
 
     logAuditAction(
@@ -133,7 +112,7 @@ export async function PUT(
       updatedMember?.name || id
     );
 
-    return NextResponse.json({ success: true, member: updatedMember || { id, name, mobile } });
+    return NextResponse.json({ success: true, member: updatedMember });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Error updating member' }, { status: 500 });
   }
@@ -160,42 +139,44 @@ export async function DELETE(
     const { adminName, adminMobile } = body;
 
     const db = getDb();
-    const numId = Number(id);
     let photoToDelete: string | null = null;
+    let memberName: string | null = null;
 
-    if (db && !isNaN(numId)) {
-      const [existing] = await db
-        .select({ photoUrl: schema.members.photoUrl })
-        .from(schema.members)
-        .where(eq(schema.members.id, numId));
+    if (db) {
+      try {
+        const [existing] = await db
+          .select({ avatarUrl: schema.profiles.avatarUrl, fullName: schema.profiles.fullName })
+          .from(schema.profiles)
+          .where(eq(schema.profiles.id, id));
 
-      if (existing?.photoUrl) {
-        photoToDelete = existing.photoUrl;
+        if (existing?.avatarUrl) {
+          photoToDelete = existing.avatarUrl;
+        }
+        memberName = existing?.fullName || null;
+
+        await db.delete(schema.profiles).where(eq(schema.profiles.id, id));
+      } catch (delErr) {
+        console.warn("Profiles delete note:", delErr);
       }
-
-      await db.delete(schema.members).where(eq(schema.members.id, numId));
     }
 
-    const store = loadStore();
-    const member = store.members.find((m) => m.id === id);
-    if (member?.photoUrl && !photoToDelete) {
-      photoToDelete = member.photoUrl;
+    // Best-effort: also remove the backing Supabase Auth identity so the
+    // mobile/email doesn't stay permanently unusable for re-registration.
+    const supabase = getServerSupabase();
+    if (supabase) {
+      supabase.auth.admin.deleteUser(id).catch(() => {});
     }
-
-    store.members = store.members.filter((m) => m.id !== id);
-    store.admins = store.admins.filter((a) => a.id !== id);
-    saveStore(store);
 
     if (photoToDelete) {
       deleteSupabaseObjectByUrl(photoToDelete).catch(() => {});
     }
 
-    if (member) {
+    if (memberName) {
       logAuditAction(
-        `Deleted Member (${member.name})`,
+        `Deleted Member (${memberName})`,
         adminName || currentUser.name || 'Admin',
         adminMobile || currentUser.mobile || '',
-        member.name
+        memberName
       );
     }
 

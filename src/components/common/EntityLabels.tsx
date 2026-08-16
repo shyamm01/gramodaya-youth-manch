@@ -258,12 +258,12 @@ const CATEGORY_COLOUR: Record<string, string> = {
   Electricity:        'bg-yellow-50 dark:bg-yellow-950/40 text-yellow-800 dark:text-yellow-200 border-yellow-200 dark:border-yellow-800',
   Cleanliness:        'bg-lime-50 dark:bg-lime-950/40 text-lime-800 dark:text-lime-200 border-lime-200 dark:border-lime-800',
   Environment:        'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800',
-  Education:          'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800',
-  Health:             'bg-red-50 dark:bg-red-950/40 text-red-800 dark:text-red-200 border-red-200 dark:border-red-800',
+  Education:          'bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800',
+  Health:             'bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border-rose-200 dark:border-rose-800',
   Sanitation:         'bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-200 border-teal-200 dark:border-teal-800',
   'Animal-related':   'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800',
   'Social Issue':     'bg-purple-50 dark:bg-purple-950/40 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-800',
-  'Government Service': 'bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800',
+  'Government Service':'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800',
   Other:              'bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700',
 };
 
@@ -284,8 +284,11 @@ export const CategoryChip: React.FC<CategoryChipProps> = ({ category, size = 'sm
 
 // ─── 7. Scope Badge ───────────────────────────────────────────────────────────
 const SCOPE_MAP: Record<RoleScope, { label: string; classes: string }> = {
-  GLOBAL:  { label: 'Global',  classes: 'bg-purple-50 dark:bg-purple-950/40 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-800' },
-  VILLAGE: { label: 'Village', classes: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800' },
+  GLOBAL:          { label: 'Global',          classes: 'bg-purple-50 dark:bg-purple-950/40 text-purple-800 dark:text-purple-200 border-purple-200 dark:border-purple-800' },
+  STATE:           { label: 'State',           classes: 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-800 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800' },
+  DISTRICT:        { label: 'District',        classes: 'bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800' },
+  GRAM_PANCHAYAT:  { label: 'Gram Panchayat',  classes: 'bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-200 border-teal-200 dark:border-teal-800' },
+  VILLAGE:         { label: 'Village',         classes: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800' },
 };
 
 interface ScopeBadgeProps {

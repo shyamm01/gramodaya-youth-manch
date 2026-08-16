@@ -48,6 +48,8 @@ export const viewport: Viewport = {
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
+import { ToastProvider } from '@/src/context/ToastContext';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -67,7 +69,9 @@ export default function RootLayout({
         <ReduxProvider>
           <ThemeProvider>
             <AppProvider>
-              <AppShell>{children}</AppShell>
+              <ToastProvider>
+                <AppShell>{children}</AppShell>
+              </ToastProvider>
             </AppProvider>
           </ThemeProvider>
         </ReduxProvider>

@@ -38,7 +38,7 @@ export async function POST(req: Request) {
       socialWorksRows,
       eldersRows,
     ] = await Promise.all([
-      db.select({ url: schema.members.photoUrl }).from(schema.members),
+      db.select({ url: schema.profiles.avatarUrl }).from(schema.profiles),
       db.select({ url: schema.gallery.photoUrl }).from(schema.gallery),
       db.select({ url: schema.events.photoUrl }).from(schema.events),
       db.select({ url: schema.complaints.photoUrl }).from(schema.complaints),

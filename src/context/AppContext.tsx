@@ -318,6 +318,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Supabase Auth listener
   useEffect(() => {
+    const hydrateRbacSession = async () => {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.authenticated && data.user) {
+            const u = data.user;
+            const isSuper = u.isSuperAdmin || u.systemRole === 'SUPER_ADMIN';
+            const isAdm = Boolean(isSuper || u.isAdmin || u.role === 'ADMIN' || u.systemRole === 'ADMIN');
+            setAuthSession((prev) => ({
+              ...prev,
+              isAdminLoggedIn: isAdm,
+              isMemberLoggedIn: true,
+              supabaseUserId: u.supabaseUserId || prev.supabaseUserId,
+              role: u.role || (isAdm ? 'ADMIN' : 'MEMBER'),
+              systemRole: u.systemRole || (isSuper ? 'SUPER_ADMIN' : isAdm ? 'ADMIN' : 'MEMBER'),
+              adminMobile: isAdm ? u.mobile : prev.adminMobile,
+              adminName: isAdm ? u.name : prev.adminName,
+              adminId: isAdm ? u.id : prev.adminId,
+              adminVillageId: u.villageId || prev.adminVillageId,
+              currentMemberMobile: u.mobile || prev.currentMemberMobile,
+              currentMember: u,
+              email: u.email || prev.email,
+              permissions: u.permissions || prev.permissions || [],
+              token: data.token || prev.token,
+            }));
+            if (data.user.mobile) {
+              setCurrentMemberMobileState(data.user.mobile);
+            }
+          }
+        }
+      } catch (e) {
+        // Silently continue
+      }
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setAuthSession((prev) => ({
@@ -325,8 +361,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           isMemberLoggedIn: true,
           supabaseUserId: session.user.id,
           email: session.user.email,
-          role: session.user.user_metadata?.role === "ADMIN" ? "ADMIN" : (prev.isAdminLoggedIn ? "ADMIN" : "MEMBER"),
+          role: session.user.user_metadata?.role === 'ADMIN' ? 'ADMIN' : prev.role || 'MEMBER',
         }));
+        hydrateRbacSession();
       }
     });
 
@@ -338,6 +375,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           supabaseUserId: session.user.id,
           email: session.user.email,
         }));
+        hydrateRbacSession();
+      } else if (_event === 'SIGNED_OUT') {
+        setAuthSession({
+          isMemberLoggedIn: false,
+          isAdminLoggedIn: false,
+          token: null,
+          email: null,
+          supabaseUserId: null,
+        });
       }
     });
 
@@ -377,20 +423,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data?.authenticated && data.user) {
-            const isAdm = Boolean(data.isAdmin || data.role === "SUPER_ADMIN" || data.role === "ADMIN");
+            const u = data.user;
+            const isSuper = u.isSuperAdmin || u.systemRole === "SUPER_ADMIN";
+            const isAdm = Boolean(isSuper || u.isAdmin || u.role === "ADMIN" || u.systemRole === "ADMIN");
             const newSession: AuthSession = {
               isAdminLoggedIn: isAdm,
               isMemberLoggedIn: true,
-              role: data.role,
-              systemRole: data.role,
-              adminMobile: isAdm ? data.user.mobile : undefined,
-              adminName: isAdm ? data.user.name : undefined,
-              adminId: isAdm ? data.user.id : undefined,
-              adminVillageId: data.user.villageId || undefined,
-              currentMemberMobile: data.user.mobile,
-              currentMember: data.user,
-              email: data.user.email,
-              permissions: data.user.permissions || [],
+              role: u.role || (isAdm ? "ADMIN" : "MEMBER"),
+              systemRole: u.systemRole || (isSuper ? "SUPER_ADMIN" : isAdm ? "ADMIN" : "MEMBER"),
+              adminMobile: isAdm ? u.mobile : undefined,
+              adminName: isAdm ? u.name : undefined,
+              adminId: isAdm ? u.id : undefined,
+              adminVillageId: u.villageId || undefined,
+              currentMemberMobile: u.mobile,
+              currentMember: u,
+              email: u.email,
+              permissions: u.permissions || [],
               token: data.token,
             };
             setAuthSession(newSession);

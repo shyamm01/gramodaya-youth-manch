@@ -139,7 +139,35 @@
       "idx": 19,
       "version": "7",
       "when": 1786731959000,
-      "tag": "0019_seed_initial_data",
+      "tag": "0019_create_chat_messages_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786731960000,
+      "tag": "0020_create_profiles_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1786731961000,
+      "tag": "0021_create_chat_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1786731962000,
+      "tag": "0022_extend_profiles_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1786731963000,
+      "tag": "0023_normalize_and_relate_enums",
       "breakpoints": true
     }
   ]

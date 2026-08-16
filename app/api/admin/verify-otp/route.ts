@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
-import { loadStore, saveStore, normalizeMobile, getOtpStore, logAuditAction } from '@/src/lib/serverStore';
-import { signJwtToken } from '@/src/lib/jwtAuth';
+import crypto from 'crypto';
+import { getSqlClient, normalizeMobile, logAuditAction, profileToMemberDTO } from '@/src/lib/authUtils';
+import { getOtpStore } from '@/src/lib/serverStore';
+import { getServerSupabase } from '@/src/lib/supabaseServer';
+import { signJwtToken, setAuthCookie } from '@/src/lib/jwtAuth';
 
 export async function POST(req: Request) {
   try {
@@ -24,88 +27,127 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    const store = loadStore();
+    const sql = getSqlClient();
+    if (!sql) {
+      return NextResponse.json({ error: 'डेटाबेस कनेक्शन अनुपलब्ध है।' }, { status: 500 });
+    }
 
-    // Check if this credential belongs to an Admin
-    const admin = store.admins.find(
-      (a) =>
-        normalizeMobile(a.mobile) === digits ||
-        (a.email && a.email.toLowerCase() === mobile.toLowerCase())
-    );
+    // Unified lookup: admins and members both live in public.profiles now.
+    const existingRows = await sql`
+      SELECT p.*, v.org_name, v.org_name_hindi
+      FROM public.profiles p
+      LEFT JOIN public.villages v ON p.village_id = v.id
+      WHERE REGEXP_REPLACE(p.mobile, '\\D', '', 'g') LIKE ${'%' + digits}
+         OR LOWER(p.email) = LOWER(${mobile})
+      LIMIT 1;
+    `;
 
-    if (admin) {
-      const adminRole = admin.role || 'ADMIN';
+    let profile = existingRows[0];
+
+    // Admin path
+    if (profile && (profile.system_role === 'ADMIN' || profile.system_role === 'SUPER_ADMIN')) {
+      const adminDTO = profileToMemberDTO(profile);
       const jwtToken = await signJwtToken({
-        id: admin.id,
-        name: admin.name,
-        mobile: admin.mobile,
-        email: admin.email,
-        role: adminRole,
-        systemRole: adminRole,
-        villageId: admin.villageId,
-        permissions: admin.permissions || [],
+        id: adminDTO.id,
+        name: adminDTO.name,
+        mobile: adminDTO.mobile,
+        email: adminDTO.email || undefined,
+        role: adminDTO.systemRole,
+        systemRole: adminDTO.systemRole,
+        villageId: adminDTO.villageId,
         isAdmin: true,
       });
 
-      logAuditAction('Admin OTP Login Success', admin.name, admin.mobile, 'Unified Portal');
-      return NextResponse.json({
+      logAuditAction('Admin OTP Login Success', adminDTO.name, adminDTO.mobile, 'Unified Portal');
+
+      const response = NextResponse.json({
         success: true,
         isAdmin: true,
-        admin,
+        admin: adminDTO,
         token: jwtToken,
         message: 'ओटीपी सत्यापन सफल! एडमिन पोर्टल में प्रवेश स्वीकृत।',
       });
+      setAuthCookie(response, jwtToken);
+      return response;
     }
 
-    // Find existing member or create new member record
-    let memberIndex = store.members.findIndex((m) => normalizeMobile(m.mobile) === digits);
-    if (memberIndex === -1) {
-      const newMember = {
-        id: `mem_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-        name: name && name.trim() ? name.trim() : `सदस्य (${digits.slice(-4)})`,
-        mobile: `+91 ${digits.slice(0, 5)} ${digits.slice(5)}`,
-        status: 'active' as const,
-        photoUrl: '',
-        createdAt: new Date().toISOString(),
-        organizationName: 'ग्रामोदय यूथ मंच',
-        fatherName: '',
-        dob: '',
-        address: 'ग्राम रसूलपुर, ग्राम पंचायत बहेरा',
-        occupation: '',
-        designation: '',
-        politicalBackground: '',
-        bloodGroup: '',
-        role: 'MEMBER' as const,
-        systemRole: 'MEMBER' as const,
-      };
-      store.members.push(newMember);
-      saveStore(store);
-      memberIndex = store.members.length - 1;
-    } else {
-      if (store.members[memberIndex].status === 'pending') {
-        store.members[memberIndex].status = 'active';
-        saveStore(store);
+    // Member path: find existing member or create a new one
+    if (!profile) {
+      const supabase = getServerSupabase();
+      if (!supabase) {
+        return NextResponse.json({ error: 'प्रमाणीकरण सेवा अनुपलब्ध है।' }, { status: 500 });
       }
+
+      const syntheticEmail = `${digits}@gym.org`;
+      const randomPassword = crypto.randomBytes(24).toString('hex');
+      const displayName = name && name.trim() ? name.trim() : `सदस्य (${digits.slice(-4)})`;
+
+      const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+        email: syntheticEmail,
+        password: randomPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: displayName,
+          mobile: digits,
+          status: 'active',
+          is_approved: true,
+          system_role: 'MEMBER',
+          role: 'MEMBER',
+        },
+      });
+
+      if (createErr || !created?.user) {
+        return NextResponse.json(
+          { error: 'सदस्य खाता बनाने में त्रुटि हुई। कृपया पुनः प्रयास करें।' },
+          { status: 500 }
+        );
+      }
+
+      // The auth trigger creates the profile row from user_metadata; make sure mobile/status stick.
+      await sql`
+        UPDATE public.profiles
+        SET mobile = ${digits}, status = 'active', is_approved = true
+        WHERE id = ${created.user.id};
+      `;
+
+      const createdRows = await sql`
+        SELECT p.*, v.org_name, v.org_name_hindi
+        FROM public.profiles p
+        LEFT JOIN public.villages v ON p.village_id = v.id
+        WHERE p.id = ${created.user.id}
+        LIMIT 1;
+      `;
+      profile = createdRows[0];
+    } else if (profile.status === 'pending') {
+      await sql`
+        UPDATE public.profiles
+        SET status = 'active', is_approved = true
+        WHERE id = ${profile.id};
+      `;
+      profile.status = 'active';
     }
 
-    const member = store.members[memberIndex];
+    const memberDTO = profileToMemberDTO(profile);
     const memberJwt = await signJwtToken({
-      id: member.id,
-      name: member.name,
-      mobile: member.mobile,
-      role: member.systemRole || member.role || 'MEMBER',
-      systemRole: member.systemRole || member.role || 'MEMBER',
-      villageId: member.villageId,
+      id: memberDTO.id,
+      name: memberDTO.name,
+      mobile: memberDTO.mobile,
+      email: memberDTO.email || undefined,
+      role: memberDTO.systemRole,
+      systemRole: memberDTO.systemRole,
+      villageId: memberDTO.villageId,
       isAdmin: false,
     });
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       isAdmin: false,
-      member,
+      member: memberDTO,
       token: memberJwt,
       message: 'ओटीपी सत्यापन सफल! पोर्टल में प्रवेश स्वीकृत।',
     });
+    setAuthCookie(response, memberJwt);
+    return response;
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Error verifying OTP' }, { status: 500 });
   }

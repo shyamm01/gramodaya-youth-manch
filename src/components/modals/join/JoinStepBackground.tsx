@@ -1,29 +1,31 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Briefcase,
-  Award,
-  Users,
-  Droplet,
+  Navigation,
   ArrowLeft,
-  RefreshCw,
-  Sparkles,
+  Loader2,
   Check,
+  MapPin,
 } from 'lucide-react';
-import { Button, Input } from '../../ui';
+import { Input } from '../../ui';
 import { useApp } from '../../../context/AppContext';
-import { cn } from '@/src/lib/utils';
+import { INDIAN_STATES, DEFAULT_PANCHAYATS } from '@/src/data/geoData';
 
 interface JoinStepBackgroundProps {
+  pincode: string;
+  setPincode: (p: string) => void;
+  selectedState: string;
+  setSelectedState: (s: string) => void;
+  selectedDistrict: string;
+  setSelectedDistrict: (d: string) => void;
+  selectedPanchayat: string;
+  setSelectedPanchayat: (gp: string) => void;
+  selectedVillage: string;
+  setSelectedVillage: (v: string) => void;
   occupation: string;
   setOccupation: (o: string) => void;
-  designation: string;
-  setDesignation: (d: string) => void;
-  politicalBackground: string;
-  setPoliticalBackground: (p: string) => void;
-  bloodGroup: string;
-  setBloodGroup: (b: string) => void;
   pledgeAccepted: boolean;
   setPledgeAccepted: (p: boolean) => void;
   isSubmitting: boolean;
@@ -32,157 +34,303 @@ interface JoinStepBackgroundProps {
 }
 
 export const JoinStepBackground: React.FC<JoinStepBackgroundProps> = ({
+  pincode,
+  setPincode,
+  selectedState,
+  setSelectedState,
+  selectedDistrict,
+  setSelectedDistrict,
+  selectedPanchayat,
+  setSelectedPanchayat,
+  selectedVillage,
+  setSelectedVillage,
   occupation,
   setOccupation,
-  designation,
-  setDesignation,
-  politicalBackground,
-  setPoliticalBackground,
-  bloodGroup,
-  setBloodGroup,
   pledgeAccepted,
   setPledgeAccepted,
   isSubmitting,
   onBack,
   onSubmit,
 }) => {
-  const { t, lang } = useApp();
+  const { lang } = useApp();
+  const isEn = lang === 'en';
+
+  const [pincodeLoading, setPincodeLoading] = useState(false);
+  const [dynamicPanchayats, setDynamicPanchayats] = useState<string[]>(['Bahera', 'Kachhauna', 'Sandila']);
+  const [dynamicVillages, setDynamicVillages] = useState<string[]>(['Rasoolpur', 'Bahera Khas', 'Shivpur', 'Durgapur']);
+  const [customPanchayat, setCustomPanchayat] = useState('');
+  const [customVillage, setCustomVillage] = useState('');
+
+  // Handle Pincode Auto-Lookup (Top-to-Down Trigger)
+  const lookupPincode = useCallback(async (pin: string) => {
+    if (pin.length !== 6) return;
+
+    setPincodeLoading(true);
+    try {
+      const res = await fetch(`/api/pincode/${pin}`);
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        if (data.state) {
+          const matchState = INDIAN_STATES.find(
+            (s) => s.name.toLowerCase() === data.state.toLowerCase() || s.nameHindi === data.state
+          );
+          setSelectedState(matchState ? matchState.name : data.state);
+        }
+        if (data.district) {
+          setSelectedDistrict(data.district);
+        }
+
+        // Populate Gram Panchayats / Post Offices from API
+        if (Array.isArray(data.postOffices) && data.postOffices.length > 0) {
+          const poNames: string[] = Array.from(
+            new Set(data.postOffices.map((po: any) => po.name).filter(Boolean))
+          );
+          setDynamicPanchayats(poNames);
+          if (poNames.length > 0) {
+            setSelectedPanchayat(poNames[0]);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Pincode lookup error in modal:', err);
+    } finally {
+      setPincodeLoading(false);
+    }
+  }, [setSelectedState, setSelectedDistrict, setSelectedPanchayat]);
+
+  const handlePincodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setPincode(val);
+    if (val.length === 6) {
+      lookupPincode(val);
+    }
+  };
+
+  const handleStateChange = (stateName: string) => {
+    setSelectedState(stateName);
+    const stateObj = INDIAN_STATES.find((s) => s.name === stateName);
+    if (stateObj && stateObj.districts.length > 0) {
+      setSelectedDistrict(stateObj.districts[0].name);
+    }
+  };
+
+  const handleDistrictChange = (distName: string) => {
+    setSelectedDistrict(distName);
+    const matchPanchayats = DEFAULT_PANCHAYATS.filter(
+      (p) => p.district.toLowerCase() === distName.toLowerCase()
+    );
+    if (matchPanchayats.length > 0) {
+      const names = matchPanchayats.map((p) => p.name);
+      setDynamicPanchayats(names);
+      setSelectedPanchayat(names[0]);
+      if (matchPanchayats[0].villages.length > 0) {
+        setDynamicVillages(matchPanchayats[0].villages.map((v) => v.name));
+        setSelectedVillage(matchPanchayats[0].villages[0].name);
+      }
+    }
+  };
+
+  const handlePanchayatChange = (panchayatName: string) => {
+    setSelectedPanchayat(panchayatName);
+    if (panchayatName === '__other__') return;
+
+    const matchPanchayat = DEFAULT_PANCHAYATS.find(
+      (p) => p.name.toLowerCase() === panchayatName.toLowerCase()
+    );
+    if (matchPanchayat && matchPanchayat.villages.length > 0) {
+      const vNames = matchPanchayat.villages.map((v) => v.name);
+      setDynamicVillages(vNames);
+      setSelectedVillage(vNames[0]);
+    }
+  };
+
+  const currentDistricts =
+    INDIAN_STATES.find((s) => s.name === selectedState)?.districts || [
+      { name: selectedDistrict, nameHindi: selectedDistrict },
+    ];
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 animate-in fade-in duration-200">
-      {/* Informational Banner */}
-      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 flex items-center justify-between">
-        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-          {lang === 'en' ? 'Additional Information (Optional)' : 'अतिरिक्त जानकारी (वैकल्पिक)'}
-        </span>
-        <span className="text-[10px] text-slate-500 font-medium">
-          {lang === 'en' ? 'Can be updated later' : 'बाद में भी जोड़ सकते हैं'}
-        </span>
-      </div>
-
-      {/* Row 1: Occupation & Designation */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
-            <Briefcase className="w-3.5 h-3.5 text-slate-400" />
-            <span>{lang === 'en' ? 'Occupation / Profession' : 'पेशा / व्यवसाय'}</span>
-          </label>
+      {/* ── 1. PINCODE AUTO-LOOKUP ── */}
+      <div className="space-y-1.5">
+        <label className="block text-xs font-medium text-stone-700 dark:text-stone-300">
+          {isEn ? 'Pincode (Auto-fills State & District)' : 'पिनकोड (राज्य व जिला स्वतः भरेगा)'}
+        </label>
+        <div className="relative">
+          <Navigation className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
           <Input
             type="text"
-            value={occupation}
-            onChange={(e) => setOccupation(e.target.value)}
-            placeholder={
-              lang === 'en' ? 'e.g. Student, Farmer, Teacher' : 'उदा. छात्र, किसान, शिक्षक, व्यापार'
-            }
-            className="h-9.5 text-xs rounded-lg"
+            maxLength={6}
+            value={pincode}
+            onChange={handlePincodeChange}
+            placeholder="241125"
+            className="pl-9 pr-9 h-10 text-xs font-mono rounded-xl"
           />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
-            <Award className="w-3.5 h-3.5 text-slate-400" />
-            <span>{lang === 'en' ? 'Designation / Responsibility' : 'पद / दायित्व'}</span>
-          </label>
-          <Input
-            type="text"
-            value={designation}
-            onChange={(e) => setDesignation(e.target.value)}
-            placeholder={lang === 'en' ? 'e.g. Member / Volunteer' : 'उदा. सदस्य / युवा स्वयंसेवक'}
-            className="h-9.5 text-xs rounded-lg"
-          />
+          {pincodeLoading && (
+            <Loader2 className="w-3.5 h-3.5 text-amber-600 animate-spin absolute right-3 top-1/2 -translate-y-1/2" />
+          )}
         </div>
       </div>
 
-      {/* Row 2: Political Background & Blood Group */}
+      {/* ── 2. STATE & DISTRICT SELECTORS ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
         <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
-            <Users className="w-3.5 h-3.5 text-slate-400" />
-            <span>{lang === 'en' ? 'Political / Social Background' : 'राजनीतिक / सामाजिक पृष्ठभूमि'}</span>
-          </label>
-          <Input
-            type="text"
-            value={politicalBackground}
-            onChange={(e) => setPoliticalBackground(e.target.value)}
-            placeholder={
-              lang === 'en' ? 'e.g. Social Worker / None' : 'उदा. सामाजिक कार्यकर्ता / कोई नहीं'
-            }
-            className="h-9.5 text-xs rounded-lg"
-          />
-        </div>
-
-        <div className="space-y-1.5">
-          <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1">
-            <Droplet className="w-3.5 h-3.5 text-rose-500" />
-            <span>{lang === 'en' ? 'Blood Group' : 'रक्त समूह (Blood Group)'}</span>
+          <label className="block text-xs font-medium text-stone-700 dark:text-stone-300">
+            {isEn ? 'State' : 'राज्य'}
           </label>
           <select
-            value={bloodGroup}
-            onChange={(e) => setBloodGroup(e.target.value)}
-            className="w-full h-9.5 px-3 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs text-slate-900 dark:text-slate-100 font-medium focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+            value={selectedState}
+            onChange={(e) => handleStateChange(e.target.value)}
+            className="w-full h-10 px-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs text-stone-900 dark:text-white font-medium focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
           >
-            <option value="">{lang === 'en' ? 'Select Blood Group' : 'रक्त समूह चुनें'}</option>
-            <option value="A+">A+</option>
-            <option value="A-">A-</option>
-            <option value="B+">B+</option>
-            <option value="B-">B-</option>
-            <option value="O+">O+</option>
-            <option value="O-">O-</option>
-            <option value="AB+">AB+</option>
-            <option value="AB-">AB-</option>
+            {INDIAN_STATES.map((st) => (
+              <option key={st.code} value={st.name}>
+                {isEn ? st.name : st.nameHindi}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-stone-700 dark:text-stone-300">
+            {isEn ? 'District' : 'जनपद / जिला'}
+          </label>
+          <select
+            value={selectedDistrict}
+            onChange={(e) => handleDistrictChange(e.target.value)}
+            className="w-full h-10 px-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs text-stone-900 dark:text-white font-medium focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+          >
+            {currentDistricts.map((d) => (
+              <option key={d.name} value={d.name}>
+                {isEn ? d.name : d.nameHindi || d.name}
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
-      {/* Membership Pledge Checkbox */}
+      {/* ── 3. GRAM PANCHAYAT & VILLAGE SELECTORS ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-stone-700 dark:text-stone-300">
+            {isEn ? 'Gram Panchayat' : 'ग्राम पंचायत'}
+          </label>
+          <select
+            value={selectedPanchayat}
+            onChange={(e) => handlePanchayatChange(e.target.value)}
+            className="w-full h-10 px-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs text-stone-900 dark:text-white font-medium focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+          >
+            {dynamicPanchayats.map((gp) => (
+              <option key={gp} value={gp}>
+                {gp}
+              </option>
+            ))}
+            <option value="__other__">{isEn ? 'Other (Custom)' : 'अन्य (खुद लिखें)'}</option>
+          </select>
+          {selectedPanchayat === '__other__' && (
+            <Input
+              type="text"
+              required
+              value={customPanchayat}
+              onChange={(e) => setCustomPanchayat(e.target.value)}
+              placeholder={isEn ? 'Panchayat Name' : 'ग्राम पंचायत का नाम'}
+              className="h-8 text-xs mt-1"
+            />
+          )}
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="block text-xs font-medium text-stone-700 dark:text-stone-300">
+            {isEn ? 'Village' : 'ग्राम / गांव'}
+          </label>
+          <select
+            value={selectedVillage}
+            onChange={(e) => setSelectedVillage(e.target.value)}
+            className="w-full h-10 px-3 rounded-xl border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800 text-xs text-stone-900 dark:text-white font-medium focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+          >
+            {dynamicVillages.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+            <option value="__other__">{isEn ? 'Other (Custom)' : 'अन्य (खुद लिखें)'}</option>
+          </select>
+          {selectedVillage === '__other__' && (
+            <Input
+              type="text"
+              required
+              value={customVillage}
+              onChange={(e) => setCustomVillage(e.target.value)}
+              placeholder={isEn ? 'Village Name' : 'गांव का नाम'}
+              className="h-8 text-xs mt-1"
+            />
+          )}
+        </div>
+      </div>
+
+      {/* ── 4. OCCUPATION ── */}
+      <div className="space-y-1.5">
+        <label className="block text-xs font-medium text-stone-700 dark:text-stone-300 flex items-center gap-1">
+          <Briefcase className="w-3.5 h-3.5 text-stone-400" />
+          <span>{isEn ? 'Occupation / Profession' : 'पेशा / व्यवसाय'}</span>
+        </label>
+        <Input
+          type="text"
+          value={occupation}
+          onChange={(e) => setOccupation(e.target.value)}
+          placeholder={isEn ? 'e.g. Student, Farmer, Teacher' : 'उदा. छात्र, किसान, शिक्षक, व्यापार'}
+          className="h-10 text-xs rounded-xl"
+        />
+      </div>
+
+      {/* ── 5. PLEDGE CHECKBOX ── */}
       <div
         onClick={() => setPledgeAccepted(!pledgeAccepted)}
-        className="flex items-start gap-2.5 p-3 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 cursor-pointer select-none"
+        className="p-3.5 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 cursor-pointer flex items-start gap-3 transition-colors"
       >
         <div
-          className={cn(
-            'w-4 h-4 rounded mt-0.5 flex items-center justify-center border transition-colors',
+          className={`w-5 h-5 rounded-lg border flex items-center justify-center flex-shrink-0 mt-0.5 transition-all ${
             pledgeAccepted
-              ? 'bg-emerald-600 border-emerald-600 text-white'
-              : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-950'
-          )}
+              ? 'bg-amber-600 border-amber-600 text-white'
+              : 'border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900'
+          }`}
         >
-          {pledgeAccepted && <Check className="w-3 h-3 stroke-[3]" />}
+          {pledgeAccepted && <Check className="w-3.5 h-3.5" />}
         </div>
-        <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug">
-          {lang === 'en'
-            ? 'I agree to the principles, community guidelines and rural development initiatives of Gramodaya Youth Manch.'
-            : 'मैं ग्रामोदय यूथ मंच के नियमों एवं ग्राम विकास अभियानों के प्रति निष्ठावान रहने का संकल्प लेता हूँ।'}
+        <p className="text-[11px] text-stone-600 dark:text-stone-300 leading-relaxed select-none">
+          {isEn
+            ? 'I pledge to contribute selflessly towards the development, youth empowerment, and welfare of the village under Gramodaya Youth Manch.'
+            : 'मैं ग्रामोदय यूथ मंच के अंतर्गत गांव के विकास, युवा सशक्तिकरण और जनकल्याण के लिए निस्वार्थ भाव से कार्य करने का संकल्प लेता/लेती हूँ।'}
         </p>
       </div>
 
-      {/* Step 3 Action Buttons */}
-      <div className="pt-2 flex items-center justify-between">
-        <Button
+      {/* ── 6. NAVIGATION & SUBMIT BUTTONS ── */}
+      <div className="pt-2 flex items-center gap-2.5">
+        <button
           type="button"
-          variant="outline"
+          disabled={isSubmitting}
           onClick={onBack}
-          className="text-xs h-9 px-3 rounded-lg border-slate-200 dark:border-slate-800 cursor-pointer"
+          className="py-2.5 px-4 rounded-xl border border-stone-200 dark:border-stone-700 text-stone-700 dark:text-stone-300 text-xs font-semibold hover:bg-stone-100 dark:hover:bg-stone-800 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
         >
-          <ArrowLeft className="w-3.5 h-3.5 mr-1" />
-          <span>{lang === 'en' ? 'Back' : 'वापस'}</span>
-        </Button>
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>{isEn ? 'Back' : 'पीछे'}</span>
+        </button>
 
-        <Button
+        <button
           type="submit"
           disabled={isSubmitting || !pledgeAccepted}
-          className="text-xs h-9 px-6 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs cursor-pointer"
+          className="flex-1 py-3 px-6 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {isSubmitting ? (
-            <span className="flex items-center gap-1.5">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-              {lang === 'en' ? 'Submitting...' : 'जमा हो रहा है...'}
-            </span>
+            <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
-            <span>{t('join.submitBtn')}</span>
+            <>
+              <span>{isEn ? 'Submit Membership Request' : 'सदस्यता आवेदन जमा करें'}</span>
+              <Check className="w-4 h-4" />
+            </>
           )}
-        </Button>
+        </button>
       </div>
     </form>
   );

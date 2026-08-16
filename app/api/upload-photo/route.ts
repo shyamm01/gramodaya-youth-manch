@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { loadStore, saveStore } from '@/src/lib/serverStore';
-import { ensureSupabaseUrl, deleteSupabaseObjectByUrl } from '@/src/lib/supabaseStorage';
+import { ensureSupabaseUrl } from '@/src/lib/supabaseStorage';
 import { getDb } from '@/src/db';
 import * as schema from '@/src/db/schema';
 import { eq } from 'drizzle-orm';
@@ -15,16 +14,15 @@ export async function POST(req: Request) {
     const db = getDb();
     let oldPhotoUrl: string | null = null;
 
-    // Fetch existing photo URL to auto-clean old file
-    if (db && targetType === 'member') {
-      const numId = Number(targetId);
-      if (!isNaN(numId)) {
-        const existing = await db.query.members.findFirst({
-          where: eq(schema.members.id, numId),
-          columns: { photoUrl: true },
+    // Fetch existing photo URL to auto-clean old file (admins and members both live in profiles)
+    if (db && (targetType === 'member' || targetType === 'admin')) {
+      try {
+        const existing = await db.query.profiles.findFirst({
+          where: eq(schema.profiles.id, targetId),
+          columns: { avatarUrl: true },
         });
-        oldPhotoUrl = existing?.photoUrl || null;
-      }
+        oldPhotoUrl = existing?.avatarUrl || null;
+      } catch (e) {}
     }
 
     // 1. Resolve photo to Supabase Storage public CDN URL with auto-cleanup of old photo
@@ -41,21 +39,14 @@ export async function POST(req: Request) {
       }, { status: 500 });
     }
 
-    // 2. Update In-Memory / File Store
-    const store = loadStore();
-    if (targetType === 'admin') {
-      store.admins = store.admins.map((a) => (a.id === targetId ? { ...a, photoUrl: finalPhotoUrl } : a));
-    } else if (targetType === 'member') {
-      store.members = store.members.map((m) => (m.id === targetId ? { ...m, photoUrl: finalPhotoUrl } : m));
-    }
-    saveStore(store);
-
-    // 3. Update PostgreSQL Database (Drizzle)
-    if (db && targetType === 'member') {
-      const numId = Number(targetId);
-      if (!isNaN(numId)) {
-        await db.update(schema.members).set({ photoUrl: finalPhotoUrl }).where(eq(schema.members.id, numId));
-      }
+    // 2. Update PostgreSQL Database (Drizzle)
+    if (db && (targetType === 'member' || targetType === 'admin')) {
+      try {
+        await db.update(schema.profiles).set({
+          avatarUrl: finalPhotoUrl,
+          updatedAt: new Date(),
+        }).where(eq(schema.profiles.id, targetId));
+      } catch (e) {}
     }
 
     return NextResponse.json({ success: true, photoUrl: finalPhotoUrl });

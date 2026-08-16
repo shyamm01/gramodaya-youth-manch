@@ -211,9 +211,9 @@ export const authSlice = createSlice({
       .addCase(loginUser.fulfilled, (state, action) => {
         state.status = 'succeeded';
         const payload = action.payload;
-        const effectiveRole = payload.role || payload.user?.systemRole || (payload.isAdmin ? 'ADMIN' : 'MEMBER');
-        const isAdm = Boolean(payload.isAdmin || effectiveRole === 'SUPER_ADMIN' || effectiveRole === 'ADMIN');
-        const user = payload.user || payload.member;
+        const user = payload.user;
+        const effectiveRole = user?.systemRole || user?.role || (user?.isAdmin ? 'ADMIN' : 'MEMBER');
+        const isAdm = Boolean(user?.isAdmin || effectiveRole === 'SUPER_ADMIN' || effectiveRole === 'ADMIN');
 
         state.user = user;
         state.token = payload.token;
@@ -291,14 +291,15 @@ export const authSlice = createSlice({
     builder.addCase(fetchCurrentUser.fulfilled, (state, action) => {
       const payload = action.payload;
       if (payload.authenticated && payload.user) {
-        const isAdm = Boolean(payload.isAdmin || payload.role === 'SUPER_ADMIN' || payload.role === 'ADMIN');
-        state.user = payload.user;
+        const u = payload.user;
+        const isAdm = Boolean(u.isAdmin || u.role === 'SUPER_ADMIN' || u.role === 'ADMIN');
+        state.user = u;
         state.token = payload.token || state.token;
-        state.role = payload.role;
-        state.systemRole = payload.role;
+        state.role = u.role;
+        state.systemRole = u.systemRole || u.role;
         state.isAuthenticated = true;
         state.isAdmin = isAdm;
-        state.isSuperAdmin = payload.role === 'SUPER_ADMIN';
+        state.isSuperAdmin = u.systemRole === 'SUPER_ADMIN' || u.isSuperAdmin;
       }
     });
 

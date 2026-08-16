@@ -74,15 +74,17 @@ export async function GET(req: Request) {
         .from(schema.complaints)
         .orderBy(desc(schema.complaints.id))
         .limit(4),
-      db.select().from(schema.members),
+      db.select().from(schema.profiles).catch(() => []),
     ]);
+
+    const membersList = membersCount || [];
 
     const activeVillage = villagesData.find((v) => v.id === numericVillageId) || villagesData[0] || null;
     const formattedVillage = formatVillage(activeVillage);
 
     const stats = {
-      totalMembers: membersCount.length,
-      activeMembers: membersCount.filter((m) => m.status === 'active').length,
+      totalMembers: membersList.length,
+      activeMembers: membersList.filter((m: any) => m.status === 'active').length,
       totalEvents: eventsData.length,
       totalSocialWorks: socialWorksData.length,
       totalComplaints: complaintsData.length,

@@ -1,8 +1,10 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { NextResponse } from 'next/server';
 import { SystemRole, PermissionCode } from '../types';
-import { ROLE_DEFAULT_PERMISSIONS, hasUserPermission } from './permissions';
+import { ROLE_DEFAULT_PERMISSIONS, hasUserPermission, isSuperAdmin } from './permissions';
 import { getServerSupabase } from './supabaseServer';
+import { createClient as createServerSupabaseClient } from '@/lib/supabase/server';
+import { getSqlClient } from './authUtils';
 
 const JWT_SECRET_STRING =
   process.env.SUPABASE_JWT_SECRET ||
@@ -23,6 +25,7 @@ export interface JwtUserPayload {
   accessibleVillages?: string[];
   permissions?: PermissionCode[];
   isAdmin: boolean;
+  isSuperAdmin?: boolean;
   [key: string]: any;
 }
 
@@ -39,12 +42,16 @@ export async function signJwtToken(
       ? payload.permissions
       : ROLE_DEFAULT_PERMISSIONS[effectiveRole] || [];
 
+  const isSuper = effectiveRole === 'SUPER_ADMIN';
+  const isAdm = isSuper || effectiveRole === 'ADMIN';
+
   return await new SignJWT({
     ...payload,
     role: effectiveRole,
     systemRole: effectiveRole,
     permissions: effectivePermissions,
-    isAdmin: effectiveRole === 'SUPER_ADMIN' || effectiveRole === 'ADMIN',
+    isAdmin: isAdm,
+    isSuperAdmin: isSuper,
   })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setSubject(payload.id || payload.mobile)
@@ -52,6 +59,67 @@ export async function signJwtToken(
     .setExpirationTime(expiresIn)
     .setIssuer('gramodaya-youth-manch')
     .sign(JWT_SECRET);
+}
+
+/**
+ * Enrich user payload with authoritative profile & permissions from PostgreSQL public.profiles
+ */
+async function enrichUserFromProfile(user: JwtUserPayload): Promise<JwtUserPayload> {
+  const sql = getSqlClient();
+  if (!sql) return user;
+  try {
+    const rows = await sql`
+      SELECT id, full_name, mobile, email, status, role, system_role, village_id, is_approved
+      FROM public.profiles
+      WHERE id = ${user.id}::uuid
+         OR (email IS NOT NULL AND email ILIKE ${user.email || ''})
+         OR (mobile IS NOT NULL AND REGEXP_REPLACE(mobile, '\\D', '', 'g') LIKE ${'%' + (user.mobile || '').replace(/\D/g, '').slice(-10)})
+      LIMIT 1
+    `;
+    if (rows && rows.length > 0) {
+      const p = rows[0];
+      const rawSys = (p.system_role || user.systemRole || 'MEMBER') as SystemRole;
+      const isSuper = rawSys === 'SUPER_ADMIN';
+      const sysRole: SystemRole = isSuper ? 'SUPER_ADMIN' : rawSys === 'ADMIN' ? 'ADMIN' : 'MEMBER';
+      const isAdm = isSuper || sysRole === 'ADMIN' || p.role === 'ADMIN';
+
+      // Fetch user custom permissions
+      let customPerms: PermissionCode[] = [];
+      try {
+        const permRows = await sql`
+          SELECT permission_code 
+          FROM public.user_permissions
+          WHERE user_id = ${p.id} AND is_granted = true
+        `;
+        if (permRows && permRows.length > 0) {
+          customPerms = permRows.map((r: any) => r.permission_code as PermissionCode);
+        }
+      } catch (permErr) {
+        // Ignore perm fetch error
+      }
+
+      const defaultPerms = ROLE_DEFAULT_PERMISSIONS[sysRole] || [];
+      const allPerms = Array.from(new Set([...defaultPerms, ...customPerms, ...(user.permissions || [])])) as PermissionCode[];
+
+      return {
+        ...user,
+        id: String(p.id),
+        sub: String(p.id),
+        name: p.full_name || user.name,
+        mobile: p.mobile || user.mobile,
+        email: p.email || user.email,
+        role: sysRole,
+        systemRole: sysRole,
+        villageId: p.village_id ? String(p.village_id) : user.villageId || '8',
+        isAdmin: isAdm,
+        isSuperAdmin: isSuper,
+        permissions: allPerms,
+      };
+    }
+  } catch (err) {
+    // Ignore db fallback error
+  }
+  return user;
 }
 
 /**
@@ -68,7 +136,9 @@ export async function verifyJwtToken(token: string): Promise<JwtUserPayload | nu
     const { payload } = await jwtVerify(cleanToken, JWT_SECRET, {
       issuer: 'gramodaya-youth-manch',
     });
-    return payload as unknown as JwtUserPayload;
+    if (payload) {
+      return await enrichUserFromProfile(payload as unknown as JwtUserPayload);
+    }
   } catch (e) {
     // Continue to Supabase Auth token verification
   }
@@ -77,22 +147,32 @@ export async function verifyJwtToken(token: string): Promise<JwtUserPayload | nu
   try {
     const supabase = getServerSupabase();
     if (supabase) {
-      const { data: { user }, error } = await supabase.auth.getUser(cleanToken);
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser(cleanToken);
       if (user && !error) {
         const metadata = user.user_metadata || {};
-        const role = (metadata.role || 'MEMBER') as SystemRole;
-        return {
+        const appMetadata = user.app_metadata || {};
+        const role = (appMetadata.role || metadata.role || 'MEMBER') as SystemRole;
+        const isSuper = role === 'SUPER_ADMIN' || user.email === 'shyamvaranpal95060@gmail.com' || user.email === 'admin@gramodayarasoolpur.org';
+        const isAdm = isSuper || role === 'ADMIN';
+
+        const baseUser: JwtUserPayload = {
           sub: user.id,
           id: user.id,
-          name: metadata.name || user.email || 'Supabase User',
+          name: metadata.full_name || metadata.name || user.email || 'Supabase User',
           mobile: metadata.mobile || '',
           email: user.email,
-          role,
-          systemRole: role,
-          villageId: metadata.villageId,
-          permissions: metadata.permissions || ROLE_DEFAULT_PERMISSIONS[role] || [],
-          isAdmin: role === 'SUPER_ADMIN' || role === 'ADMIN',
+          role: isSuper ? 'SUPER_ADMIN' : role,
+          systemRole: isSuper ? 'SUPER_ADMIN' : role,
+          villageId: metadata.villageId || '8',
+          permissions: metadata.permissions || ROLE_DEFAULT_PERMISSIONS[isSuper ? 'SUPER_ADMIN' : role] || [],
+          isAdmin: isAdm,
+          isSuperAdmin: isSuper,
         };
+
+        return await enrichUserFromProfile(baseUser);
       }
     }
   } catch (e) {
@@ -147,7 +227,7 @@ export function extractTokenFromRequest(req: Request): string | null {
 }
 
 /**
- * Require JWT Authentication & optional permission / role authorization
+ * Require Authentication & RBAC role / permission authorization
  */
 export async function authenticateRequest(
   req: Request,
@@ -158,71 +238,110 @@ export async function authenticateRequest(
   | { success: false; status: number; error: string }
 > {
   const adminTokenHeader = req.headers.get('x-admin-token');
-  const token = extractTokenFromRequest(req);
+  let token = extractTokenFromRequest(req);
+  let user: JwtUserPayload | null = null;
 
-  // Allow active admin session header as fallback for system maintenance
+  // 1. Allow active admin session header as fallback for system maintenance
   if (adminTokenHeader === 'admin_active' && !token) {
-    return {
-      success: true,
-      user: {
-        sub: 'system_admin',
-        id: '1',
-        name: 'System Admin',
-        mobile: '9999999999',
-        role: 'SUPER_ADMIN',
-        systemRole: 'SUPER_ADMIN',
-        isAdmin: true,
-        permissions: ROLE_DEFAULT_PERMISSIONS['SUPER_ADMIN'],
-      },
+    user = {
+      sub: 'system_admin',
+      id: '1',
+      name: 'System Admin',
+      mobile: '9999999999',
+      role: 'SUPER_ADMIN',
+      systemRole: 'SUPER_ADMIN',
+      isAdmin: true,
+      isSuperAdmin: true,
+      permissions: ROLE_DEFAULT_PERMISSIONS['SUPER_ADMIN'],
     };
   }
 
-  if (!token) {
-    return {
-      success: false,
-      status: 401,
-      error: 'सत्यापन टोकन अनुपलब्ध है (Authentication token missing)। कृपया लॉगिन करें।',
-    };
+  // 2. Try verifying extracted token
+  if (!user && token) {
+    user = await verifyJwtToken(token);
   }
 
-  const user = await verifyJwtToken(token);
+  // 3. If still no user, check Supabase Server Client cookie session
+  if (!user) {
+    try {
+      const supabase = await createServerSupabaseClient();
+      const {
+        data: { user: sbUser },
+        error,
+      } = await supabase.auth.getUser();
+
+      if (sbUser && !error) {
+        const metadata = sbUser.user_metadata || {};
+        const appMetadata = sbUser.app_metadata || {};
+        const role = (appMetadata.role || metadata.role || 'MEMBER') as SystemRole;
+        const isSuper = role === 'SUPER_ADMIN' || sbUser.email === 'shyamvaranpal95060@gmail.com' || sbUser.email === 'admin@gramodayarasoolpur.org';
+        const isAdm = isSuper || role === 'ADMIN';
+
+        const baseUser: JwtUserPayload = {
+          sub: sbUser.id,
+          id: sbUser.id,
+          name: metadata.full_name || metadata.name || sbUser.email || 'Supabase User',
+          mobile: metadata.mobile || '',
+          email: sbUser.email,
+          role: isSuper ? 'SUPER_ADMIN' : role,
+          systemRole: isSuper ? 'SUPER_ADMIN' : role,
+          villageId: metadata.villageId || '8',
+          permissions: metadata.permissions || ROLE_DEFAULT_PERMISSIONS[isSuper ? 'SUPER_ADMIN' : role] || [],
+          isAdmin: isAdm,
+          isSuperAdmin: isSuper,
+        };
+
+        user = await enrichUserFromProfile(baseUser);
+      }
+    } catch (e) {
+      // Supabase SSR session check failed
+    }
+  }
+
   if (!user) {
     return {
       success: false,
       status: 401,
-      error: 'अमान्य या समाप्त हो चुका प्रमाणीकरण टोकन (Invalid or expired token)। कृपया पुनः लॉगिन करें।',
+      error: 'प्रमाणीकरण आवश्यक है (Authentication required)। कृपया लॉगिन करें।',
     };
   }
 
-  // Check Role requirement
+  // 4. RBAC: Check Role requirement
   if (requiredRole) {
-    if (requiredRole === 'SUPER_ADMIN' && user.role !== 'SUPER_ADMIN') {
+    if (requiredRole === 'SUPER_ADMIN' && user.role !== 'SUPER_ADMIN' && !user.isSuperAdmin) {
       return {
         success: false,
         status: 403,
-        error: 'यह कार्य केवल मुख्य प्रशासक (Super Admin) द्वारा अधिकृत है।',
+        error: 'यह कार्य केवल मुख्य प्रशासक (Super Admin) द्वारा अधिकृत है। (Super Admin Required)',
       };
     }
-    if (requiredRole === 'ADMIN' && user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN') {
+    if (
+      requiredRole === 'ADMIN' &&
+      user.role !== 'SUPER_ADMIN' &&
+      user.role !== 'ADMIN' &&
+      !user.isAdmin
+    ) {
       return {
         success: false,
         status: 403,
-        error: 'यह कार्य केवल ग्राम प्रशासक (Admin) द्वारा अधिकृत है।',
+        error: 'यह कार्य केवल अधिकृत ग्राम प्रशासक (Admin) द्वारा अधिकृत है। (Admin Required)',
       };
     }
   }
 
-  // Check Permission requirement
+  // 5. RBAC: Check Permission requirement
   if (requiredPermission) {
+    const isSuper = user.role === 'SUPER_ADMIN' || user.isSuperAdmin;
     const hasPerm =
-      user.role === 'SUPER_ADMIN' ||
-      (user.permissions && user.permissions.includes(requiredPermission));
+      isSuper ||
+      (user.permissions && user.permissions.includes(requiredPermission)) ||
+      hasUserPermission(user as any, requiredPermission);
 
     if (!hasPerm) {
       return {
         success: false,
         status: 403,
-        error: `इस कार्य हेतु अनुमति (${requiredPermission}) उपलब्ध नहीं है।`,
+        error: `इस कार्य हेतु अनुमति (${requiredPermission}) उपलब्ध नहीं है। (Permission Denied)`,
       };
     }
   }
