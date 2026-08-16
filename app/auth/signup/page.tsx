@@ -28,6 +28,8 @@ function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get('next') || '/dashboard';
+  const inviteEmail = searchParams.get('inviteEmail') || '';
+  const inviteName = searchParams.get('inviteName') || '';
 
   const { lang } = useApp();
   const isEn = lang === 'en';
@@ -35,7 +37,7 @@ function SignupForm() {
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
 
   // Form State: Basic Personal Details
-  const [fullName, setFullName] = useState('');
+  const [fullName, setFullName] = useState(inviteName);
   const [mobile, setMobile] = useState('');
   const [fatherName, setFatherName] = useState('');
   const [gender, setGender] = useState<'Male' | 'Female' | 'Other'>('Male');
@@ -53,7 +55,7 @@ function SignupForm() {
   const [dynamicVillages, setDynamicVillages] = useState<string[]>(['Rasoolpur', 'Bahera Khas', 'Shivpur', 'Durgapur']);
 
   // Form State: Credentials
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(inviteEmail);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -404,8 +406,27 @@ function SignupForm() {
             </div>
           ) : (
             <>
-              {/* Form */}
-              <form onSubmit={handleSignup} className="space-y-5">
+              {/* Invitation Welcome Banner */}
+              {inviteEmail && (
+            <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 dark:bg-amber-950/30 border border-amber-500/30 flex items-start gap-3 text-amber-900 dark:text-amber-200 text-xs animate-in fade-in">
+              <div className="p-1.5 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                <UserPlus className="w-4 h-4" />
+              </div>
+              <div className="space-y-0.5">
+                <span className="font-bold text-sm block text-amber-800 dark:text-amber-300">
+                  {isEn ? 'Special Membership Invitation' : 'विशेष सदस्यता निमंत्रण'}
+                </span>
+                <p className="leading-relaxed">
+                  {isEn
+                    ? `Welcome ${fullName || inviteName || 'friend'}! You have received an invitation to join Gramodaya Youth Manch. Please complete your basic details and set your password to finish registration.`
+                    : `स्वागत है ${fullName || inviteName || 'मित्र'}! आपको ग्रामोदय यूथ मंच से जुड़ने का निमंत्रण प्राप्त हुआ है। कृपया नीचे अपना विवरण व पासवर्ड दर्ज कर सदस्यता पूर्ण करें।`}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSignup} className="space-y-5">
                 {/* ============================================================== */}
                 {/* 1. Basic Personal Details Section */}
                 {/* ============================================================== */}

@@ -11,12 +11,15 @@ import {
   ArrowRight,
   UserPlus,
   MessageSquarePlus,
+  Send,
 } from "lucide-react";
 import { VillageBadge } from "../../common";
 import { useApp } from "../../../context/AppContext";
 
 interface HomeHeroProps {
+  isLoggedIn?: boolean;
   onJoinClick: () => void;
+  onAddMemberClick?: () => void;
   activeMembersCount: number;
   resolvedComplaintsCount: number;
   socialWorksCount: number;
@@ -24,7 +27,9 @@ interface HomeHeroProps {
 }
 
 export const HomeHero: React.FC<HomeHeroProps> = ({
+  isLoggedIn = false,
   onJoinClick,
+  onAddMemberClick,
   activeMembersCount,
   resolvedComplaintsCount,
   socialWorksCount,
@@ -141,16 +146,29 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
 
         {/* Modern CTA Action Buttons */}
         <div className="flex flex-wrap items-center justify-center gap-3.5 pt-2">
-          {/* Primary Join Button */}
-          <button
-            type="button"
-            onClick={onJoinClick}
-            className="group relative inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-sm font-bold shadow-xl shadow-amber-600/30 hover:shadow-amber-500/50 border border-amber-400/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
-          >
-            <UserPlus className="w-4 h-4 transition-transform group-hover:scale-110" />
-            <span>{isEn ? 'Join Organization' : 'संगठन से जुड़ें'}</span>
-            <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 opacity-90" />
-          </button>
+          {/* If Logged In: Show "Add Member" button */}
+          {isLoggedIn ? (
+            <button
+              type="button"
+              onClick={onAddMemberClick}
+              className="group relative inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-bold shadow-xl shadow-emerald-600/30 hover:shadow-emerald-500/50 border border-emerald-400/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4 transition-transform group-hover:scale-110" />
+              <span>{isEn ? 'Add Member' : 'सदस्य जोड़ें'}</span>
+              <Send className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 opacity-90" />
+            </button>
+          ) : (
+            /* If Not Logged In: Show "Join Organization" button */
+            <button
+              type="button"
+              onClick={onJoinClick}
+              className="group relative inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-sm font-bold shadow-xl shadow-amber-600/30 hover:shadow-amber-500/50 border border-amber-400/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
+            >
+              <UserPlus className="w-4 h-4 transition-transform group-hover:scale-110" />
+              <span>{isEn ? 'Join Organization' : 'संगठन से जुड़ें'}</span>
+              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 opacity-90" />
+            </button>
+          )}
 
           {/* Secondary View Members Button */}
           <Link
