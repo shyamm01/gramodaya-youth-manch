@@ -85,66 +85,7 @@ export async function GET() {
       return NextResponse.json({ success: true, members: formattedProfiles });
     }
 
-    // 2. Fallback: Query legacy members table if profiles has no records yet
-    const memberRows = await db.query.members.findMany({
-      with: {
-        village: {
-          with: {
-            gramPanchayat: {
-              with: {
-                district: {
-                  with: {
-                    state: true,
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      orderBy: [desc(schema.members.id)],
-    });
-
-    const formattedMembers = memberRows.map((m) => {
-      const v = m.village;
-      const gp = v?.gramPanchayat;
-      const dist = gp?.district;
-      const st = dist?.state;
-
-      return {
-        id: String(m.id),
-        villageId: m.villageId ? String(m.villageId) : "1",
-        name: m.name,
-        mobile: m.mobile,
-        email: m.email || "",
-        status: m.status,
-        photoUrl: m.photoUrl || "",
-        organizationName: v?.orgNameHindi || v?.orgName || "ग्रामोदय यूथ मंच",
-        fatherName: m.fatherName || "",
-        dob: m.dob || "",
-        gender: m.gender || "",
-        address: m.address || "ग्राम रसूलपुर, ग्राम पंचायत बहेरा",
-        pincode: m.pincode || v?.pincode || gp?.pincode || "241125",
-        state: st?.name || "Uttar Pradesh",
-        district: dist?.name || "Hardoi",
-        block: v?.blockName || gp?.blockName || "Hardoi",
-        gramPanchayat: gp?.name || "Bahera",
-        villageName: v?.name || "Rasoolpur",
-        postOffice: v?.postOffice || gp?.postOffice || "Bahera Rasoolpur",
-        houseNo: m.houseNo || "",
-        street: m.street || "",
-        occupation: m.occupation || "",
-        designation: m.designation || "",
-        politicalBackground: m.politicalBackground || "",
-        bloodGroup: m.bloodGroup || "",
-        role: m.role || "MEMBER",
-        systemRole: m.systemRole || "MEMBER",
-        isApproved: m.status === 'active',
-        createdAt: m.createdAt,
-      };
-    });
-
-    return NextResponse.json({ success: true, members: formattedMembers });
+    return NextResponse.json({ success: true, members: [] });
   } catch (err: any) {
     console.error("Error fetching members:", err);
     return NextResponse.json({ success: false, error: "Failed to fetch members" }, { status: 500 });

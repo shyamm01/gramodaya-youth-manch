@@ -15,19 +15,19 @@ export async function GET(req: Request) {
 
     const rows = await db
       .select()
-      .from(schema.groupMessages)
-      .where(numericVillageId ? eq(schema.groupMessages.villageId, numericVillageId) : undefined)
-      .orderBy(asc(schema.groupMessages.id));
+      .from(schema.chatMessages)
+      .where(numericVillageId ? eq(schema.chatMessages.villageId, numericVillageId) : undefined)
+      .orderBy(asc(schema.chatMessages.createdAt));
 
     const formatted = rows.map((m) => ({
       id: String(m.id),
-      villageId: m.villageId ? String(m.villageId) : '1',
+      villageId: m.villageId ? String(m.villageId) : '8',
       senderName: m.senderName,
-      senderRole: m.senderRole,
+      senderRole: 'Member',
       senderMobile: m.senderMobile,
       senderPhoto: m.senderPhoto || '',
       text: m.text,
-      timestamp: m.timestamp,
+      timestamp: new Date(m.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
       createdAt: m.createdAt,
     }));
 
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
     // Automatically resolve village_id from logged-in sender
     if (senderMobile && !resolvedVillageId) {
       const cleanMob = senderMobile.replace(/\D/g, '').slice(-10);
-      const matchedMember = await db.query.members.findFirst({
+      const matchedMember = await db.query.profiles.findFirst({
         where: (m, { sql }) => sql`RIGHT(REGEXP_REPLACE(${m.mobile}, '\\D', '', 'g'), 10) = ${cleanMob}`,
       });
       if (matchedMember?.villageId) {
@@ -63,36 +63,31 @@ export async function POST(req: Request) {
       }
     }
 
-    const numericVillageId = resolvedVillageId || 1;
-
-    const nowStr = new Date().toLocaleTimeString('en-IN', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
+    const numericVillageId = resolvedVillageId || 8;
+    const msgId = crypto.randomUUID();
 
     const [inserted] = await db
-      .insert(schema.groupMessages)
+      .insert(schema.chatMessages)
       .values({
+        id: msgId,
+        roomId: 'general',
         villageId: numericVillageId,
         senderName: senderName.trim(),
-        senderRole: senderRole.trim(),
         senderMobile: senderMobile.trim(),
         senderPhoto: senderPhoto.trim() || null,
         text: text.trim(),
-        timestamp: nowStr,
       })
       .returning();
 
     const formatted = {
       id: String(inserted.id),
-      villageId: inserted.villageId ? String(inserted.villageId) : '1',
+      villageId: inserted.villageId ? String(inserted.villageId) : '8',
       senderName: inserted.senderName,
-      senderRole: inserted.senderRole,
+      senderRole: senderRole,
       senderMobile: inserted.senderMobile,
       senderPhoto: inserted.senderPhoto,
       text: inserted.text,
-      timestamp: inserted.timestamp,
+      timestamp: new Date(inserted.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
       createdAt: inserted.createdAt,
     };
 

@@ -17,7 +17,7 @@ export async function GET() {
     const formatted = rows.map((s) => ({
       id: String(s.id),
       villageId: s.villageId ? String(s.villageId) : "1",
-      memberId: s.memberId ? String(s.memberId) : undefined,
+      memberId: (s as any).userId ? String((s as any).userId) : undefined,
       title: s.title,
       description: s.description,
       date: s.date,

@@ -129,7 +129,7 @@ export const gramPanchayats = pgTable(
       .notNull()
       .references(() => districts.id, { onDelete: 'restrict' }),
     name: text('name').notNull(),
-    nameHindi: text('name_hindi'),
+    nameHindi: text('name_hindi').notNull(),
     blockName: text('block_name').default('Hardoi'),
     blockNameHindi: text('block_name_hindi').default('हरदोई'),
     pincode: text('pincode').default('241125'),
@@ -157,8 +157,7 @@ export const villages = pgTable(
     name: text('name').notNull(),
     nameHindi: text('name_hindi').notNull(),
     gramPanchayatId: bigint('gram_panchayat_id', { mode: 'number' })
-      .notNull()
-      .references(() => gramPanchayats.id, { onDelete: 'restrict' }),
+      .references(() => gramPanchayats.id, { onDelete: 'set null' }),
     blockName: text('block_name').default('Hardoi'),
     blockNameHindi: text('block_name_hindi').default('हरदोई'),
     pincode: text('pincode').default('241125'),
@@ -185,12 +184,11 @@ export const villages = pgTable(
 );
 
 // ==============================================================================
-// 3. PBAC PERMISSIONS & MEMBERS TABLE
+// 3. PROFILES & PBAC PERMISSIONS (Unified User / Member Architecture)
 // ==============================================================================
 
 /**
- * 3.0 PROFILES (Supabase Auth उपयोगकर्ता प्रोफाइल)
- * Implements PRD Section 19: User Profile Data Model
+ * 3.0 PROFILES (Unified User & Member Model)
  */
 export const profiles = pgTable(
   'profiles',
@@ -203,14 +201,11 @@ export const profiles = pgTable(
     fatherName: text('father_name'),
     dob: text('dob'),
     gender: text('gender'),
-    // 3NF Normalized foreign key to villages hierarchy (villages -> gram_panchayats -> districts -> states)
     villageId: bigint('village_id', { mode: 'number' })
       .references(() => villages.id, { onDelete: 'set null' }),
-    // Specific Address / House details
     houseNo: text('house_no'),
     street: text('street'),
-    pincode: text('pincode'),
-    // Membership & Governance
+    pincode: text('pincode').default('241125'),
     occupation: text('occupation'),
     designation: text('designation'),
     politicalBackground: text('political_background'),
@@ -244,58 +239,14 @@ export const permissions = pgTable('permissions', {
 });
 
 /**
- * 3.2 MEMBERS TABLE (ग्राम सदस्य एवं पदाधिकारी)
- */
-export const members = pgTable(
-  'members',
-  {
-    id: bigserial('id', { mode: 'number' }).primaryKey(),
-    villageId: bigint('village_id', { mode: 'number' })
-      .notNull()
-      .references(() => villages.id, { onDelete: 'restrict' }),
-    supabaseUserId: uuid('supabase_user_id'),
-    name: text('name').notNull(),
-    mobile: text('mobile').notNull().unique(),
-    email: text('email'),
-    passwordHash: text('password_hash'),
-    status: memberStatusEnum('status').notNull().default('active'),
-    photoUrl: text('photo_url'),
-    fatherName: text('father_name'),
-    dob: text('dob'),
-    gender: text('gender'),
-    address: text('address'),
-    houseNo: text('house_no'),
-    street: text('street'),
-    pincode: text('pincode').default('241125'),
-    occupation: text('occupation'),
-    designation: text('designation'),
-    politicalBackground: text('political_background'),
-    bloodGroup: text('blood_group'),
-    role: memberRoleEnum('role').notNull().default('MEMBER'),
-    systemRole: systemRoleEnum('system_role').notNull().default('MEMBER'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [
-    index('idx_members_village_id').on(table.villageId),
-    uniqueIndex('idx_members_mobile').on(table.mobile),
-    index('idx_members_supabase_user_id').on(table.supabaseUserId),
-    index('idx_members_status').on(table.status),
-    index('idx_members_system_role').on(table.systemRole),
-    index('idx_members_created_at').on(table.createdAt),
-  ]
-);
-
-/**
- * 3.3 USER PERMISSIONS (उपयोगकर्ता स्तर की व्यक्तिगत अनुमतियां - PBAC Overrides)
+ * 3.2 USER PERMISSIONS (उपयोगकर्ता स्तर की व्यक्तिगत अनुमतियां - PBAC Overrides)
  */
 export const userPermissions = pgTable(
   'user_permissions',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    memberId: bigint('member_id', { mode: 'number' })
-      .notNull()
-      .references(() => members.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .references(() => profiles.id, { onDelete: 'cascade' }),
     permissionCode: text('permission_code')
       .notNull()
       .references(() => permissions.code, { onDelete: 'cascade' }),
@@ -306,22 +257,21 @@ export const userPermissions = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index('idx_user_permissions_member_id').on(table.memberId),
+    index('idx_user_permissions_user_id').on(table.userId),
     index('idx_user_permissions_perm_code').on(table.permissionCode),
     index('idx_user_permissions_scope').on(table.scopeType, table.scopeId),
   ]
 );
 
 /**
- * 3.4 USER VILLAGE ROLES (ग्राम स्तर पर उपयोगकर्ता की भूमिका)
+ * 3.3 USER VILLAGE ROLES (ग्राम स्तर पर उपयोगकर्ता की भूमिका)
  */
 export const userVillageRoles = pgTable(
   'user_village_roles',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    memberId: bigint('member_id', { mode: 'number' })
-      .notNull()
-      .references(() => members.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .references(() => profiles.id, { onDelete: 'cascade' }),
     villageId: bigint('village_id', { mode: 'number' })
       .notNull()
       .references(() => villages.id, { onDelete: 'cascade' }),
@@ -331,7 +281,7 @@ export const userVillageRoles = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index('idx_user_village_roles_member').on(table.memberId),
+    index('idx_user_village_roles_user').on(table.userId),
     index('idx_user_village_roles_village').on(table.villageId),
     index('idx_user_village_roles_role').on(table.role),
   ]
@@ -349,9 +299,8 @@ export const complaints = pgTable(
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     villageId: bigint('village_id', { mode: 'number' })
-      .notNull()
       .references(() => villages.id, { onDelete: 'cascade' }),
-    memberId: bigint('member_id', { mode: 'number' }).references(() => members.id, { onDelete: 'set null' }),
+    userId: uuid('user_id').references(() => profiles.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     category: complaintCategoryEnum('category').notNull().default('Other'),
     description: text('description').notNull(),
@@ -368,7 +317,7 @@ export const complaints = pgTable(
   },
   (table) => [
     index('idx_complaints_village_id').on(table.villageId),
-    index('idx_complaints_member_id').on(table.memberId),
+    index('idx_complaints_user_id').on(table.userId),
     index('idx_complaints_status').on(table.status),
     index('idx_complaints_category').on(table.category),
     index('idx_complaints_created_at').on(table.createdAt),
@@ -383,9 +332,8 @@ export const socialWorks = pgTable(
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     villageId: bigint('village_id', { mode: 'number' })
-      .notNull()
       .references(() => villages.id, { onDelete: 'cascade' }),
-    memberId: bigint('member_id', { mode: 'number' }).references(() => members.id, { onDelete: 'set null' }),
+    userId: uuid('user_id').references(() => profiles.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     description: text('description').notNull(),
     date: date('date').notNull().default(sql`CURRENT_DATE`),
@@ -400,7 +348,7 @@ export const socialWorks = pgTable(
   },
   (table) => [
     index('idx_social_works_village_id').on(table.villageId),
-    index('idx_social_works_member_id').on(table.memberId),
+    index('idx_social_works_user_id').on(table.userId),
     index('idx_social_works_status').on(table.status),
     index('idx_social_works_date').on(table.date),
   ]
@@ -414,7 +362,6 @@ export const events = pgTable(
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     villageId: bigint('village_id', { mode: 'number' })
-      .notNull()
       .references(() => villages.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     description: text('description'),
@@ -441,7 +388,6 @@ export const gallery = pgTable(
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     villageId: bigint('village_id', { mode: 'number' })
-      .notNull()
       .references(() => villages.id, { onDelete: 'cascade' }),
     caption: text('caption'),
     photoUrl: text('photo_url').notNull(),
@@ -466,56 +412,57 @@ export const elders = pgTable(
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     villageId: bigint('village_id', { mode: 'number' })
-      .notNull()
       .references(() => villages.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
-    age: text('age'),
+    age: text('age').notNull(),
     role: text('role'),
     contribution: text('contribution'),
     photoUrl: text('photo_url'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index('idx_elders_village_id').on(table.villageId)]
+  (table) => [
+    index('idx_elders_village_id').on(table.villageId),
+    index('idx_elders_name').on(table.name),
+  ]
 );
 
 /**
- * 4.6 ANNOUNCEMENTS TABLE (सार्वजनिक सूचनाएं)
+ * 4.6 ANNOUNCEMENTS TABLE (ग्राम घोषणाएं एवं सूचनाएं)
  */
 export const announcements = pgTable(
   'announcements',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     villageId: bigint('village_id', { mode: 'number' })
-      .notNull()
       .references(() => villages.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     content: text('content').notNull(),
-    publishedBy: text('published_by').notNull().default('ग्रामोदय यूथ मंच'),
-    isUrgent: boolean('is_urgent').default(false),
     date: date('date').notNull().default(sql`CURRENT_DATE`),
+    publishedBy: text('published_by').notNull().default('Admin'),
+    isUrgent: boolean('is_urgent').default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('idx_announcements_village_id').on(table.villageId),
+    index('idx_announcements_date').on(table.date),
     index('idx_announcements_is_urgent').on(table.isUrgent),
   ]
 );
 
 /**
- * 4.7 PUBLIC INFOS TABLE (नागरिक सूचनाएं)
+ * 4.7 PUBLIC INFORMATIONS TABLE (सार्वजनिक सूचना एवं सुझाव)
  */
 export const publicInfos = pgTable(
   'public_infos',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     villageId: bigint('village_id', { mode: 'number' })
-      .notNull()
       .references(() => villages.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     description: text('description').notNull(),
-    category: text('category').notNull(),
+    category: text('category').notNull().default('General'),
     submitterName: text('submitter_name').notNull(),
     submitterMobile: text('submitter_mobile').notNull(),
     status: publicInfoStatusEnum('status').notNull().default('pending'),
@@ -529,19 +476,20 @@ export const publicInfos = pgTable(
 );
 
 // ==============================================================================
-// 5. REALTIME CHAT SUBSYSTEM (Normalized Chat Architecture)
+// 5. REALTIME CHAT & MESSAGING TABLES
 // ==============================================================================
 
 /**
- * 5.1 CHAT ROOMS (चैट रूम्स)
+ * 5.1 CHAT ROOMS TABLE
  */
 export const chatRooms = pgTable(
   'chat_rooms',
   {
-    id: text('id').primaryKey(),
+    id: text('id').primaryKey(), // e.g. 'general', 'direct_userId1_userId2'
     name: text('name').notNull(),
-    type: text('type').notNull().default('group'), // 'group' | 'personal' | 'admin'
-    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'cascade' }),
+    type: text('type').notNull().default('group'), // 'group', 'direct', 'village'
+    villageId: bigint('village_id', { mode: 'number' })
+      .references(() => villages.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -552,7 +500,7 @@ export const chatRooms = pgTable(
 );
 
 /**
- * 5.2 CHAT MEMBERS (कमरे के सदस्य)
+ * 5.2 CHAT MEMBERS TABLE
  */
 export const chatMembers = pgTable(
   'chat_members',
@@ -564,7 +512,7 @@ export const chatMembers = pgTable(
     memberId: text('member_id').notNull(),
     mobile: text('mobile').notNull(),
     name: text('name').notNull(),
-    role: text('role').default('member'),
+    role: text('role').default('Member'),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
     lastReadAt: timestamp('last_read_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -576,7 +524,7 @@ export const chatMembers = pgTable(
 );
 
 /**
- * 5.3 CHAT MESSAGES (लाइव संदेश)
+ * 5.3 CHAT MESSAGES TABLE
  */
 export const chatMessages = pgTable(
   'chat_messages',
@@ -585,7 +533,8 @@ export const chatMessages = pgTable(
     roomId: text('room_id')
       .notNull()
       .references(() => chatRooms.id, { onDelete: 'cascade' }),
-    villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'cascade' }),
+    villageId: bigint('village_id', { mode: 'number' })
+      .references(() => villages.id, { onDelete: 'cascade' }),
     senderMobile: text('sender_mobile').notNull(),
     senderName: text('sender_name').notNull(),
     senderPhoto: text('sender_photo'),
@@ -605,66 +554,14 @@ export const chatMessages = pgTable(
 );
 
 /**
- * 5.4 GROUP MESSAGES TABLE (Legacy Live Chat)
- */
-export const groupMessages = pgTable(
-  'group_messages',
-  {
-    id: bigserial('id', { mode: 'number' }).primaryKey(),
-    villageId: bigint('village_id', { mode: 'number' })
-      .notNull()
-      .references(() => villages.id, { onDelete: 'cascade' }),
-    senderName: text('sender_name').notNull(),
-    senderRole: text('sender_role').default('Member'),
-    senderMobile: text('sender_mobile'),
-    senderPhoto: text('sender_photo'),
-    text: text('text').notNull(),
-    timestamp: text('timestamp').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [
-    index('idx_group_messages_village_id').on(table.villageId),
-    index('idx_group_messages_created_at').on(table.createdAt),
-  ]
-);
-
-/**
- * 5.5 DIRECT MESSAGES TABLE (Legacy Direct Messages)
- */
-export const messages = pgTable(
-  'messages',
-  {
-    id: bigserial('id', { mode: 'number' }).primaryKey(),
-    villageId: bigint('village_id', { mode: 'number' })
-      .notNull()
-      .references(() => villages.id, { onDelete: 'cascade' }),
-    roomId: text('room_id').default('general'),
-    senderId: text('sender_id').notNull(),
-    senderName: text('sender_name').notNull(),
-    senderRole: text('sender_role').default('Member'),
-    senderMobile: text('sender_mobile'),
-    senderPhoto: text('sender_photo'),
-    text: text('text').notNull(),
-    photoUrl: text('photo_url'),
-    timestamp: text('timestamp').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [
-    index('idx_messages_village_id').on(table.villageId),
-    index('idx_messages_room_id').on(table.roomId),
-    index('idx_messages_created_at').on(table.createdAt),
-  ]
-);
-
-/**
- * 5.6 AUDIT LOGS TABLE
+ * 5.4 AUDIT LOGS TABLE
  */
 export const auditLogs = pgTable(
   'audit_logs',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     villageId: bigint('village_id', { mode: 'number' }).references(() => villages.id, { onDelete: 'set null' }),
-    memberId: bigint('member_id', { mode: 'number' }).references(() => members.id, { onDelete: 'set null' }),
+    userId: uuid('user_id').references(() => profiles.id, { onDelete: 'set null' }),
     userName: text('user_name').notNull(),
     action: text('action').notNull(),
     details: text('details'),
@@ -673,7 +570,7 @@ export const auditLogs = pgTable(
   },
   (table) => [
     index('idx_audit_logs_village_id').on(table.villageId),
-    index('idx_audit_logs_member_id').on(table.memberId),
+    index('idx_audit_logs_user_id').on(table.userId),
     index('idx_audit_logs_timestamp').on(table.timestamp),
   ]
 );
@@ -707,7 +604,6 @@ export const villagesRelations = relations(villages, ({ one, many }) => ({
     fields: [villages.gramPanchayatId],
     references: [gramPanchayats.id],
   }),
-  members: many(members),
   profiles: many(profiles),
   complaints: many(complaints),
   socialWorks: many(socialWorks),
@@ -722,11 +618,16 @@ export const villagesRelations = relations(villages, ({ one, many }) => ({
   auditLogs: many(auditLogs),
 }));
 
-export const profilesRelations = relations(profiles, ({ one }) => ({
+export const profilesRelations = relations(profiles, ({ one, many }) => ({
   village: one(villages, {
     fields: [profiles.villageId],
     references: [villages.id],
   }),
+  complaints: many(complaints),
+  socialWorks: many(socialWorks),
+  userPermissions: many(userPermissions),
+  villageRoles: many(userVillageRoles),
+  auditLogs: many(auditLogs),
 }));
 
 export const permissionsRelations = relations(permissions, ({ many }) => ({
@@ -738,16 +639,16 @@ export const userPermissionsRelations = relations(userPermissions, ({ one }) => 
     fields: [userPermissions.permissionCode],
     references: [permissions.code],
   }),
-  member: one(members, {
-    fields: [userPermissions.memberId],
-    references: [members.id],
+  user: one(profiles, {
+    fields: [userPermissions.userId],
+    references: [profiles.id],
   }),
 }));
 
 export const userVillageRolesRelations = relations(userVillageRoles, ({ one }) => ({
-  member: one(members, {
-    fields: [userVillageRoles.memberId],
-    references: [members.id],
+  user: one(profiles, {
+    fields: [userVillageRoles.userId],
+    references: [profiles.id],
   }),
   village: one(villages, {
     fields: [userVillageRoles.villageId],
@@ -755,26 +656,14 @@ export const userVillageRolesRelations = relations(userVillageRoles, ({ one }) =
   }),
 }));
 
-export const membersRelations = relations(members, ({ one, many }) => ({
-  village: one(villages, {
-    fields: [members.villageId],
-    references: [villages.id],
-  }),
-  userPermissions: many(userPermissions),
-  villageRoles: many(userVillageRoles),
-  complaints: many(complaints),
-  socialWorks: many(socialWorks),
-  auditLogs: many(auditLogs),
-}));
-
 export const complaintsRelations = relations(complaints, ({ one }) => ({
   village: one(villages, {
     fields: [complaints.villageId],
     references: [villages.id],
   }),
-  member: one(members, {
-    fields: [complaints.memberId],
-    references: [members.id],
+  user: one(profiles, {
+    fields: [complaints.userId],
+    references: [profiles.id],
   }),
 }));
 
@@ -783,9 +672,9 @@ export const socialWorksRelations = relations(socialWorks, ({ one }) => ({
     fields: [socialWorks.villageId],
     references: [villages.id],
   }),
-  member: one(members, {
-    fields: [socialWorks.memberId],
-    references: [members.id],
+  user: one(profiles, {
+    fields: [socialWorks.userId],
+    references: [profiles.id],
   }),
 }));
 
@@ -851,28 +740,14 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
   }),
 }));
 
-export const groupMessagesRelations = relations(groupMessages, ({ one }) => ({
-  village: one(villages, {
-    fields: [groupMessages.villageId],
-    references: [villages.id],
-  }),
-}));
-
-export const messagesRelations = relations(messages, ({ one }) => ({
-  village: one(villages, {
-    fields: [messages.villageId],
-    references: [villages.id],
-  }),
-}));
-
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   village: one(villages, {
     fields: [auditLogs.villageId],
     references: [villages.id],
   }),
-  member: one(members, {
-    fields: [auditLogs.memberId],
-    references: [members.id],
+  user: one(profiles, {
+    fields: [auditLogs.userId],
+    references: [profiles.id],
   }),
 }));
 
@@ -904,9 +779,6 @@ export type NewUserPermissionModel = typeof userPermissions.$inferInsert;
 export type UserVillageRoleModel = typeof userVillageRoles.$inferSelect;
 export type NewUserVillageRoleModel = typeof userVillageRoles.$inferInsert;
 
-export type MemberModel = typeof members.$inferSelect;
-export type NewMemberModel = typeof members.$inferInsert;
-
 export type ComplaintModel = typeof complaints.$inferSelect;
 export type NewComplaintModel = typeof complaints.$inferInsert;
 
@@ -937,11 +809,20 @@ export type NewChatMemberModel = typeof chatMembers.$inferInsert;
 export type ChatMessageModel = typeof chatMessages.$inferSelect;
 export type NewChatMessageModel = typeof chatMessages.$inferInsert;
 
-export type GroupMessageModel = typeof groupMessages.$inferSelect;
-export type NewGroupMessageModel = typeof groupMessages.$inferInsert;
-
-export type MessageModel = typeof messages.$inferSelect;
-export type NewMessageModel = typeof messages.$inferInsert;
-
 export type AuditLogModel = typeof auditLogs.$inferSelect;
 export type NewAuditLogModel = typeof auditLogs.$inferInsert;
+
+// ==============================================================================
+// 8. BACKWARD COMPATIBILITY ALIASES
+// ==============================================================================
+export const members = profiles;
+export const groupMessages = chatMessages;
+export const messages = chatMessages;
+
+export type MemberModel = ProfileModel;
+export type NewMemberModel = NewProfileModel;
+export type GroupMessageModel = ChatMessageModel;
+export type NewGroupMessageModel = NewChatMessageModel;
+export type MessageModel = ChatMessageModel;
+export type NewMessageModel = NewChatMessageModel;
+

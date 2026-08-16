@@ -77,14 +77,7 @@ export async function GET(req: Request) {
       db.select().from(schema.profiles).catch(() => []),
     ]);
 
-    let membersList = membersCount;
-    if (!membersList || membersList.length === 0) {
-      try {
-        membersList = await db.select().from(schema.members);
-      } catch (e) {
-        membersList = [];
-      }
-    }
+    const membersList = membersCount || [];
 
     const activeVillage = villagesData.find((v) => v.id === numericVillageId) || villagesData[0] || null;
     const formattedVillage = formatVillage(activeVillage);

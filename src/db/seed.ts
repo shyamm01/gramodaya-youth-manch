@@ -5,7 +5,7 @@ import {
   gramPanchayats,
   villages,
   permissions,
-  members,
+  profiles,
   announcements,
   complaints,
   socialWorks,
@@ -176,47 +176,7 @@ export async function seedDatabase() {
       })
       .onConflictDoNothing();
 
-    // 6. Seed Admins
-    console.log(`Inserting ${store.admins.length} admins...`);
-    for (const admin of store.admins) {
-      await db
-        .insert(members)
-        .values({
-          villageId,
-          name: admin.name,
-          mobile: admin.mobile,
-          role: 'ADMIN',
-          systemRole: admin.isHead ? 'SUPER_ADMIN' : 'ADMIN',
-          status: 'active',
-          photoUrl: admin.photoUrl || null,
-          address: `${admin.village || 'Rasoolpur'}, ग्राम पंचायत ${admin.gramPanchayat || 'Bahera'}`,
-        })
-        .onConflictDoUpdate({
-          target: members.mobile,
-          set: {
-            name: admin.name,
-            photoUrl: admin.photoUrl || null,
-            systemRole: admin.isHead ? 'SUPER_ADMIN' : 'ADMIN',
-          },
-        });
-    }
-
-    // 7. Seed Members
-    console.log(`Inserting ${store.members.length} members...`);
-    for (const member of store.members) {
-      await db
-        .insert(members)
-        .values({
-          villageId,
-          name: member.name,
-          mobile: member.mobile,
-          role: 'MEMBER',
-          systemRole: 'MEMBER',
-          status: member.status,
-          address: member.address || 'ग्राम रसूलपुर, ग्राम पंचायत बहेरा',
-        })
-        .onConflictDoNothing();
-    }
+    // 6. Profiles are not seeded automatically; real accounts are created via Supabase Auth signup.
 
     // 8. Seed Announcements
     console.log(`Inserting ${store.announcements.length} announcements...`);

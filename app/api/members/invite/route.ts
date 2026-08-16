@@ -57,23 +57,6 @@ export async function POST(req: Request) {
             isVerified = true;
           }
         } catch (e) {}
-
-        // Fallback to legacy members table
-        if (!isVerified) {
-          try {
-            const memberRecord = await db.query.members.findFirst({
-              where: or(
-                eq(schema.members.supabaseUserId, currentUser.id),
-                currentUser.email ? eq(schema.members.email, currentUser.email.toLowerCase().trim()) : undefined,
-                cleanReqMobile ? like(schema.members.mobile, `%${cleanReqMobile}%`) : undefined
-              ),
-            });
-
-            if (memberRecord && memberRecord.status === 'active') {
-              isVerified = true;
-            }
-          } catch (me) {}
-        }
       }
 
       // If not verified in DB, check if status is active in auth metadata
@@ -124,8 +107,8 @@ export async function POST(req: Request) {
 
     // 4. Check if member already exists in DB
     if (db) {
-      const existing = await db.query.members.findFirst({
-        where: eq(schema.members.email, cleanEmail),
+      const existing = await db.query.profiles.findFirst({
+        where: eq(schema.profiles.email, cleanEmail),
       });
 
       if (existing) {

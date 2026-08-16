@@ -32,9 +32,9 @@ export async function GET(req: Request, context: RouteContext) {
       );
     }
 
-    // 1. Fetch member record
-    const member = await db.query.members.findFirst({
-      where: (m, { eq }) => eq(m.id, memberId),
+    // 1. Fetch profile record
+    const member = await db.query.profiles.findFirst({
+      where: (m, { eq }) => eq(m.id, rawMemberId),
       with: {
         village: true,
       },
@@ -49,7 +49,7 @@ export async function GET(req: Request, context: RouteContext) {
 
     // 2. Fetch explicit permission overrides
     const userPerms = await db.query.userPermissions.findMany({
-      where: (up, { eq }) => eq(up.memberId, memberId),
+      where: (up, { eq }) => eq(up.userId, rawMemberId),
     });
 
     const isSuperAdmin = member.systemRole === 'SUPER_ADMIN';
@@ -68,11 +68,11 @@ export async function GET(req: Request, context: RouteContext) {
       success: true,
       member: {
         id: String(member.id),
-        name: member.name,
+        name: member.fullName,
         mobile: member.mobile,
         role: member.role,
         systemRole: member.systemRole,
-        villageId: member.villageId ? String(member.villageId) : '1',
+        villageId: member.villageId ? String(member.villageId) : '8',
       },
       isSuperAdmin,
       roleDefaults,
@@ -97,8 +97,8 @@ export async function POST(req: Request, context: RouteContext) {
     const currentUser = auth.user;
 
     const { memberId: rawMemberId } = await context.params;
-    const memberId = Number(rawMemberId);
-    if (!memberId || isNaN(memberId)) {
+    const userId = rawMemberId;
+    if (!userId) {
       return NextResponse.json(
         { success: false, error: 'Valid member ID is required.' },
         { status: 400 }
@@ -124,27 +124,25 @@ export async function POST(req: Request, context: RouteContext) {
     }
 
     // 1. Remove existing user permission overrides
-    await db.delete(schema.userPermissions).where(eq(schema.userPermissions.memberId, memberId));
+    await db.delete(schema.userPermissions).where(eq(schema.userPermissions.userId, userId));
 
     // 2. Insert new overrides
     if (permissions.length > 0) {
       await db.insert(schema.userPermissions).values(
         permissions.map((p: any) => ({
-          memberId,
+          userId,
           permissionCode: p.code,
           isGranted: p.isGranted !== false,
           grantedBy: grantedBy || currentUser.name || 'Admin',
-          grantedByMobile: grantedByMobile || currentUser.mobile || '',
-          reason: reason || 'Admin Override',
         }))
       );
     }
 
     logAuditAction(
-      `Updated custom permissions for Member #${memberId} (${permissions.length} items)`,
+      `Updated custom permissions for User ${userId} (${permissions.length} items)`,
       grantedBy || currentUser.name || 'Admin',
       grantedByMobile || currentUser.mobile || '',
-      `Member #${memberId}`
+      `User ${userId}`
     );
 
     return NextResponse.json({ success: true, count: permissions.length });

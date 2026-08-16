@@ -94,20 +94,20 @@ export async function GET() {
           },
         },
       },
-      orderBy: [desc(schema.members.id)],
+      orderBy: [desc(schema.profiles.createdAt)],
     });
 
-    const formattedLeaders = leaders.map((l) => {
+    const formattedLeaders = leaders.map((l: any) => {
       const v = l.village;
       const gp = v?.gramPanchayat;
       const dist = gp?.district;
 
       return {
         id: String(l.id),
-        villageId: l.villageId ? String(l.villageId) : '1',
-        name: l.name,
+        villageId: l.villageId ? String(l.villageId) : '8',
+        name: l.fullName || l.name || 'Leader',
         mobile: l.mobile,
-        photoUrl: l.photoUrl || '',
+        photoUrl: l.avatarUrl || l.photoUrl || '',
         designation:
           l.designation ||
           (l.systemRole === 'SUPER_ADMIN'
@@ -115,10 +115,10 @@ export async function GET() {
             : 'ग्राम संयोजक (Village Coordinator)'),
         role: l.role,
         systemRole: l.systemRole,
-        gramPanchayat: gp?.name || 'Bahera',
-        village: v?.name || 'Rasoolpur',
-        district: dist?.name || 'Hardoi',
-        address: l.address || '',
+        gramPanchayat: gp?.nameHindi || gp?.name || 'Bahera',
+        village: v?.nameHindi || v?.name || 'Rasoolpur',
+        district: dist?.nameHindi || dist?.name || 'Hardoi',
+        address: l.houseNo ? `${l.houseNo}, ${v?.name || 'Rasoolpur'}` : `${v?.name || 'Rasoolpur'}, ${gp?.name || 'Bahera'}`,
         bloodGroup: l.bloodGroup || '',
         joinedAt: l.createdAt,
       };
