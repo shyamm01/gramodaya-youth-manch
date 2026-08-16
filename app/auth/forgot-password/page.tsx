@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/src/context/ToastContext';
+import { useApp } from '@/src/context/AppContext';
 import { KeyRound, Mail, AlertCircle, CheckCircle2, ArrowLeft, Send } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
@@ -11,6 +12,9 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  const { lang } = useApp();
+  const isEn = lang === 'en';
 
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const supabase = createClient();
@@ -21,14 +25,14 @@ export default function ForgotPasswordPage() {
 
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@')) {
-      const msg = 'कृपया एक वैध ईमेल पता दर्ज करें (Please enter a valid email address)';
+      const msg = isEn ? 'Please enter a valid email address' : 'कृपया एक वैध ईमेल पता दर्ज करें';
       setErrorMessage(msg);
-      toastError(msg, 'अमान्य ईमेल');
+      toastError(msg, isEn ? 'Invalid Email' : 'अमान्य ईमेल');
       return;
     }
 
     setLoading(true);
-    toastInfo('पासवर्ड रीसेट लिंक भेजा जा रहा है...', 'प्रक्रिया जारी');
+    toastInfo(isEn ? 'Sending reset link...' : 'पासवर्ड रीसेट लिंक भेजा जा रहा है...', 'Reset Password');
 
     try {
       const redirectTo = `${window.location.origin}/auth/update-password`;
@@ -37,20 +41,25 @@ export default function ForgotPasswordPage() {
       });
 
       if (error) {
-        const msg = error.message || 'पासवर्ड रीसेट अनुरोध भेजने में त्रुटि।';
+        const msg = error.message || (isEn ? 'Failed to send password reset request.' : 'पासवर्ड रीसेट अनुरोध भेजने में त्रुटि।');
         setErrorMessage(msg);
-        toastError(msg, 'त्रुटि');
+        toastError(msg, isEn ? 'Error' : 'त्रुटि');
         setLoading(false);
         return;
       }
 
       // Neutral success to prevent account enumeration (PRD Section 26)
       setIsSubmitted(true);
-      toastSuccess('यदि ईमेल पंजीकृत है, तो रीसेट लिंक भेज दिया गया है।', 'लिंक प्रेषित');
+      toastSuccess(
+        isEn
+          ? 'If the email is registered, a password reset link has been dispatched.'
+          : 'यदि ईमेल पंजीकृत है, तो रीसेट लिंक भेज दिया गया है।',
+        isEn ? 'Link Sent' : 'लिंक प्रेषित'
+      );
     } catch (err: any) {
-      const msg = err?.message || 'अनुरोध विफल रहा। कृपया बाद में प्रयास करें।';
+      const msg = err?.message || (isEn ? 'Request failed. Please try again later.' : 'अनुरोध विफल रहा। कृपया बाद में प्रयास करें।');
       setErrorMessage(msg);
-      toastError(msg, 'त्रुटि');
+      toastError(msg, isEn ? 'Error' : 'त्रुटि');
     } finally {
       setLoading(false);
     }
@@ -65,10 +74,12 @@ export default function ForgotPasswordPage() {
             <KeyRound className="w-8 h-8" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-stone-900 dark:text-white tracking-tight">
-            पासवर्ड रीसेट | Reset Password
+            {isEn ? 'Reset Password' : 'पासवर्ड रीसेट'}
           </h1>
           <p className="text-sm text-stone-600 dark:text-stone-400 mt-2">
-            अपना ईमेल दर्ज करें और हम आपको पासवर्ड रीसेट लिंक भेजेंगे
+            {isEn
+              ? 'Enter your email and we will send you a password reset link'
+              : 'अपना ईमेल दर्ज करें और हम आपको पासवर्ड रीसेट लिंक भेजेंगे'}
           </p>
         </div>
 
@@ -87,10 +98,18 @@ export default function ForgotPasswordPage() {
                 <CheckCircle2 className="w-8 h-8" />
               </div>
               <h2 className="text-xl font-bold text-stone-900 dark:text-white">
-                रीसेट लिंक भेजा गया (Reset Link Sent)
+                {isEn ? 'Reset Link Sent' : 'रीसेट लिंक भेजा गया'}
               </h2>
               <p className="text-sm text-stone-600 dark:text-stone-300 leading-relaxed">
-                यदि <strong className="text-stone-800 dark:text-stone-200">{email}</strong> पंजीकृत है, तो आपको पासवर्ड बदलने के लिए एक लिंक प्राप्त होगा। कृपया अपना इनबॉक्स और स्पैम फ़ोल्डर जांचें।
+                {isEn ? (
+                  <>
+                    If <strong className="text-stone-800 dark:text-stone-200">{email}</strong> is registered, you will receive an email to reset your password. Please check your inbox and spam folder.
+                  </>
+                ) : (
+                  <>
+                    यदि <strong className="text-stone-800 dark:text-stone-200">{email}</strong> पंजीकृत है, तो आपको पासवर्ड बदलने के लिए एक लिंक प्राप्त होगा। कृपया अपना इनबॉक्स और स्पैम फ़ोल्डर जांचें।
+                  </>
+                )}
               </p>
               <div className="pt-4">
                 <Link
@@ -98,7 +117,7 @@ export default function ForgotPasswordPage() {
                   className="inline-flex items-center justify-center gap-2 py-3 px-6 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm transition-all shadow-md cursor-pointer"
                 >
                   <ArrowLeft className="w-4 h-4" />
-                  <span>लॉगिन पृष्ठ पर वापस जाएं (Back to Login)</span>
+                  <span>{isEn ? 'Back to Login' : 'लॉगिन पृष्ठ पर वापस जाएं'}</span>
                 </Link>
               </div>
             </div>
@@ -106,7 +125,7 @@ export default function ForgotPasswordPage() {
             <form onSubmit={handleResetRequest} className="space-y-5">
               <div>
                 <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
-                  पंजीकृत ईमेल (Registered Email)
+                  {isEn ? 'Registered Email' : 'पंजीकृत ईमेल'}
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 dark:text-stone-500" />
@@ -130,7 +149,7 @@ export default function ForgotPasswordPage() {
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>रीसेट लिंक भेजें (Send Reset Link)</span>
+                    <span>{isEn ? 'Send Reset Link' : 'रीसेट लिंक भेजें'}</span>
                     <Send className="w-4 h-4" />
                   </>
                 )}
@@ -146,7 +165,7 @@ export default function ForgotPasswordPage() {
                 className="font-medium text-sm text-stone-600 dark:text-stone-400 hover:text-amber-600 dark:hover:text-amber-400 inline-flex items-center gap-2 transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span>साइन इन पर वापस जाएं (Back to Sign in)</span>
+                <span>{isEn ? 'Back to Sign In' : 'साइन इन पर वापस जाएं'}</span>
               </Link>
             </div>
           )}

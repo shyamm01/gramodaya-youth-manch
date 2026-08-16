@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/src/context/ToastContext';
+import { useApp } from '@/src/context/AppContext';
 import { Lock, CheckCircle2, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function UpdatePasswordPage() {
@@ -15,6 +16,9 @@ export default function UpdatePasswordPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
+  const { lang } = useApp();
+  const isEn = lang === 'en';
+
   const { success: toastSuccess, error: toastError } = useToast();
   const supabase = createClient();
 
@@ -23,15 +27,15 @@ export default function UpdatePasswordPage() {
     setErrorMessage(null);
 
     if (password.length < 8) {
-      const msg = 'नया पासवर्ड कम से कम 8 अक्षरों का होना चाहिए (Password must be at least 8 characters)';
+      const msg = isEn ? 'Password must be at least 8 characters' : 'नया पासवर्ड कम से कम 8 अक्षरों का होना चाहिए';
       setErrorMessage(msg);
-      toastError(msg, 'कमजोर पासवर्ड');
+      toastError(msg, isEn ? 'Weak Password' : 'कमजोर पासवर्ड');
       return;
     }
     if (password !== confirmPassword) {
-      const msg = 'दोनों पासवर्ड मेल नहीं खाते (Passwords do not match)';
+      const msg = isEn ? 'Passwords do not match' : 'दोनों पासवर्ड मेल नहीं खाते';
       setErrorMessage(msg);
-      toastError(msg, 'पासवर्ड बेमेल');
+      toastError(msg, isEn ? 'Password Mismatch' : 'पासवर्ड बेमेल');
       return;
     }
 
@@ -43,23 +47,23 @@ export default function UpdatePasswordPage() {
       });
 
       if (error) {
-        const msg = error.message || 'पासवर्ड अपडेट करने में त्रुटि। कृपया पुनः प्रयास करें।';
+        const msg = error.message || (isEn ? 'Failed to update password. Please try again.' : 'पासवर्ड अपडेट करने में त्रुटि। कृपया पुनः प्रयास करें।');
         setErrorMessage(msg);
-        toastError(msg, 'त्रुटि');
+        toastError(msg, isEn ? 'Error' : 'त्रुटि');
         setLoading(false);
         return;
       }
 
       setIsSuccess(true);
-      toastSuccess('पासवर्ड सफलतापूर्वक अपडेट किया गया!', 'सफल');
+      toastSuccess(isEn ? 'Password updated successfully!' : 'पासवर्ड सफलतापूर्वक अपडेट किया गया!', isEn ? 'Success' : 'सफल');
       setTimeout(() => {
         router.refresh();
         router.replace('/dashboard');
       }, 2000);
     } catch (err: any) {
-      const msg = err?.message || 'पासवर्ड अपडेट करने में असमर्थ।';
+      const msg = err?.message || (isEn ? 'Could not update password.' : 'पासवर्ड अपडेट करने में असमर्थ।');
       setErrorMessage(msg);
-      toastError(msg, 'त्रुटि');
+      toastError(msg, isEn ? 'Error' : 'त्रुटि');
       setLoading(false);
     }
   };
@@ -73,10 +77,12 @@ export default function UpdatePasswordPage() {
             <ShieldCheck className="w-8 h-8" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-stone-900 dark:text-white tracking-tight">
-            नया पासवर्ड बनाएं | Set New Password
+            {isEn ? 'Set New Password' : 'नया पासवर्ड बनाएं'}
           </h1>
           <p className="text-sm text-stone-600 dark:text-stone-400 mt-2">
-            कृपया अपने खाते के लिए एक नया और मजबूत पासवर्ड दर्ज करें
+            {isEn
+              ? 'Please enter a new and strong password for your account'
+              : 'कृपया अपने खाते के लिए एक नया और मजबूत पासवर्ड दर्ज करें'}
           </p>
         </div>
 
@@ -95,17 +101,19 @@ export default function UpdatePasswordPage() {
                 <CheckCircle2 className="w-8 h-8" />
               </div>
               <h2 className="text-xl font-bold text-stone-900 dark:text-white">
-                पासवर्ड सफलतापूर्वक बदला गया!
+                {isEn ? 'Password Updated Successfully!' : 'पासवर्ड सफलतापूर्वक बदला गया!'}
               </h2>
               <p className="text-sm text-stone-600 dark:text-stone-300">
-                आपका नया पासवर्ड सुरक्षित रूप से सहेज लिया गया है। आपको डैशबोर्ड पर भेजा जा रहा है...
+                {isEn
+                  ? 'Your new password has been securely saved. Redirecting to dashboard...'
+                  : 'आपका नया पासवर्ड सुरक्षित रूप से सहेज लिया गया है। आपको डैशबोर्ड पर भेजा जा रहा है...'}
               </p>
               <div className="pt-4">
                 <Link
                   href="/dashboard"
                   className="inline-flex items-center justify-center gap-2 py-3 px-6 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm transition-all shadow-md cursor-pointer"
                 >
-                  <span>डैशबोर्ड पर जाएं (Go to Dashboard)</span>
+                  <span>{isEn ? 'Go to Dashboard' : 'डैशबोर्ड पर जाएं'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
@@ -114,7 +122,7 @@ export default function UpdatePasswordPage() {
             <form onSubmit={handleUpdatePassword} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
-                  नया पासवर्ड (New Password)
+                  {isEn ? 'New Password' : 'नया पासवर्ड'}
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 dark:text-stone-500" />
@@ -128,13 +136,13 @@ export default function UpdatePasswordPage() {
                   />
                 </div>
                 <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1 pl-1">
-                  कम से कम 8 अक्षर (Minimum 8 characters)
+                  {isEn ? 'Minimum 8 characters' : 'कम से कम 8 अक्षर'}
                 </p>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
-                  नए पासवर्ड की पुष्टि (Confirm New Password)
+                  {isEn ? 'Confirm New Password' : 'नए पासवर्ड की पुष्टि'}
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 dark:text-stone-500" />
@@ -158,7 +166,7 @@ export default function UpdatePasswordPage() {
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
                   <>
-                    <span>पासवर्ड अपडेट करें (Update Password)</span>
+                    <span>{isEn ? 'Update Password' : 'पासवर्ड अपडेट करें'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}

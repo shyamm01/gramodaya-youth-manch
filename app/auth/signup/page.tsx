@@ -5,12 +5,16 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/src/context/ToastContext';
+import { useApp } from '@/src/context/AppContext';
 import { UserPlus, Mail, Lock, User, AlertCircle, ArrowRight, Check } from 'lucide-react';
 
 function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get('next') || '/dashboard';
+
+  const { lang } = useApp();
+  const isEn = lang === 'en';
 
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
 
@@ -44,27 +48,27 @@ function SignupForm() {
     const cleanEmail = email.trim().toLowerCase();
 
     if (!cleanName) {
-      const msg = 'कृपया अपना पूरा नाम दर्ज करें (Please enter your full name)';
+      const msg = isEn ? 'Please enter your full name' : 'कृपया अपना पूरा नाम दर्ज करें';
       setErrorMessage(msg);
-      toastError(msg, 'नाम आवश्यक है');
+      toastError(msg, isEn ? 'Name Required' : 'नाम आवश्यक है');
       return;
     }
     if (!cleanEmail || !cleanEmail.includes('@')) {
-      const msg = 'कृपया एक वैध ईमेल पता दर्ज करें (Please enter a valid email address)';
+      const msg = isEn ? 'Please enter a valid email address' : 'कृपया एक वैध ईमेल पता दर्ज करें';
       setErrorMessage(msg);
-      toastError(msg, 'अमान्य ईमेल');
+      toastError(msg, isEn ? 'Invalid Email' : 'अमान्य ईमेल');
       return;
     }
     if (password.length < 8) {
-      const msg = 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए (Password must be at least 8 characters)';
+      const msg = isEn ? 'Password must be at least 8 characters' : 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए';
       setErrorMessage(msg);
-      toastError(msg, 'कमजोर पासवर्ड');
+      toastError(msg, isEn ? 'Weak Password' : 'कमजोर पासवर्ड');
       return;
     }
     if (password !== confirmPassword) {
-      const msg = 'पासवर्ड और पुष्टि पासवर्ड मेल नहीं खाते (Passwords do not match)';
+      const msg = isEn ? 'Passwords do not match' : 'पासवर्ड और पुष्टि पासवर्ड मेल नहीं खाते';
       setErrorMessage(msg);
-      toastError(msg, 'पासवर्ड बेमेल');
+      toastError(msg, isEn ? 'Password Mismatch' : 'पासवर्ड बेमेल');
       return;
     }
 
@@ -84,12 +88,12 @@ function SignupForm() {
       });
 
       if (error) {
-        let msg = error.message || 'पंजीकरण विफल रहा। कृपया पुनः प्रयास करें।';
+        let msg = error.message || (isEn ? 'Registration failed. Please try again.' : 'पंजीकरण विफल रहा। कृपया पुनः प्रयास करें।');
         if (error.message.toLowerCase().includes('already registered')) {
-          msg = 'यह ईमेल पहले से पंजीकृत है। कृपया लॉगिन करें या पासवर्ड रीसेट करें।';
+          msg = isEn ? 'This email is already registered. Please sign in or reset your password.' : 'यह ईमेल पहले से पंजीकृत है। कृपया लॉगिन करें या पासवर्ड रीसेट करें।';
         }
         setErrorMessage(msg);
-        toastError(msg, 'पंजीकरण त्रुटि');
+        toastError(msg, isEn ? 'Registration Error' : 'पंजीकरण त्रुटि');
         setLoading(false);
         return;
       }
@@ -97,23 +101,25 @@ function SignupForm() {
       if (data?.user) {
         setIsSuccess(true);
         if (data.session) {
-          const succ = 'खाता सफलतापूर्वक बनाया गया! आपको डैशबोर्ड पर भेजा जा रहा है...';
+          const succ = isEn ? 'Account created successfully! Redirecting to dashboard...' : 'खाता सफलतापूर्वक बनाया गया! आपको डैशबोर्ड पर भेजा जा रहा है...';
           setSuccessInfo(succ);
-          toastSuccess(succ, 'स्वागत है!');
+          toastSuccess(succ, isEn ? 'Welcome' : 'स्वागत है!');
           setTimeout(() => {
             router.refresh();
             router.replace(next);
           }, 1500);
         } else {
-          const info = `हमने ${cleanEmail} पर एक सत्यापन ईमेल भेजा है। कृपया अपना इनबॉक्स जांचें और खाते को सक्रिय करने के लिए लिंक पर क्लिक करें।`;
+          const info = isEn
+            ? `We sent a verification email to ${cleanEmail}. Please check your inbox and click the link to activate your account.`
+            : `हमने ${cleanEmail} पर एक सत्यापन ईमेल भेजा है। कृपया अपना इनबॉक्स जांचें और खाते को सक्रिय करने के लिए लिंक पर क्लिक करें।`;
           setSuccessInfo(info);
-          toastSuccess('सत्यापन ईमेल भेजा गया। कृपया अपना इनबॉक्स जांचें।', 'पंजीकरण सफल');
+          toastSuccess(isEn ? 'Verification email sent. Please check your inbox.' : 'सत्यापन ईमेल भेजा गया। कृपया अपना इनबॉक्स जांचें।', isEn ? 'Registration Successful' : 'पंजीकरण सफल');
         }
       }
     } catch (err: any) {
-      const msg = err?.message || 'पंजीकरण के दौरान एक त्रुटि हुई।';
+      const msg = err?.message || (isEn ? 'An error occurred during registration.' : 'पंजीकरण के दौरान एक त्रुटि हुई।');
       setErrorMessage(msg);
-      toastError(msg, 'त्रुटि');
+      toastError(msg, isEn ? 'Error' : 'त्रुटि');
     } finally {
       setLoading(false);
     }
@@ -122,7 +128,7 @@ function SignupForm() {
   const handleGoogleSignup = async () => {
     setErrorMessage(null);
     setOauthLoading(true);
-    toastInfo('गूगल प्रमाणीकरण पृष्ठ पर भेजा जा रहा है...', 'Google Signup');
+    toastInfo(isEn ? 'Redirecting to Google Authentication...' : 'गूगल प्रमाणीकरण पृष्ठ पर भेजा जा रहा है...', 'Google Signup');
 
     try {
       const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
@@ -138,15 +144,15 @@ function SignupForm() {
       });
 
       if (error) {
-        const msg = error.message || 'गूगल ऑथेंटिकेशन में त्रुटि।';
+        const msg = error.message || (isEn ? 'Google authentication error.' : 'गूगल ऑथेंटिकेशन में त्रुटि।');
         setErrorMessage(msg);
-        toastError(msg, 'OAuth त्रुटि');
+        toastError(msg, 'OAuth');
         setOauthLoading(false);
       }
     } catch (err: any) {
-      const msg = err?.message || 'गूगल ऑथेंटिकेशन आरंभ करने में असमर्थ।';
+      const msg = err?.message || (isEn ? 'Could not initiate Google authentication.' : 'गूगल ऑथेंटिकेशन आरंभ करने में असमर्थ।');
       setErrorMessage(msg);
-      toastError(msg, 'त्रुटि');
+      toastError(msg, isEn ? 'Error' : 'त्रुटि');
       setOauthLoading(false);
     }
   };
@@ -160,10 +166,12 @@ function SignupForm() {
             <UserPlus className="w-8 h-8" />
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-stone-900 dark:text-white tracking-tight">
-            नया खाता बनाएं | Sign Up
+            {isEn ? 'Create Account' : 'नया खाता बनाएं'}
           </h1>
           <p className="text-sm text-stone-600 dark:text-stone-400 mt-2">
-            ग्रामोदय यूथ मंच से जुड़ें और ग्राम विकास में भागीदार बनें
+            {isEn
+              ? 'Join Gramodaya Youth Manch and participate in village development'
+              : 'ग्रामोदय यूथ मंच से जुड़ें और ग्राम विकास में भागीदार बनें'}
           </p>
         </div>
 
@@ -183,7 +191,7 @@ function SignupForm() {
                 <Check className="w-8 h-8" />
               </div>
               <h2 className="text-xl font-bold text-stone-900 dark:text-white">
-                पंजीकरण सफल! (Registration Successful)
+                {isEn ? 'Registration Successful!' : 'पंजीकरण सफल!'}
               </h2>
               <p className="text-sm text-stone-600 dark:text-stone-300 leading-relaxed">
                 {successInfo}
@@ -193,7 +201,7 @@ function SignupForm() {
                   href="/auth/login"
                   className="inline-flex items-center justify-center gap-2 py-3 px-6 rounded-2xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm transition-all shadow-md cursor-pointer"
                 >
-                  <span>लॉगिन पृष्ठ पर जाएं (Go to Login)</span>
+                  <span>{isEn ? 'Go to Login' : 'लॉगिन पृष्ठ पर जाएं'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
@@ -204,7 +212,7 @@ function SignupForm() {
               <form onSubmit={handleSignup} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
-                    पूरा नाम (Full Name)
+                    {isEn ? 'Full Name' : 'पूरा नाम'}
                   </label>
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 dark:text-stone-500" />
@@ -213,7 +221,7 @@ function SignupForm() {
                       required
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder="e.g. Ramesh Kumar"
+                      placeholder={isEn ? 'e.g. Ramesh Kumar' : 'उदा. रमेश कुमार'}
                       className="w-full pl-12 pr-4 py-3 bg-stone-50 dark:bg-stone-800/50 border border-stone-200 dark:border-stone-700/80 rounded-2xl text-stone-900 dark:text-white placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500 transition-all text-sm"
                     />
                   </div>
@@ -221,7 +229,7 @@ function SignupForm() {
 
                 <div>
                   <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
-                    ईमेल (Email Address)
+                    {isEn ? 'Email Address' : 'ईमेल पता'}
                   </label>
                   <div className="relative">
                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 dark:text-stone-500" />
@@ -238,7 +246,7 @@ function SignupForm() {
 
                 <div>
                   <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
-                    पासवर्ड (Password - min 8 chars)
+                    {isEn ? 'Password' : 'पासवर्ड'}
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 dark:text-stone-500" />
@@ -252,13 +260,13 @@ function SignupForm() {
                     />
                   </div>
                   <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1 pl-1">
-                    कम से कम 8 अक्षर (Minimum 8 characters)
+                    {isEn ? 'Minimum 8 characters' : 'कम से कम 8 अक्षर'}
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-stone-700 dark:text-stone-300 uppercase tracking-wider mb-2">
-                    पासवर्ड पुष्टि (Confirm Password)
+                    {isEn ? 'Confirm Password' : 'पासवर्ड पुष्टि'}
                   </label>
                   <div className="relative">
                     <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-stone-400 dark:text-stone-500" />
@@ -282,7 +290,7 @@ function SignupForm() {
                     <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <>
-                      <span>खाता बनाएं (Create Account)</span>
+                      <span>{isEn ? 'Create Account' : 'खाता बनाएं'}</span>
                       <UserPlus className="w-4 h-4" />
                     </>
                   )}
@@ -292,8 +300,8 @@ function SignupForm() {
               {/* Divider */}
               <div className="relative flex py-6 items-center">
                 <div className="flex-grow border-t border-stone-200 dark:border-stone-800"></div>
-                <span className="flex-shrink mx-4 text-xs uppercase font-medium text-stone-400 dark:text-stone-500 tracking-wider">
-                  OR
+                <span className="flex-shrink mx-4 text-xs uppercase font-semibold text-stone-400 dark:text-stone-500 tracking-wider">
+                  {isEn ? 'OR' : 'या'}
                 </span>
                 <div className="flex-grow border-t border-stone-200 dark:border-stone-800"></div>
               </div>
@@ -327,7 +335,7 @@ function SignupForm() {
                     />
                   </svg>
                 )}
-                <span>Continue with Google</span>
+                <span>{isEn ? 'Continue with Google' : 'गूगल के साथ जारी रखें'}</span>
               </button>
             </>
           )}
@@ -335,12 +343,12 @@ function SignupForm() {
           {/* Footer link */}
           <div className="mt-8 text-center pt-6 border-t border-stone-100 dark:border-stone-800/80">
             <p className="text-sm text-stone-600 dark:text-stone-400">
-              पहले से खाता है? (Already have an account?){' '}
+              {isEn ? 'Already have an account?' : 'पहले से खाता है?'}{' '}
               <Link
                 href={`/auth/login?next=${encodeURIComponent(next)}`}
-                className="font-bold text-amber-600 dark:text-amber-400 hover:text-amber-500 inline-flex items-center gap-1 hover:underline"
+                className="font-bold text-amber-600 dark:text-amber-400 hover:text-amber-500 inline-flex items-center gap-1 hover:underline ml-1"
               >
-                साइन इन करें (Sign in)
+                {isEn ? 'Sign In' : 'साइन इन करें'}
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </p>
