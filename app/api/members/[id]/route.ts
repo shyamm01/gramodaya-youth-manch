@@ -47,21 +47,44 @@ export async function PUT(
     const numId = Number(id);
 
     if (db) {
-      const updateData: any = {};
-      if (name !== undefined) updateData.name = name.trim();
+      const updateData: any = { updatedAt: new Date() };
+      if (name !== undefined) {
+        updateData.fullName = name.trim();
+        updateData.name = name.trim();
+      }
       if (mobile !== undefined) updateData.mobile = normalizeMobile(mobile);
-      if (status !== undefined) updateData.status = status;
-      if (photoUrl !== undefined) updateData.photoUrl = photoUrl;
+      if (status !== undefined) {
+        updateData.status = status;
+        updateData.isApproved = status === 'active';
+      }
+      if (role !== undefined) {
+        updateData.role = role;
+        updateData.systemRole = role;
+      }
+      if (photoUrl !== undefined) {
+        updateData.photoUrl = photoUrl;
+        updateData.avatarUrl = photoUrl;
+      }
       if (fatherName !== undefined) updateData.fatherName = fatherName.trim();
       if (dob !== undefined) updateData.dob = dob;
       if (address !== undefined) updateData.address = address.trim();
       if (villageId !== undefined && !isNaN(Number(villageId))) updateData.villageId = Number(villageId);
 
-      if (!isNaN(numId)) {
-        await db.update(schema.members).set(updateData).where(eq(schema.members.id, numId));
-      } else {
-        await db.update(schema.members).set(updateData).where(eq(schema.members.supabaseUserId, id));
+      // Try updating profiles first
+      try {
+        await db.update(schema.profiles).set(updateData).where(eq(schema.profiles.id, id));
+      } catch (profUpdateErr) {
+        console.warn("Profile update note:", profUpdateErr);
       }
+
+      // Fallback update on legacy members table
+      try {
+        if (!isNaN(numId)) {
+          await db.update(schema.members).set(updateData).where(eq(schema.members.id, numId));
+        } else {
+          await db.update(schema.members).set(updateData).where(eq(schema.members.supabaseUserId, id));
+        }
+      } catch (memErr) {}
     }
 
     const store = loadStore();

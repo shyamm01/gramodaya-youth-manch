@@ -198,11 +198,39 @@ export const profiles = pgTable(
     id: uuid('id').primaryKey(),
     fullName: text('full_name'),
     avatarUrl: text('avatar_url'),
+    photoUrl: text('photo_url'),
+    mobile: text('mobile'),
+    email: text('email'),
+    fatherName: text('father_name'),
+    dob: text('dob'),
+    gender: text('gender'),
+    villageId: bigint('village_id', { mode: 'number' })
+      .references(() => villages.id, { onDelete: 'set null' }),
+    villageName: text('village_name'),
+    gramPanchayat: text('gram_panchayat'),
+    district: text('district'),
+    state: text('state'),
+    pincode: text('pincode').default('241125'),
+    address: text('address'),
+    houseNo: text('house_no'),
+    street: text('street'),
+    occupation: text('occupation'),
+    designation: text('designation'),
+    politicalBackground: text('political_background'),
+    bloodGroup: text('blood_group'),
+    status: memberStatusEnum('status').notNull().default('pending'),
+    role: memberRoleEnum('role').notNull().default('MEMBER'),
+    systemRole: systemRoleEnum('system_role').notNull().default('MEMBER'),
+    isApproved: boolean('is_approved').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('idx_profiles_created_at').on(table.createdAt),
+    index('idx_profiles_mobile').on(table.mobile),
+    index('idx_profiles_status').on(table.status),
+    index('idx_profiles_system_role').on(table.systemRole),
+    index('idx_profiles_village_id').on(table.villageId),
   ]
 );
 
@@ -683,6 +711,7 @@ export const villagesRelations = relations(villages, ({ one, many }) => ({
     references: [gramPanchayats.id],
   }),
   members: many(members),
+  profiles: many(profiles),
   complaints: many(complaints),
   socialWorks: many(socialWorks),
   events: many(events),
@@ -694,6 +723,13 @@ export const villagesRelations = relations(villages, ({ one, many }) => ({
   chatMessages: many(chatMessages),
   userVillageRoles: many(userVillageRoles),
   auditLogs: many(auditLogs),
+}));
+
+export const profilesRelations = relations(profiles, ({ one }) => ({
+  village: one(villages, {
+    fields: [profiles.villageId],
+    references: [villages.id],
+  }),
 }));
 
 export const permissionsRelations = relations(permissions, ({ many }) => ({

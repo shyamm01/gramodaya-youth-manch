@@ -101,7 +101,7 @@ export const JoinStepCredentials: React.FC<JoinStepCredentialsProps> = ({
             minLength={8}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder={isEn ? 'Create secure password' : 'सुरक्षित पासवर्ड बनाएं'}
             className="pl-9 pr-10 h-10 text-xs rounded-xl"
           />
           <button
@@ -131,7 +131,7 @@ export const JoinStepCredentials: React.FC<JoinStepCredentialsProps> = ({
             required
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            placeholder="••••••••"
+            placeholder={isEn ? 'Re-enter password' : 'पासवर्ड पुनः दर्ज करें'}
             className="pl-9 h-10 text-xs rounded-xl"
           />
         </div>

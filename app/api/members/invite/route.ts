@@ -44,16 +44,35 @@ export async function POST(req: Request) {
 
       if (db) {
         const cleanReqMobile = normalizeMobile(currentUser.mobile || '');
-        const memberRecord = await db.query.members.findFirst({
-          where: or(
-            eq(schema.members.supabaseUserId, currentUser.id),
-            currentUser.email ? eq(schema.members.email, currentUser.email.toLowerCase().trim()) : undefined,
-            cleanReqMobile ? like(schema.members.mobile, `%${cleanReqMobile}%`) : undefined
-          ),
-        });
+        // Check profiles table first
+        try {
+          const profileRecord = await db.query.profiles.findFirst({
+            where: or(
+              eq(schema.profiles.id, currentUser.id),
+              currentUser.email ? eq(schema.profiles.email, currentUser.email.toLowerCase().trim()) : undefined,
+              cleanReqMobile ? like(schema.profiles.mobile, `%${cleanReqMobile}%`) : undefined
+            ),
+          });
+          if (profileRecord && profileRecord.status === 'active') {
+            isVerified = true;
+          }
+        } catch (e) {}
 
-        if (memberRecord && memberRecord.status === 'active') {
-          isVerified = true;
+        // Fallback to legacy members table
+        if (!isVerified) {
+          try {
+            const memberRecord = await db.query.members.findFirst({
+              where: or(
+                eq(schema.members.supabaseUserId, currentUser.id),
+                currentUser.email ? eq(schema.members.email, currentUser.email.toLowerCase().trim()) : undefined,
+                cleanReqMobile ? like(schema.members.mobile, `%${cleanReqMobile}%`) : undefined
+              ),
+            });
+
+            if (memberRecord && memberRecord.status === 'active') {
+              isVerified = true;
+            }
+          } catch (me) {}
         }
       }
 

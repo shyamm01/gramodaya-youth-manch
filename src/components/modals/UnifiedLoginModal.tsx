@@ -232,7 +232,7 @@ export const UnifiedLoginModal: React.FC = () => {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder={lang === "en" ? "Enter your password" : "अपना पासवर्ड दर्ज करें"}
                   className="pl-10 pr-10 h-10.5 text-xs rounded-xl"
                 />
                 <button
