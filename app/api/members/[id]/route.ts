@@ -53,9 +53,17 @@ export async function PUT(
         profileUpdateData.status = status;
         profileUpdateData.isApproved = status === 'active';
       }
-      if (role !== undefined) {
-        profileUpdateData.role = role;
-        profileUpdateData.systemRole = role;
+      if (body.systemRole !== undefined) {
+        profileUpdateData.systemRole = body.systemRole;
+        profileUpdateData.role = (body.systemRole === 'SUPER_ADMIN' || body.systemRole === 'ADMIN') ? 'ADMIN' : 'MEMBER';
+      } else if (role !== undefined) {
+        if (role === 'SUPER_ADMIN' || role === 'DISTRICT_ADMIN' || role === 'PANCHAYAT_ADMIN' || role === 'VILLAGE_ADMIN' || role === 'VILLAGE_MODERATOR' || role === 'ADMIN' || role === 'GUEST') {
+          profileUpdateData.systemRole = role;
+          profileUpdateData.role = (role === 'SUPER_ADMIN' || role === 'ADMIN') ? 'ADMIN' : 'MEMBER';
+        } else {
+          profileUpdateData.role = role;
+          profileUpdateData.systemRole = role;
+        }
       }
       if (photoUrl !== undefined) {
         profileUpdateData.avatarUrl = photoUrl;

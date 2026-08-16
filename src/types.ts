@@ -1,6 +1,9 @@
-export type RoleScope = 'GLOBAL' | 'VILLAGE';
+export type RoleScope = 'GLOBAL' | 'STATE' | 'DISTRICT' | 'GRAM_PANCHAYAT' | 'VILLAGE';
 
 export type SystemRole = 'SUPER_ADMIN' | 'ADMIN' | 'MEMBER';
+
+export type MemberRole = 'MEMBER' | 'ADMIN';
+export type MemberStatus = 'active' | 'pending' | 'suspended';
 
 export type PermissionCode =
   | 'village:manage'

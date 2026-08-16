@@ -957,9 +957,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 className="px-3 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold outline-none cursor-pointer"
               >
                 <option value="ALL">All Roles</option>
-                <option value="MEMBER">Member</option>
-                <option value="ADMIN">Admin</option>
-                <option value="SUPER_ADMIN">Super Admin</option>
+                <option value="MEMBER">Member (सदस्य)</option>
+                <option value="ADMIN">Admin (एडमिन)</option>
+                <option value="SUPER_ADMIN">Super Admin (मुख्य प्रशासक)</option>
               </select>
 
               {/* Date Selector Filter for Member Registration */}
@@ -2356,8 +2356,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold cursor-pointer outline-none focus:border-emerald-500"
                     >
                       <option value="MEMBER">Member (सदस्य)</option>
-                      <option value="ADMIN">Admin (इकाई एडमिन)</option>
-                      <option value="SUPER_ADMIN">Super Admin</option>
+                      <option value="ADMIN">Admin (एडमिन)</option>
+                      <option value="SUPER_ADMIN">Super Admin (मुख्य प्रशासक)</option>
                     </select>
                   </div>
                   <div>

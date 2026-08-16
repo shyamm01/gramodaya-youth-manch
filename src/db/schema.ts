@@ -18,6 +18,9 @@ import { relations, sql } from 'drizzle-orm';
 // ==============================================================================
 export const roleScopeEnum = pgEnum('role_scope', [
   'GLOBAL',
+  'STATE',
+  'DISTRICT',
+  'GRAM_PANCHAYAT',
   'VILLAGE',
 ]);
 
