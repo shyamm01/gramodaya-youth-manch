@@ -97,6 +97,9 @@ export async function POST(req: Request) {
       });
 
       if (createErr || !created?.user) {
+        if (createErr?.code === 'no_authorization' || createErr?.status === 401) {
+          console.error('Member creation blocked: SUPABASE_SERVICE_ROLE_KEY is not configured.');
+        }
         return NextResponse.json(
           { error: 'सदस्य खाता बनाने में त्रुटि हुई। कृपया पुनः प्रयास करें।' },
           { status: 500 }

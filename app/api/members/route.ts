@@ -212,6 +212,13 @@ export async function POST(req: Request) {
     });
 
     if (createErr || !created?.user) {
+      if (createErr?.code === "no_authorization" || createErr?.status === 401) {
+        console.error("Member creation blocked: SUPABASE_SERVICE_ROLE_KEY is not configured.");
+        return NextResponse.json(
+          { success: false, error: "सर्वर कॉन्फ़िगरेशन त्रुटि। कृपया व्यवस्थापक से संपर्क करें।" },
+          { status: 500 }
+        );
+      }
       return NextResponse.json(
         { success: false, error: "यह खाता पहले से पंजीकृत हो सकता है अथवा खाता बनाने में त्रुटि हुई।" },
         { status: 409 }
