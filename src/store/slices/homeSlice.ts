@@ -60,7 +60,7 @@ export const fetchHomeAnnouncements = createAsyncThunk(
   'home/fetchAnnouncements',
   async (_, { rejectWithValue }) => {
     try {
-      const data = await apiClient.get('/api/announcements');
+      const data = await apiClient.get('/api/announcements', { headers: { 'X-Limit': '5' } });
       if (!data?.success) return rejectWithValue(data?.error || 'सूचनाएं लोड करने में त्रुटि हुई।');
       return data;
     } catch (err: any) {
@@ -74,7 +74,7 @@ export const fetchHomeEvents = createAsyncThunk(
   'home/fetchEvents',
   async (_, { rejectWithValue }) => {
     try {
-      const data = await apiClient.get('/api/events');
+      const data = await apiClient.get('/api/events', { headers: { 'X-Limit': '3' } });
       if (!data?.success) return rejectWithValue(data?.error || 'कार्यक्रम लोड करने में त्रुटि हुई।');
       return data;
     } catch (err: any) {
@@ -88,7 +88,7 @@ export const fetchHomeSocialWork = createAsyncThunk(
   'home/fetchSocialWork',
   async (_, { rejectWithValue }) => {
     try {
-      const data = await apiClient.get('/api/social-work');
+      const data = await apiClient.get('/api/social-work', { headers: { 'X-Limit': '4' } });
       if (!data?.success) return rejectWithValue(data?.error || 'सामाजिक कार्य लोड करने में त्रुटि हुई।');
       return data;
     } catch (err: any) {
@@ -102,7 +102,7 @@ export const fetchHomeGallery = createAsyncThunk(
   'home/fetchGallery',
   async (_, { rejectWithValue }) => {
     try {
-      const data = await apiClient.get('/api/gallery');
+      const data = await apiClient.get('/api/gallery', { headers: { 'X-Limit': '6' } });
       if (!data?.success) return rejectWithValue(data?.error || 'गैलरी लोड करने में त्रुटि हुई।');
       return data;
     } catch (err: any) {
