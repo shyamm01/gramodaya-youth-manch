@@ -40,8 +40,8 @@ import {
   setPublicInfos as reduxSetPublicInfos,
   setGroupMessages as reduxSetGroupMessages,
 } from '../store/slices/communitySlice';
-import { setCredentials as reduxSetCredentials, logout as reduxLogout } from '../store/slices/authSlice';
-import { updateVillageSettings as reduxUpdateVillageSettings, setVillagesList as reduxSetVillagesList } from '../store/slices/villageSlice';
+import { setCredentials as reduxSetCredentials, logout as reduxLogout, fetchCurrentUser } from '../store/slices/authSlice';
+import { updateVillageSettings as reduxUpdateVillageSettings, fetchVillagesList } from '../store/slices/villageSlice';
 import {
   OFFICIAL_VILLAGE,
   INITIAL_VILLAGES,
@@ -224,9 +224,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [lang, setLangState] = useState<string>("hi");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [currentMemberMobile, setCurrentMemberMobileState] = useState<string | null>(null);
-  const isFetchingAuthMeRef = useRef(false);
   const isFetchingDataRef = useRef(false);
   const lastDataFetchTimeRef = useRef<number>(0);
+  // Single-flight caches so concurrent callers (Supabase auth listener, session
+  // restore, refreshData) share one in-flight Redux thunk dispatch instead of
+  // each firing its own /api/auth/me or /api/villages request.
+  const authMeInFlightRef = useRef<Promise<any> | null>(null);
+  const villagesInFlightRef = useRef<Promise<Village[] | null> | null>(null);
+
+  const fetchAuthMeOnce = useCallback((): Promise<any> => {
+    if (!authMeInFlightRef.current) {
+      authMeInFlightRef.current = (store.dispatch(fetchCurrentUser() as any) as any)
+        .unwrap()
+        .catch(() => null)
+        .finally(() => {
+          authMeInFlightRef.current = null;
+        });
+    }
+    return authMeInFlightRef.current;
+  }, []);
+
+  const fetchVillagesOnce = useCallback((): Promise<Village[] | null> => {
+    if (!villagesInFlightRef.current) {
+      villagesInFlightRef.current = (store.dispatch(fetchVillagesList() as any) as any)
+        .unwrap()
+        .catch(() => null)
+        .finally(() => {
+          villagesInFlightRef.current = null;
+        });
+    }
+    return villagesInFlightRef.current;
+  }, []);
 
   const setLang = (newLang: string) => {
     setLangState(newLang);
@@ -320,33 +348,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const hydrateRbacSession = async () => {
       try {
-        const res = await fetch('/api/auth/me', { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.authenticated && data.user) {
-            const u = data.user;
-            const isSuper = u.isSuperAdmin || u.systemRole === 'SUPER_ADMIN';
-            const isAdm = Boolean(isSuper || u.isAdmin || u.role === 'ADMIN' || u.systemRole === 'ADMIN');
-            setAuthSession((prev) => ({
-              ...prev,
-              isAdminLoggedIn: isAdm,
-              isMemberLoggedIn: true,
-              supabaseUserId: u.supabaseUserId || prev.supabaseUserId,
-              role: u.role || (isAdm ? 'ADMIN' : 'MEMBER'),
-              systemRole: u.systemRole || (isSuper ? 'SUPER_ADMIN' : isAdm ? 'ADMIN' : 'MEMBER'),
-              adminMobile: isAdm ? u.mobile : prev.adminMobile,
-              adminName: isAdm ? u.name : prev.adminName,
-              adminId: isAdm ? u.id : prev.adminId,
-              adminVillageId: u.villageId || prev.adminVillageId,
-              currentMemberMobile: u.mobile || prev.currentMemberMobile,
-              currentMember: u,
-              email: u.email || prev.email,
-              permissions: u.permissions || prev.permissions || [],
-              token: data.token || prev.token,
-            }));
-            if (data.user.mobile) {
-              setCurrentMemberMobileState(data.user.mobile);
-            }
+        const data = await fetchAuthMeOnce();
+        if (data?.authenticated && data.user) {
+          const u = data.user;
+          const isSuper = u.isSuperAdmin || u.systemRole === 'SUPER_ADMIN';
+          const isAdm = Boolean(isSuper || u.isAdmin || u.role === 'ADMIN' || u.systemRole === 'ADMIN');
+          setAuthSession((prev) => ({
+            ...prev,
+            isAdminLoggedIn: isAdm,
+            isMemberLoggedIn: true,
+            supabaseUserId: u.supabaseUserId || prev.supabaseUserId,
+            role: u.role || (isAdm ? 'ADMIN' : 'MEMBER'),
+            systemRole: u.systemRole || (isSuper ? 'SUPER_ADMIN' : isAdm ? 'ADMIN' : 'MEMBER'),
+            adminMobile: isAdm ? u.mobile : prev.adminMobile,
+            adminName: isAdm ? u.name : prev.adminName,
+            adminId: isAdm ? u.id : prev.adminId,
+            adminVillageId: u.villageId || prev.adminVillageId,
+            currentMemberMobile: u.mobile || prev.currentMemberMobile,
+            currentMember: u,
+            email: u.email || prev.email,
+            permissions: u.permissions || prev.permissions || [],
+            token: data.token || prev.token,
+          }));
+          if (data.user.mobile) {
+            setCurrentMemberMobileState(data.user.mobile);
           }
         }
       } catch (e) {
@@ -416,11 +441,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setLangState(savedLang);
       }
 
-      if (isFetchingAuthMeRef.current) return;
-      isFetchingAuthMeRef.current = true;
-
-      fetch("/api/auth/me", { credentials: "include" })
-        .then((res) => (res.ok ? res.json() : null))
+      fetchAuthMeOnce()
         .then((data) => {
           if (data?.authenticated && data.user) {
             const u = data.user;
@@ -451,9 +472,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })
         .catch(() => {
           /* ignore network errors during initial check */
-        })
-        .finally(() => {
-          isFetchingAuthMeRef.current = false;
         });
     }
   }, []);
@@ -658,51 +676,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isFetchingDataRef.current = true;
 
     try {
-      const [authRes, villagesRes] = await Promise.all([
-        authenticatedFetch('/api/auth/me').catch(() => null),
-        authenticatedFetch('/api/villages').catch(() => null),
+      const [authData, villagesList] = await Promise.all([
+        fetchAuthMeOnce(),
+        fetchVillagesOnce(),
       ]);
 
-      if (authRes && authRes.ok) {
-        const authData = await authRes.json();
-        if (authData?.user) {
-          const user = authData.user;
-          const isAdm = Boolean(
-            authData.isAdmin ||
-            user.isAdmin ||
-            user.systemRole === 'SUPER_ADMIN' ||
-            user.systemRole === 'ADMIN'
-          );
-          setAuthSession((prev) => ({
-            ...prev,
-            isAdminLoggedIn: isAdm,
-            isMemberLoggedIn: true,
-            role: user.role,
-            systemRole: user.systemRole,
-            adminMobile: isAdm ? user.mobile : prev.adminMobile,
-            adminName: isAdm ? user.name : prev.adminName,
-            adminId: isAdm ? user.id : prev.adminId,
-            adminVillageId: user.villageId,
-            currentMemberMobile: user.mobile,
-            currentMember: user,
-            email: user.email,
-            permissions: user.permissions || [],
-          }));
-          if (user.permissions) setUserPermissions(user.permissions);
-        }
+      if (authData?.user) {
+        const user = authData.user;
+        const isAdm = Boolean(
+          authData.isAdmin ||
+          user.isAdmin ||
+          user.systemRole === 'SUPER_ADMIN' ||
+          user.systemRole === 'ADMIN'
+        );
+        setAuthSession((prev) => ({
+          ...prev,
+          isAdminLoggedIn: isAdm,
+          isMemberLoggedIn: true,
+          role: user.role,
+          systemRole: user.systemRole,
+          adminMobile: isAdm ? user.mobile : prev.adminMobile,
+          adminName: isAdm ? user.name : prev.adminName,
+          adminId: isAdm ? user.id : prev.adminId,
+          adminVillageId: user.villageId,
+          currentMemberMobile: user.mobile,
+          currentMember: user,
+          email: user.email,
+          permissions: user.permissions || [],
+        }));
+        if (user.permissions) setUserPermissions(user.permissions);
       }
 
-      if (villagesRes && villagesRes.ok) {
-        const vData = await villagesRes.json();
-        if (vData?.villages && Array.isArray(vData.villages)) {
-          setVillages(vData.villages);
-          store.dispatch(reduxSetVillagesList(vData.villages));
-          const currentV =
-            vData.villages.find((v: any) => v.id === activeVillageId) || vData.villages[0];
-          if (currentV) {
-            setVillageSettings(currentV);
-            store.dispatch(reduxUpdateVillageSettings(currentV));
-          }
+      if (villagesList && Array.isArray(villagesList) && villagesList.length > 0) {
+        setVillages(villagesList);
+        const currentV =
+          villagesList.find((v: any) => v.id === activeVillageId) || villagesList[0];
+        if (currentV) {
+          setVillageSettings(currentV as any);
+          store.dispatch(reduxUpdateVillageSettings(currentV as any));
         }
       }
 
