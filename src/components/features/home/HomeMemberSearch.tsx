@@ -118,7 +118,7 @@ export const HomeMemberSearch: React.FC<HomeMemberSearchProps> = ({
                           <a
                             href={`tel:+91${cleanDigits}`}
                             className="p-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg transition-transform duration-200 active:scale-95 cursor-pointer shadow-xs"
-                            title="Call"
+                            title={t('common.call')}
                           >
                             <Phone className="w-3.5 h-3.5" />
                           </a>
@@ -127,7 +127,7 @@ export const HomeMemberSearch: React.FC<HomeMemberSearchProps> = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-lg transition-transform duration-200 active:scale-95 cursor-pointer shadow-xs"
-                            title="WhatsApp"
+                            title={t('common.whatsapp')}
                           >
                             <WhatsAppIcon className="w-3.5 h-3.5" />
                           </a>

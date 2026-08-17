@@ -65,6 +65,8 @@ export const hi: Record<string, string> = {
   'common.resolved': 'निस्तारित',
   'common.inProgress': 'प्रक्रियाधीन',
   'common.new': 'नवीन',
+  'common.more': 'अधिक',
+  'common.urgent': 'अति-आवश्यक',
   'common.call': 'कॉल',
   'common.whatsapp': 'व्हाट्सएप',
   'common.message': 'संदेश',

@@ -6,12 +6,16 @@ import { validateRequestBody, announcementCreateSchema } from "@/src/lib/validat
 import { logAuditAction } from "@/src/lib/authUtils";
 import { requireAuth } from "@/src/lib/jwtAuth";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const db = getDb();
     if (!db) return NextResponse.json({ success: true, announcements: [] });
 
-    const rows = await db.select().from(schema.announcements).orderBy(desc(schema.announcements.id));
+    const limitParam = Number(new URL(req.url).searchParams.get('limit'));
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? limitParam : undefined;
+
+    const baseQuery = db.select().from(schema.announcements).orderBy(desc(schema.announcements.id));
+    const rows = limit ? await baseQuery.limit(limit) : await baseQuery;
 
     const formatted = rows.map((a) => ({
       id: String(a.id),

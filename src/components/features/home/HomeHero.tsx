@@ -13,6 +13,7 @@ import {
   Send,
 } from "lucide-react";
 import { VillageBadge } from "../../common";
+import { Skeleton } from "../../ui";
 import { useApp } from "../../../context/AppContext";
 
 interface HomeHeroProps {
@@ -23,6 +24,8 @@ interface HomeHeroProps {
   resolvedComplaintsCount: number;
   socialWorksCount: number;
   eventsCount: number;
+  /** True only until the /api/home/stats card has data for the first time. */
+  statsLoading?: boolean;
 }
 
 export const HomeHero: React.FC<HomeHeroProps> = ({
@@ -33,6 +36,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   resolvedComplaintsCount,
   socialWorksCount,
   eventsCount,
+  statsLoading = false,
 }) => {
   const { villageSettings, t, lang } = useApp();
   const isEn = lang === 'en';
@@ -132,7 +136,11 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 </div>
                 <div className="text-left min-w-0">
                   <span className="block text-lg sm:text-xl font-black text-white leading-none tracking-tight drop-shadow">
-                    {stat.value || "0"}
+                    {statsLoading ? (
+                      <Skeleton className="h-4 w-6 bg-white/15" />
+                    ) : (
+                      stat.value || "0"
+                    )}
                   </span>
                   <span className="text-[10px] sm:text-[11px] font-bold text-slate-300 dark:text-slate-400 truncate block mt-1">
                     {stat.label}

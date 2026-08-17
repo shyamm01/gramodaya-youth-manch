@@ -13,26 +13,41 @@ import {
   Sparkles,
   AlertCircle,
 } from 'lucide-react';
-import { Card, Badge } from '../../ui';
+import { Card, Badge, Skeleton } from '../../ui';
 import { PublicInfo, SocialWork, EventItem, GalleryItem, Announcement } from '../../../types';
 import { useApp } from '../../../context/AppContext';
 
 interface HomeActivityFeedsProps {
   announcements?: Announcement[] | any[];
+  announcementsLoading?: boolean;
   approvedInfos?: PublicInfo[];
   approvedSocialWorks: SocialWork[] | any[];
+  socialWorkLoading?: boolean;
   publishedEvents: EventItem[] | any[];
+  eventsLoading?: boolean;
   approvedGalleryPhotos: GalleryItem[] | any[];
+  galleryLoading?: boolean;
 }
+
+const MiniFeedSkeleton: React.FC = () => (
+  <div className="space-y-2.5">
+    <Skeleton className="h-14 w-full rounded-xl" />
+    <Skeleton className="h-14 w-full rounded-xl" />
+  </div>
+);
 
 export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
   announcements = [],
+  announcementsLoading = false,
   approvedInfos = [],
   approvedSocialWorks = [],
+  socialWorkLoading = false,
   publishedEvents = [],
+  eventsLoading = false,
   approvedGalleryPhotos = [],
+  galleryLoading = false,
 }) => {
-  const { t } = useApp();
+  const { t, lang } = useApp();
 
   const notices = announcements.length > 0 ? announcements : approvedInfos;
 
@@ -68,7 +83,9 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
               </Link>
             </div>
 
-            {notices.length === 0 ? (
+            {announcementsLoading ? (
+              <MiniFeedSkeleton />
+            ) : notices.length === 0 ? (
               <div className="text-center py-8 px-4 rounded-xl bg-[#FBF9F5] dark:bg-[#0B0F17]/60 border border-dashed border-[#E0DCCF] dark:border-slate-800/80">
                 <Volume2 className="w-6 h-6 mx-auto text-[#A59F8E] dark:text-slate-600 mb-1.5 opacity-60" />
                 <p className="text-xs text-[#8C8675] dark:text-slate-400 font-medium">
@@ -85,10 +102,13 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 truncate max-w-[75%]">
                         {item.isUrgent && (
-                          <span className="flex items-center gap-0.5 text-[9px] font-extrabold bg-red-500 text-white px-1.5 py-0.2 rounded-full uppercase tracking-wider">
+                          <Badge
+                            variant="destructive"
+                            className="gap-0.5 text-[9px] px-1.5 py-0.2 uppercase tracking-wider bg-red-500 text-white border-transparent"
+                          >
                             <AlertCircle className="w-2.5 h-2.5" />
-                            अति-आवश्यक
-                          </span>
+                            {t('common.urgent')}
+                          </Badge>
                         )}
                         <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100/70 dark:bg-blue-950/80 px-2 py-0.5 rounded-md truncate">
                           {item.title || item.name}
@@ -97,7 +117,7 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
                       {(item.date || item.createdAt) && (
                         <span className="text-[9px] text-[#8C8675] dark:text-slate-500 font-mono flex-shrink-0">
                           {new Date(item.date || item.createdAt).toLocaleDateString(
-                            t('common.village') === 'Village' ? 'en-IN' : 'hi-IN',
+                            lang === 'en' ? 'en-IN' : 'hi-IN',
                             {
                               day: 'numeric',
                               month: 'short',
@@ -143,7 +163,9 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
               </Link>
             </div>
 
-            {approvedSocialWorks.length === 0 ? (
+            {socialWorkLoading ? (
+              <MiniFeedSkeleton />
+            ) : approvedSocialWorks.length === 0 ? (
               <div className="text-center py-8 px-4 rounded-xl bg-[#FBF9F5] dark:bg-[#0B0F17]/60 border border-dashed border-[#E0DCCF] dark:border-slate-800/80">
                 <HeartHandshake className="w-6 h-6 mx-auto text-[#A59F8E] dark:text-slate-600 mb-1.5 opacity-60" />
                 <p className="text-xs text-[#8C8675] dark:text-slate-400 font-medium">
@@ -205,7 +227,9 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
               </Link>
             </div>
 
-            {publishedEvents.length === 0 ? (
+            {eventsLoading ? (
+              <MiniFeedSkeleton />
+            ) : publishedEvents.length === 0 ? (
               <div className="text-center py-8 px-4 rounded-xl bg-[#FBF9F5] dark:bg-[#0B0F17]/60 border border-dashed border-[#E0DCCF] dark:border-slate-800/80">
                 <Calendar className="w-6 h-6 mx-auto text-[#A59F8E] dark:text-slate-600 mb-1.5 opacity-60" />
                 <p className="text-xs text-[#8C8675] dark:text-slate-400 font-medium">
@@ -275,11 +299,17 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
               </Link>
             </div>
 
-            {approvedGalleryPhotos.length === 0 ? (
+            {galleryLoading ? (
+              <div className="grid grid-cols-3 gap-2">
+                <Skeleton className="aspect-square w-full rounded-xl" />
+                <Skeleton className="aspect-square w-full rounded-xl" />
+                <Skeleton className="aspect-square w-full rounded-xl" />
+              </div>
+            ) : approvedGalleryPhotos.length === 0 ? (
               <div className="text-center py-8 px-4 rounded-xl bg-[#FBF9F5] dark:bg-[#0B0F17]/60 border border-dashed border-[#E0DCCF] dark:border-slate-800/80">
                 <ImageIcon className="w-6 h-6 mx-auto text-[#A59F8E] dark:text-slate-600 mb-1.5 opacity-60" />
                 <p className="text-xs text-[#8C8675] dark:text-slate-400 font-medium">
-                  {t('home.noPhotos')}
+                  {t('home.noGallery')}
                 </p>
               </div>
             ) : (

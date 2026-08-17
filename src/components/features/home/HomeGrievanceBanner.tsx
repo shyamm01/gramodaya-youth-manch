@@ -3,20 +3,22 @@
 import React from 'react';
 import Link from 'next/link';
 import { AlertTriangle, ArrowRight, CheckCircle2, FileText } from 'lucide-react';
-import { Complaint } from '../../../types';
+import { Badge, Skeleton } from '../../ui';
 import { useApp } from '../../../context/AppContext';
 
 interface HomeGrievanceBannerProps {
-  complaints: Complaint[];
+  /** Server-computed count (SQL count(), not derived from a truncated list). */
+  newComplaintsCount: number;
   resolvedComplaintsCount: number;
+  loading?: boolean;
 }
 
 export const HomeGrievanceBanner: React.FC<HomeGrievanceBannerProps> = ({
-  complaints,
+  newComplaintsCount,
   resolvedComplaintsCount,
+  loading = false,
 }) => {
   const { t } = useApp();
-  const newComplaintsCount = complaints.filter((c) => c.status === 'NEW').length;
 
   return (
     <section className="max-w-5xl mx-auto px-4 sm:px-6">
@@ -48,17 +50,26 @@ export const HomeGrievanceBanner: React.FC<HomeGrievanceBannerProps> = ({
 
         {/* Status badges & action button */}
         <div className="flex items-center gap-2.5 z-10 w-full sm:w-auto justify-between sm:justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-amber-200/60 dark:border-slate-800">
-          <div className="flex items-center gap-2 text-[11px] font-bold">
-            {newComplaintsCount > 0 && (
-              <span className="px-2.5 py-1 rounded-lg bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 border border-amber-300/60 dark:border-amber-800 flex items-center gap-1">
-                <FileText className="w-3 h-3" />
-                {newComplaintsCount} {t('common.new')}
-              </span>
+          <div className="flex items-center gap-2">
+            {loading ? (
+              <>
+                <Skeleton className="h-5 w-16 rounded-lg" />
+                <Skeleton className="h-5 w-16 rounded-lg" />
+              </>
+            ) : (
+              <>
+                {newComplaintsCount > 0 && (
+                  <Badge variant="warning" className="gap-1 rounded-lg">
+                    <FileText className="w-3 h-3" />
+                    {newComplaintsCount} {t('common.new')}
+                  </Badge>
+                )}
+                <Badge variant="success" className="gap-1 rounded-lg">
+                  <CheckCircle2 className="w-3 h-3" />
+                  {resolvedComplaintsCount} {t('common.resolved')}
+                </Badge>
+              </>
             )}
-            <span className="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" />
-              {resolvedComplaintsCount} {t('common.resolved')}
-            </span>
           </div>
 
           <div className="p-2 rounded-xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-700 dark:text-amber-300 group-hover:bg-amber-500 group-hover:text-white transition-all duration-300">

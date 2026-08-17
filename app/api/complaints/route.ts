@@ -5,12 +5,16 @@ import { desc } from "drizzle-orm";
 import { validateRequestBody, complaintCreateSchema } from "@/src/lib/validations";
 import { logAuditAction } from "@/src/lib/authUtils";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const db = getDb();
     if (!db) return NextResponse.json({ success: true, complaints: [] });
 
-    const rows = await db.select().from(schema.complaints).orderBy(desc(schema.complaints.id));
+    const limitParam = Number(new URL(req.url).searchParams.get('limit'));
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? limitParam : undefined;
+
+    const baseQuery = db.select().from(schema.complaints).orderBy(desc(schema.complaints.id));
+    const rows = limit ? await baseQuery.limit(limit) : await baseQuery;
 
     const formatted = rows.map((c) => ({
       id: String(c.id),

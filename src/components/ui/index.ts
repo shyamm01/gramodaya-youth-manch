@@ -9,6 +9,7 @@ export * from './dialog';
 export * from './tabs';
 export * from './avatar';
 export * from './separator';
+export * from './skeleton';
 export * from './DatePicker';
 export * from './ImageUploader';
 export * from './ImageCropperModal';

@@ -65,6 +65,8 @@ export const en: Record<string, string> = {
   'common.resolved': 'Resolved',
   'common.inProgress': 'In Progress',
   'common.new': 'New',
+  'common.more': 'More',
+  'common.urgent': 'Urgent',
   'common.call': 'Call',
   'common.whatsapp': 'WhatsApp',
   'common.message': 'Message',

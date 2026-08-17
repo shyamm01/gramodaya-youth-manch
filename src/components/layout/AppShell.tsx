@@ -118,7 +118,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       )}
 
       {/* Footer */}
-      <footer className="bg-[#1B4332] dark:bg-[#0F141C] text-white py-12 px-4 sm:px-6 lg:px-8 border-t border-[#2D6A4F] dark:border-[#1E293B] transition-colors">
+      {/* Hidden on mobile: BottomNav already provides navigation there, and a
+          long desktop-style footer works against the "feels like an app" goal. */}
+      <footer className="hidden md:block bg-[#1B4332] dark:bg-[#0F141C] text-white py-12 px-4 sm:px-6 lg:px-8 border-t border-[#2D6A4F] dark:border-[#1E293B] transition-colors">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="space-y-3">
             <h3 className="text-lg font-bold text-amber-400">
@@ -136,7 +138,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
           <div className="space-y-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
-              {t('footer.navigation')}
+              {t('footer.quickLinks')}
             </h4>
             <ul className="space-y-1 text-xs">
               {footerLinks.slice(0, 5).map((l) => (
@@ -154,7 +156,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
           <div className="space-y-2">
             <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
-              {t('footer.community')}
+              {t('footer.civicServices')}
             </h4>
             <ul className="space-y-1 text-xs">
               {footerLinks.slice(5).map((l) => (

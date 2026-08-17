@@ -70,16 +70,16 @@ export const HomeLeadership: React.FC<HomeLeadershipProps> = ({ admins }) => {
                   {admin.name}
                 </h4>
 
-                <span className="mt-1 px-2 py-0.5 text-[10px] font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-200/80 dark:border-emerald-900/60 rounded-md truncate max-w-full">
+                <Badge variant="success" className="mt-1 rounded-md truncate max-w-full">
                   {admin.role}
-                </span>
+                </Badge>
               </div>
 
               <div className="flex items-center gap-2 mt-3 pt-2.5 border-t border-[#E0DCCF]/60 dark:border-slate-800 w-full justify-center">
                 <a
                   href={`tel:+91${cleanDigits}`}
                   className="p-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg transition-transform duration-200 active:scale-95 cursor-pointer shadow-xs"
-                  title="Call"
+                  title={t('common.call')}
                 >
                   <PhoneCall className="w-3.5 h-3.5" />
                 </a>
@@ -88,7 +88,7 @@ export const HomeLeadership: React.FC<HomeLeadershipProps> = ({ admins }) => {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-lg transition-transform duration-200 active:scale-95 cursor-pointer shadow-xs"
-                  title="WhatsApp"
+                  title={t('common.whatsapp')}
                 >
                   <WhatsAppIcon className="w-3.5 h-3.5" />
                 </a>

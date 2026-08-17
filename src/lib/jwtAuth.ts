@@ -101,6 +101,29 @@ async function enrichUserFromProfile(user: JwtUserPayload): Promise<JwtUserPaylo
       const defaultPerms = ROLE_DEFAULT_PERMISSIONS[sysRole] || [];
       const allPerms = Array.from(new Set([...defaultPerms, ...customPerms, ...(user.permissions || [])])) as PermissionCode[];
 
+      // Fetch the villages this user is explicitly granted a role in (public.user_village_roles).
+      // SUPER_ADMIN is left unrestricted (undefined) — permission checks elsewhere already
+      // treat an empty/absent accessibleVillages list as "no village restriction".
+      let accessibleVillages: string[] | undefined;
+      if (!isSuper) {
+        try {
+          const villageRoleRows = await sql`
+            SELECT village_id FROM public.user_village_roles WHERE user_id = ${p.id}
+          `;
+          const villageIds = new Set<string>(
+            villageRoleRows.map((r: any) => String(r.village_id))
+          );
+          if (p.village_id) {
+            villageIds.add(String(p.village_id));
+          }
+          if (villageIds.size > 0) {
+            accessibleVillages = Array.from(villageIds);
+          }
+        } catch (villageRoleErr) {
+          // Ignore — falls back to no restriction rather than blocking the user out.
+        }
+      }
+
       return {
         ...user,
         id: String(p.id),
@@ -114,6 +137,7 @@ async function enrichUserFromProfile(user: JwtUserPayload): Promise<JwtUserPaylo
         isAdmin: isAdm,
         isSuperAdmin: isSuper,
         permissions: allPerms,
+        accessibleVillages: accessibleVillages || user.accessibleVillages,
       };
     }
   } catch (err) {
