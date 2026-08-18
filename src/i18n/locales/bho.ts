@@ -3,8 +3,8 @@ export const bho: Record<string, string> = {
   'nav.home': 'घर (Home)',
   'nav.members': 'सदस्य लोगन के सूची (Members)',
   'nav.leadership': 'मुख्य मुखिया आ नेतृत्व (Leadership)',
-  'nav.problems': 'गांव के समस्या आ समाधान (Problems)',
-  'nav.socialWork': 'समाज सेवा के काम (Social Work)',
+  'nav.problems': 'शिकायत निवारण (Grievance Redressal)',
+  'nav.socialWork': 'समाज कल्याण (Social Welfare)',
   'nav.announcements': 'सरकारी आ गाँव के सूचना (Notices)',
   'nav.events': 'गाँव के जलसा आ कार्यक्रम (Events)',
   'nav.gallery': 'गाँव के फोटो गैलरी (Gallery)',
@@ -12,7 +12,14 @@ export const bho: Record<string, string> = {
   'nav.elders': 'सयान बुजुर्ग लोगन के आदर (Elders)',
   'nav.about': 'मंच के बारे में (About)',
   'nav.liveChat': 'लाईव बतकही मंच (Live Chat)',
+  'nav.education': 'शिक्षा (Education)',
+  'nav.employment': 'रोजगार (Employment)',
   'nav.admin': 'प्रशासनिक खाता (Admin)',
+
+  // Footer
+  'footer.community': 'समाज (Community)',
+  'footer.noticesMedia': 'सूचना आ मीडिया (Notices & Media)',
+  'footer.support': 'मदद (Support)',
 
   // Common UI
   'common.village': 'गाँव',

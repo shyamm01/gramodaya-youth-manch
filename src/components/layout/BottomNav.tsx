@@ -19,6 +19,9 @@ import {
   PhoneCall,
   Info,
   MessageSquare,
+  Bell,
+  GraduationCap,
+  Briefcase,
 } from 'lucide-react';
 
 export const BottomNav: React.FC = () => {
@@ -29,19 +32,22 @@ export const BottomNav: React.FC = () => {
 
   const mainTabs = [
     { href: '/', labelKey: 'nav.home', icon: Home },
-    { href: '/members', labelKey: 'nav.members', icon: Users },
+    { href: '/education', labelKey: 'nav.education', icon: GraduationCap },
     { href: '/problems', labelKey: 'nav.problems', icon: AlertTriangle },
     { href: '/social-work', labelKey: 'nav.socialWork', icon: HeartHandshake },
   ];
 
   const drawerLinks = [
+    { href: '/employment', labelKey: 'nav.employment', icon: Briefcase },
     { href: '/events', labelKey: 'nav.events', icon: Calendar },
-    { href: '/gallery', labelKey: 'nav.gallery', icon: ImageIcon },
-    { href: '/elders', labelKey: 'nav.elders', icon: Award },
-    { href: '/helpline', labelKey: 'nav.helpline', icon: PhoneCall },
-    { href: '/leadership', labelKey: 'nav.leadership', icon: Users },
     { href: '/live-chat', labelKey: 'nav.liveChat', icon: MessageSquare },
+    { href: '/members', labelKey: 'nav.members', icon: Users },
+    { href: '/leadership', labelKey: 'nav.leadership', icon: Users },
+    { href: '/elders', labelKey: 'nav.elders', icon: Award },
     { href: '/about', labelKey: 'nav.about', icon: Info },
+    { href: '/announcements', labelKey: 'nav.announcements', icon: Bell },
+    { href: '/gallery', labelKey: 'nav.gallery', icon: ImageIcon },
+    { href: '/helpline', labelKey: 'nav.helpline', icon: PhoneCall },
   ];
 
   const isCurrent = (href: string) => {

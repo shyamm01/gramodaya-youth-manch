@@ -3,8 +3,8 @@ export const awa: Record<string, string> = {
   'nav.home': 'घर (Home)',
   'nav.members': 'सदस्यन क सूची (Members)',
   'nav.leadership': 'मुख्य अगुआ लोग (Leadership)',
-  'nav.problems': 'गाँव क समस्या अउर समाधान (Problems)',
-  'nav.socialWork': 'समाज सेवा क काम (Social Work)',
+  'nav.problems': 'शिकायत निवारण (Grievance Redressal)',
+  'nav.socialWork': 'समाज कल्याण (Social Welfare)',
   'nav.announcements': 'सार्वजनिक सूचना (Notices)',
   'nav.events': 'गाँव क जलसा (Events)',
   'nav.gallery': 'गाँव क तस्वीरन (Gallery)',
@@ -12,7 +12,14 @@ export const awa: Record<string, string> = {
   'nav.elders': 'सयाने बुजुर्गन क आदर (Elders)',
   'nav.about': 'मंच क परिचय (About)',
   'nav.liveChat': 'लाइव बात-चीत मंच (Live Chat)',
+  'nav.education': 'शिक्षा (Education)',
+  'nav.employment': 'रोजगार (Employment)',
   'nav.admin': 'एडमिन क बस्ता (Admin)',
+
+  // Footer
+  'footer.community': 'समाज (Community)',
+  'footer.noticesMedia': 'सूचना अउर मीडिया (Notices & Media)',
+  'footer.support': 'मदद (Support)',
 
   // Common UI
   'common.village': 'गाँव',

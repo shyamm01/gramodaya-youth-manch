@@ -11,4 +11,6 @@ export { HelplineSection } from './HelplineSection';
 export { AboutSection } from './AboutSection';
 export { EldersSection } from './EldersSection';
 export { LiveChatSection } from './LiveChatSection';
+export { EducationSection } from './EducationSection';
+export { EmploymentSection } from './EmploymentSection';
 export { AdminPanel } from './AdminPanel';

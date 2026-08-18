@@ -3,8 +3,8 @@ export const mr: Record<string, string> = {
   'nav.home': 'मुख्यपृष्ठ (Home)',
   'nav.members': 'सदस्य यादी (Members)',
   'nav.leadership': 'मुख्य नेतृत्व (Leadership)',
-  'nav.problems': 'गावातील समस्या व निवारण (Problems)',
-  'nav.socialWork': 'सामाजिक कार्य (Social Work)',
+  'nav.problems': 'तक्रार निवारण (Grievance Redressal)',
+  'nav.socialWork': 'सामाजिक कल्याण (Social Welfare)',
   'nav.announcements': 'सार्वजनिक सूचना (Notices)',
   'nav.events': 'ग्राम कार्यक्रम (Events)',
   'nav.gallery': 'छायाचित्र दालन (Gallery)',
@@ -12,7 +12,14 @@ export const mr: Record<string, string> = {
   'nav.elders': 'ज्येष्ठ नागरिक सन्मान (Elders)',
   'nav.about': 'मंचाबद्दल माहिती (About)',
   'nav.liveChat': 'थेट संवाद मंच (Live Chat)',
+  'nav.education': 'शिक्षण (Education)',
+  'nav.employment': 'रोजगार (Employment)',
   'nav.admin': 'प्रशासकीय नियंत्रण (Admin)',
+
+  // Footer
+  'footer.community': 'समुदाय (Community)',
+  'footer.noticesMedia': 'सूचना व माध्यम (Notices & Media)',
+  'footer.support': 'सहाय्य (Support)',
 
   // Common UI
   'common.village': 'गाव',

@@ -3,8 +3,8 @@ export const bn: Record<string, string> = {
   'nav.home': 'হোম (Home)',
   'nav.members': 'সদস্য তালিকা (Members)',
   'nav.leadership': 'মূল নেতৃত্ব (Leadership)',
-  'nav.problems': 'গ্রামের সমস্যা ও প্রতিকার (Problems)',
-  'nav.socialWork': 'সমাজসেবা (Social Work)',
+  'nav.problems': 'অভিযোগ নিষ্পত্তি (Grievance Redressal)',
+  'nav.socialWork': 'সমাজকল্যাণ (Social Welfare)',
   'nav.announcements': 'বিজ্ঞপ্তি (Notices)',
   'nav.events': 'অনুষ্ঠানমালা (Events)',
   'nav.gallery': 'ছবির গ্যালারি (Gallery)',
@@ -12,7 +12,14 @@ export const bn: Record<string, string> = {
   'nav.elders': 'প্রবীণদের সম্মাননা (Elders)',
   'nav.about': 'সংগঠন সম্পর্কে (About)',
   'nav.liveChat': 'লাইভ চ্যাট ফোরাম (Live Chat)',
+  'nav.education': 'শিক্ষা (Education)',
+  'nav.employment': 'কর্মসংস্থান (Employment)',
   'nav.admin': 'অ্যাডমিন ড্যাশবোর্ড (Admin)',
+
+  // Footer
+  'footer.community': 'সম্প্রদায় (Community)',
+  'footer.noticesMedia': 'বিজ্ঞপ্তি ও মিডিয়া (Notices & Media)',
+  'footer.support': 'সহায়তা (Support)',
 
   // Common UI
   'common.village': 'গ্রাম',

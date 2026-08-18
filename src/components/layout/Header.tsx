@@ -15,17 +15,12 @@ import {
   Menu,
   X,
   Home,
-  Users,
-  Crown,
+  GraduationCap,
+  Briefcase,
   AlertTriangle,
   Heart,
-  Bell,
   Calendar,
-  Image,
-  Phone,
-  Info,
   MessageCircle,
-  MoreHorizontal,
   Database,
   User,
   CreditCard,
@@ -36,20 +31,12 @@ import {
 // Primary nav — visible in desktop header
 const PRIMARY_NAV = [
   { href: "/", labelKey: "nav.home", icon: Home },
-  { href: "/members", labelKey: "nav.members", icon: Users },
+  { href: "/education", labelKey: "nav.education", icon: GraduationCap },
+  { href: "/employment", labelKey: "nav.employment", icon: Briefcase },
   { href: "/problems", labelKey: "nav.problems", icon: AlertTriangle },
   { href: "/social-work", labelKey: "nav.socialWork", icon: Heart },
   { href: "/events", labelKey: "nav.events", icon: Calendar },
   { href: "/live-chat", labelKey: "nav.liveChat", icon: MessageCircle },
-];
-
-// Secondary nav — shown in "More" dropdown / mobile menu
-const SECONDARY_NAV = [
-  { href: "/leadership", labelKey: "nav.leadership", icon: Crown },
-  { href: "/announcements", labelKey: "nav.announcements", icon: Bell },
-  { href: "/gallery", labelKey: "nav.gallery", icon: Image },
-  { href: "/helpline", labelKey: "nav.helpline", icon: Phone },
-  { href: "/about", labelKey: "nav.about", icon: Info },
 ];
 
 export const Header: React.FC = () => {
@@ -68,7 +55,6 @@ export const Header: React.FC = () => {
   } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [moreDropdownOpen, setMoreDropdownOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [isSupabaseSetupOpen, setIsSupabaseSetupOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -157,11 +143,17 @@ export const Header: React.FC = () => {
     }
   };
 
-  const allNav = [...PRIMARY_NAV, ...SECONDARY_NAV];
-
   return (
     <header className="sticky top-0 z-40 w-full bg-white dark:bg-[#0F172A] border-b border-[#E0DCCF] dark:border-slate-800 transition-colors duration-200 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      {/* ── Top Utility Bar: Language + Theme ── */}
+      <div className="w-full bg-[#F7F5F0] dark:bg-slate-900/60 border-b border-[#E0DCCF] dark:border-slate-800">
+        <div className="max-w-full mx-auto px-4 sm:px-6 h-8 flex items-center justify-end gap-1.5">
+          <LanguageSelector compact={true} />
+          <ThemeToggle compact={true} />
+        </div>
+      </div>
+
+      <div className="max-w-full mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-14">
           {/* ── Logo + Name ── */}
           <Link
@@ -205,53 +197,10 @@ export const Header: React.FC = () => {
                 </Link>
               );
             })}
-
-            {/* More dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setMoreDropdownOpen(!moreDropdownOpen)}
-                onBlur={() => setTimeout(() => setMoreDropdownOpen(false), 150)}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                  moreDropdownOpen ||
-                  SECONDARY_NAV.some((n) => isLinkActive(n.href))
-                    ? "bg-[#1E3A2F] dark:bg-emerald-900/80 text-white dark:text-emerald-100"
-                    : "text-[#2C3327] dark:text-slate-300 hover:bg-[#F0EDE4] dark:hover:bg-slate-800"
-                }`}
-              >
-                <MoreHorizontal className="w-3.5 h-3.5" />
-              </button>
-
-              {moreDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-[#131B2E] border border-[#E0DCCF] dark:border-slate-800 rounded-xl shadow-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-150">
-                  {SECONDARY_NAV.map((item) => {
-                    const active = isLinkActive(item.href);
-                    const Icon = item.icon;
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setMoreDropdownOpen(false)}
-                        className={`flex items-center gap-2.5 px-3.5 py-2 text-xs font-bold transition cursor-pointer ${
-                          active
-                            ? "bg-[#E8F2EC] dark:bg-emerald-950/60 text-[#1E3A2F] dark:text-emerald-200"
-                            : "text-[#2C3327] dark:text-slate-300 hover:bg-[#F7F5F0] dark:hover:bg-slate-800"
-                        }`}
-                      >
-                        <Icon className="w-3.5 h-3.5 text-[#8C8675] dark:text-slate-500" />
-                        {t(item.labelKey)}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
           </nav>
 
           {/* ── Right Actions ── */}
           <div className="flex items-center gap-1.5">
-            <LanguageSelector compact={true} />
-            <ThemeToggle compact={true} />
-
             {(!supabaseUrl || supabaseUrl.includes("example.supabase")) && (
               <button
                 onClick={() => setIsSupabaseSetupOpen(true)}
@@ -452,7 +401,7 @@ export const Header: React.FC = () => {
         {/* ── Mobile Dropdown ── */}
         {mobileMenuOpen && (
           <nav className="lg:hidden pt-2 pb-3 border-t border-[#E0DCCF] dark:border-slate-800 grid grid-cols-2 gap-1.5 animate-fade-in">
-            {allNav.map((item) => {
+            {PRIMARY_NAV.map((item) => {
               const active = isLinkActive(item.href);
               const Icon = item.icon;
               return (

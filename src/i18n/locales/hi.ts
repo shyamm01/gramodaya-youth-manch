@@ -3,8 +3,8 @@ export const hi: Record<string, string> = {
   'nav.home': 'मुखपृष्ठ',
   'nav.members': 'सदस्य',
   'nav.leadership': 'नेतृत्व',
-  'nav.problems': 'समस्याएं',
-  'nav.socialWork': 'सामाजिक कार्य',
+  'nav.problems': 'शिकायत निवारण',
+  'nav.socialWork': 'सामाजिक कल्याण',
   'nav.announcements': 'सूचनाएं',
   'nav.events': 'कार्यक्रम',
   'nav.gallery': 'गैलरी',
@@ -12,6 +12,8 @@ export const hi: Record<string, string> = {
   'nav.elders': 'बुजुर्ग सम्मान',
   'nav.about': 'मंच परिचय',
   'nav.liveChat': 'लाइव चैट',
+  'nav.education': 'शिक्षा',
+  'nav.employment': 'रोजगार',
   'nav.admin': 'एडमिन पैनल',
 
   // Header / Top Bar
@@ -28,8 +30,9 @@ export const hi: Record<string, string> = {
   'header.close': 'बंद करें',
 
   // Footer
-  'footer.quickLinks': 'त्वरित लिंक',
-  'footer.civicServices': 'नागरिक सेवाएं',
+  'footer.community': 'समुदाय',
+  'footer.noticesMedia': 'सूचना एवं मीडिया',
+  'footer.support': 'सहायता',
   'footer.security': 'सुरक्षित एडमिनिस्ट्रेशन',
   'footer.securityDesc': 'ग्राम समस्याओं का समाधान, डिजिटल आईडी कार्ड एवं संगठन रिकॉर्ड।',
   'footer.adminDashboard': 'प्रशासनिक डैशबोर्ड',
@@ -182,6 +185,34 @@ export const hi: Record<string, string> = {
   'about.p3Desc': 'गांव के जरूरतमंद परिवारों एवं आपत्काल में त्वरित मदद पहुँचाना।',
   'about.p4Title': '👴 बुजुर्गों का सम्मान व स्वास्थ्य',
   'about.p4Desc': 'गांव के बुजुर्गों की देखभाल, सम्मान और आवश्यक स्वास्थ्य सहायता।',
+
+  // Education
+  'education.badge': 'शिक्षा एवं अध्ययन',
+  'education.title': 'शिक्षा',
+  'education.subtitle': 'गांव के विद्यार्थियों व युवाओं हेतु छात्रवृत्ति, विद्यालय कार्यक्रम एवं अध्ययन संसाधन।',
+  'education.scholarships.title': '🎓 छात्रवृत्ति एवं वित्तीय सहायता',
+  'education.scholarships.desc': 'मेधावी एवं जरूरतमंद विद्यार्थियों की शिक्षा हेतु सरकारी व संगठन छात्रवृत्तियां।',
+  'education.schools.title': '🏫 विद्यालय एवं साक्षरता कार्यक्रम',
+  'education.schools.desc': 'गांव में स्थानीय विद्यालय नामांकन, उपस्थिति एवं वयस्क साक्षरता अभियानों हेतु सहायता।',
+  'education.digital.title': '💻 डिजिटल अध्ययन संसाधन',
+  'education.digital.desc': 'ऑनलाइन अध्ययन सामग्री, ई-लाइब्रेरी एवं डिजिटल कौशल निर्माण सामग्री तक पहुंच।',
+  'education.guidance.title': '🧭 करियर एवं उच्च शिक्षा मार्गदर्शन',
+  'education.guidance.desc': 'उच्च शिक्षा विकल्पों, प्रवेश परीक्षाओं एवं करियर मार्गों पर विद्यार्थियों हेतु परामर्श।',
+  'education.contactCta': 'शिक्षा संबंधी सहायता हेतु हेल्पलाइन से संपर्क करें',
+
+  // Employment
+  'employment.badge': 'रोजगार एवं आजीविका',
+  'employment.title': 'रोजगार',
+  'employment.subtitle': 'गांव के युवाओं एवं परिवारों हेतु सरकारी योजनाएं, कौशल प्रशिक्षण एवं आजीविका के अवसर।',
+  'employment.mgnrega.title': '🏗️ मनरेगा — ग्रामीण रोजगार गारंटी',
+  'employment.mgnrega.desc': 'ग्रामीण रोजगार गारंटी योजना एवं गारंटीशुदा कार्य दिवसों हेतु पंजीकरण की जानकारी।',
+  'employment.skill.title': '🛠️ कौशल विकास एवं व्यावसायिक प्रशिक्षण',
+  'employment.skill.desc': 'गांव के युवाओं में रोजगार योग्य कौशल निर्माण हेतु व्यावसायिक प्रशिक्षण कार्यक्रम।',
+  'employment.selfEmployment.title': '💼 स्वरोजगार एवं लघु व्यवसाय सहायता',
+  'employment.selfEmployment.desc': 'लघु व्यवसाय एवं स्वरोजगार उद्यम आरंभ करने हेतु मार्गदर्शन एवं योजना जानकारी।',
+  'employment.jobBoard.title': '📋 रोजगार सूचना पटल',
+  'employment.jobBoard.desc': 'उपलब्ध होने पर स्थानीय एवं आसपास की नौकरी रिक्तियां समुदाय के साथ साझा की जाती हैं।',
+  'employment.contactCta': 'रोजगार संबंधी सहायता हेतु हेल्पलाइन से संपर्क करें',
 
   // Elders Section
   'elders.badge': 'ग्राम के आदरणीय वयोवृद्ध एवं संरक्षक',

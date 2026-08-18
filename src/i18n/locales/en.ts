@@ -3,8 +3,8 @@ export const en: Record<string, string> = {
   'nav.home': 'Home',
   'nav.members': 'Members',
   'nav.leadership': 'Leadership',
-  'nav.problems': 'Grievances',
-  'nav.socialWork': 'Social Work',
+  'nav.problems': 'Grievance Redressal',
+  'nav.socialWork': 'Social Welfare',
   'nav.announcements': 'Notices',
   'nav.events': 'Events',
   'nav.gallery': 'Gallery',
@@ -12,6 +12,8 @@ export const en: Record<string, string> = {
   'nav.elders': 'Elders Honor',
   'nav.about': 'About Manch',
   'nav.liveChat': 'Live Chat',
+  'nav.education': 'Education',
+  'nav.employment': 'Employment',
   'nav.admin': 'Admin Panel',
 
   // Header / Top Bar
@@ -28,8 +30,9 @@ export const en: Record<string, string> = {
   'header.close': 'Close',
 
   // Footer
-  'footer.quickLinks': 'Quick Links',
-  'footer.civicServices': 'Civic Services',
+  'footer.community': 'Community',
+  'footer.noticesMedia': 'Notices & Media',
+  'footer.support': 'Support',
   'footer.security': 'Administration & Security',
   'footer.securityDesc': 'Village grievance redressal, digital ID cards and organization records.',
   'footer.adminDashboard': 'Admin Dashboard',
@@ -182,6 +185,34 @@ export const en: Record<string, string> = {
   'about.p3Desc': 'Immediate help to needy village families and emergency relief assistance.',
   'about.p4Title': '👴 Elders Care & Health',
   'about.p4Desc': 'Care, respect and necessary healthcare support for village elders.',
+
+  // Education
+  'education.badge': 'Education & Learning',
+  'education.title': 'Education',
+  'education.subtitle': 'Scholarships, school programs and learning resources for the students and youth of the village.',
+  'education.scholarships.title': '🎓 Scholarships & Financial Aid',
+  'education.scholarships.desc': 'Government and organization scholarships to support the education of meritorious and needy students.',
+  'education.schools.title': '🏫 School & Literacy Programs',
+  'education.schools.desc': 'Support for local school enrollment, attendance and adult literacy drives in the village.',
+  'education.digital.title': '💻 Digital Learning Resources',
+  'education.digital.desc': 'Access to online study material, e-libraries and digital skill-building content.',
+  'education.guidance.title': '🧭 Career & Higher Education Guidance',
+  'education.guidance.desc': 'Counselling for students on higher education choices, entrance exams and career paths.',
+  'education.contactCta': 'Contact the Helpline for education-related assistance',
+
+  // Employment
+  'employment.badge': 'Employment & Livelihood',
+  'employment.title': 'Employment',
+  'employment.subtitle': 'Government schemes, skill training and livelihood opportunities for village youth and families.',
+  'employment.mgnrega.title': '🏗️ MGNREGA — Rural Employment Guarantee',
+  'employment.mgnrega.desc': 'Information on the rural employment guarantee scheme and how to register for guaranteed work days.',
+  'employment.skill.title': '🛠️ Skill Development & Vocational Training',
+  'employment.skill.desc': 'Trade and vocational training programs to build employable skills among village youth.',
+  'employment.selfEmployment.title': '💼 Self-Employment & Small Business Support',
+  'employment.selfEmployment.desc': 'Guidance and scheme information for starting small businesses and self-employment ventures.',
+  'employment.jobBoard.title': '📋 Job Opportunities Board',
+  'employment.jobBoard.desc': 'Local and nearby job openings shared with the community as they become available.',
+  'employment.contactCta': 'Contact the Helpline for employment-related assistance',
 
   // Elders Section
   'elders.badge': 'Respected Village Elders & Mentors',
