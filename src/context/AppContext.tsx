@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { supabase } from '../lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 import {
   Admin,
   Member,
@@ -198,6 +198,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
   const [activeSection, setActiveSectionState] = useState<string>("home");
   const [historyStack, setHistoryStack] = useState<string[]>([]);
   const [lang, setLangState] = useState<string>("hi");
