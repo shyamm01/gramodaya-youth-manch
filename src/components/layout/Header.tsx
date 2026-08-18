@@ -61,7 +61,6 @@ export const Header: React.FC = () => {
     authSession,
     currentMemberMobile,
     members,
-    setIsAdminLoginModalOpen,
     setIsMyProfileModalOpen,
     setSelectedIdCardMember,
     adminLogout,

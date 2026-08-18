@@ -5,16 +5,16 @@ import { useApp } from '../../context/AppContext';
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
 import { BackButtonHeader } from '../common/BackButtonHeader';
-import { UnifiedLoginModal } from '../modals/UnifiedLoginModal';
 import { MyProfileModal } from '../modals/MyProfileModal';
 import { MemberChatModal } from '../modals/MemberChatModal';
 import { DigitalIdCard } from '../features/DigitalIdCard';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Shield, Lock } from 'lucide-react';
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
+  const router = useRouter();
   const {
     t,
     lang,
@@ -22,7 +22,6 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     isLoading,
     isMyProfileModalOpen,
     setIsMyProfileModalOpen,
-    setIsAdminLoginModalOpen,
     selectedChatPartner,
     setSelectedChatPartner,
     selectedIdCardMember,
@@ -66,7 +65,6 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         {children}
 
         {/* Global Modals for admin actions */}
-        <UnifiedLoginModal />
         <MyProfileModal
           isOpen={isMyProfileModalOpen}
           onClose={() => setIsMyProfileModalOpen(false)}
@@ -99,7 +97,6 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       <BottomNav />
 
       {/* Global Modals */}
-      <UnifiedLoginModal />
       <MyProfileModal
         isOpen={isMyProfileModalOpen}
         onClose={() => setIsMyProfileModalOpen(false)}
@@ -192,7 +189,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 </div>
               ) : (
                 <button
-                  onClick={() => setIsAdminLoginModalOpen(true)}
+                  onClick={() => router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`)}
                   className="inline-flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition border border-white/20 cursor-pointer"
                 >
                   <Lock className="w-3.5 h-3.5 text-amber-300" />

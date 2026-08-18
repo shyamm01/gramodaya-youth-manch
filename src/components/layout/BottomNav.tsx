@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import {
   Home,
@@ -23,7 +23,8 @@ import {
 
 export const BottomNav: React.FC = () => {
   const pathname = usePathname();
-  const { t, authSession, setIsAdminLoginModalOpen } = useApp();
+  const router = useRouter();
+  const { t, authSession } = useApp();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const mainTabs = [
@@ -106,8 +107,8 @@ export const BottomNav: React.FC = () => {
               ) : (
                 <button
                   onClick={() => {
-                    setIsAdminLoginModalOpen(true);
                     setIsMenuOpen(false);
+                    router.push(`/auth/login?next=${encodeURIComponent(pathname)}`);
                   }}
                   className="w-full flex items-center justify-center gap-2 py-3 bg-[#3B4F3D] hover:bg-[#4B634D] text-amber-300 font-bold rounded-xl text-sm border border-[#4B634D] shadow cursor-pointer"
                 >

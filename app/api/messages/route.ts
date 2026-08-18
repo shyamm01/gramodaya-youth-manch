@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore, normalizeMobile } from '@/src/lib/serverStore';
+import { requireAuth } from '@/src/lib/jwtAuth';
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const userMobile = searchParams.get('userMobile');
-  const isAdmin = searchParams.get('isAdmin') === 'true' || userMobile === 'ADMIN';
   const villageId = searchParams.get('villageId');
+
+  const auth = await requireAuth(req);
+  const isAdmin = auth.success && Boolean(auth.user.isAdmin);
 
   const store = loadStore();
   const allMessages = store.messages || [];
@@ -96,7 +99,8 @@ export async function DELETE(req: Request) {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     const userMobile = searchParams.get('userMobile');
-    const isAdmin = searchParams.get('isAdmin') === 'true';
+    const auth = await requireAuth(req);
+    const isAdmin = auth.success && Boolean(auth.user.isAdmin);
 
     let messageId = id;
     let senderMobile = userMobile;

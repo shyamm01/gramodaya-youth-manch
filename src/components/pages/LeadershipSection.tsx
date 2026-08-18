@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { Phone, MessageSquare, ShieldCheck, UserCheck, Camera } from 'lucide-react';
 import {
@@ -14,7 +15,9 @@ import {
 import { WhatsAppIcon } from '../common';
 
 export const LeadershipSection: React.FC = () => {
-  const { admins: contextAdmins, villageSettings, authSession, uploadPhoto, setIsAdminLoginModalOpen, t, lang } = useApp();
+  const { admins: contextAdmins, villageSettings, authSession, uploadPhoto, t, lang } = useApp();
+  const router = useRouter();
+  const pathname = usePathname();
   const [fetchedAdmins, setFetchedAdmins] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -110,7 +113,7 @@ export const LeadershipSection: React.FC = () => {
         ) : (
           <div className="mt-3">
             <button
-              onClick={() => setIsAdminLoginModalOpen(true)}
+              onClick={() => router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`)}
               className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
             >
               <Camera className="w-3.5 h-3.5" />
@@ -169,7 +172,7 @@ export const LeadershipSection: React.FC = () => {
                   </label>
                 ) : (
                   <button
-                    onClick={() => setIsAdminLoginModalOpen(true)}
+                    onClick={() => router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`)}
                     className="absolute -bottom-1 -right-1 bg-emerald-700 hover:bg-emerald-800 text-white p-1.5 rounded-full cursor-pointer shadow-md transition-transform hover:scale-105 flex items-center"
                     title={t('members.changePhoto')}
                   >

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { HeartHandshake, Plus, Calendar, MapPin, Trash2, Share2 } from 'lucide-react';
 import {
@@ -21,7 +22,6 @@ export const SocialWorkSection: React.FC = () => {
     authSession,
     isApprovedMember,
     currentMemberMobile,
-    setIsMemberLoginModalOpen,
     canDeleteContent,
     updateSocialWorkStatus,
     deleteSocialWork,
@@ -29,6 +29,8 @@ export const SocialWorkSection: React.FC = () => {
     lang,
     villageSettings,
   } = useApp();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [fetchedSocialWorks, setFetchedSocialWorks] = useState<any[] | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -148,7 +150,7 @@ export const SocialWorkSection: React.FC = () => {
           size="default"
           onClick={() => {
             if (!authSession.isAdminLoggedIn && !authSession.isMemberLoggedIn) {
-              setIsMemberLoginModalOpen(true);
+              router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`);
             } else if (!isApprovedMember) {
               setUnapprovedAlert(true);
             } else {

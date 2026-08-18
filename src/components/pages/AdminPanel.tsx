@@ -107,7 +107,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     isSuperAdmin,
     authSession,
     refreshData,
-    setIsAdminLoginModalOpen,
     approveMember,
     updateMember,
     deleteMember,
@@ -348,7 +347,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           <button
-            onClick={() => setIsAdminLoginModalOpen(true)}
+            onClick={() => router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`)}
             className="w-full py-3 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-extrabold text-xs rounded-xl transition shadow cursor-pointer flex items-center justify-center gap-2 active:scale-95"
           >
             <Lock className="w-4 h-4" />

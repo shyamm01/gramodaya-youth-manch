@@ -179,7 +179,7 @@ export async function verifyJwtToken(token: string): Promise<JwtUserPayload | nu
         const metadata = user.user_metadata || {};
         const appMetadata = user.app_metadata || {};
         const role = (appMetadata.role || metadata.role || 'MEMBER') as SystemRole;
-        const isSuper = role === 'SUPER_ADMIN' || user.email === 'shyamvaranpal95060@gmail.com' || user.email === 'admin@gramodayarasoolpur.org';
+        const isSuper = role === 'SUPER_ADMIN';
         const isAdm = isSuper || role === 'ADMIN';
 
         const baseUser: JwtUserPayload = {
@@ -229,7 +229,7 @@ export function clearAuthCookie(response: Response) {
 }
 
 /**
- * Extract token from Request (Authorization header, x-admin-token, or cookies)
+ * Extract token from Request (Authorization header or cookies)
  */
 export function extractTokenFromRequest(req: Request): string | null {
   // 1. Authorization header
@@ -261,31 +261,15 @@ export async function authenticateRequest(
   | { success: true; user: JwtUserPayload }
   | { success: false; status: number; error: string }
 > {
-  const adminTokenHeader = req.headers.get('x-admin-token');
   let token = extractTokenFromRequest(req);
   let user: JwtUserPayload | null = null;
 
-  // 1. Allow active admin session header as fallback for system maintenance
-  if (adminTokenHeader === 'admin_active' && !token) {
-    user = {
-      sub: 'system_admin',
-      id: '1',
-      name: 'System Admin',
-      mobile: '9999999999',
-      role: 'SUPER_ADMIN',
-      systemRole: 'SUPER_ADMIN',
-      isAdmin: true,
-      isSuperAdmin: true,
-      permissions: ROLE_DEFAULT_PERMISSIONS['SUPER_ADMIN'],
-    };
-  }
-
-  // 2. Try verifying extracted token
-  if (!user && token) {
+  // 1. Try verifying extracted token
+  if (token) {
     user = await verifyJwtToken(token);
   }
 
-  // 3. If still no user, check Supabase Server Client cookie session
+  // 2. If still no user, check Supabase Server Client cookie session
   if (!user) {
     try {
       const supabase = await createServerSupabaseClient();
@@ -298,7 +282,7 @@ export async function authenticateRequest(
         const metadata = sbUser.user_metadata || {};
         const appMetadata = sbUser.app_metadata || {};
         const role = (appMetadata.role || metadata.role || 'MEMBER') as SystemRole;
-        const isSuper = role === 'SUPER_ADMIN' || sbUser.email === 'shyamvaranpal95060@gmail.com' || sbUser.email === 'admin@gramodayarasoolpur.org';
+        const isSuper = role === 'SUPER_ADMIN';
         const isAdm = isSuper || role === 'ADMIN';
 
         const baseUser: JwtUserPayload = {
@@ -330,7 +314,7 @@ export async function authenticateRequest(
     };
   }
 
-  // 4. RBAC: Check Role requirement
+  // 3. RBAC: Check Role requirement
   if (requiredRole) {
     if (requiredRole === 'SUPER_ADMIN' && user.role !== 'SUPER_ADMIN' && !user.isSuperAdmin) {
       return {
@@ -353,7 +337,7 @@ export async function authenticateRequest(
     }
   }
 
-  // 5. RBAC: Check Permission requirement
+  // 4. RBAC: Check Permission requirement
   if (requiredPermission) {
     const isSuper = user.role === 'SUPER_ADMIN' || user.isSuperAdmin;
     const hasPerm =

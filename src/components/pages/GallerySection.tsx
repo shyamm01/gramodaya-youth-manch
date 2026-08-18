@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { Image as ImageIcon, Plus, Trash2, Check, Edit2 } from 'lucide-react';
 import {
@@ -21,9 +22,10 @@ export const GallerySection: React.FC = () => {
     deleteGalleryItem,
     authSession,
     isApprovedMember,
-    setIsMemberLoginModalOpen,
     t,
   } = useApp();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [fetchedGallery, setFetchedGallery] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -146,7 +148,7 @@ export const GallerySection: React.FC = () => {
           size="default"
           onClick={() => {
             if (!authSession.isAdminLoggedIn && !authSession.isMemberLoggedIn) {
-              setIsMemberLoginModalOpen(true);
+              router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`);
             } else if (!isApprovedMember) {
               setUnapprovedAlert(true);
             } else {
