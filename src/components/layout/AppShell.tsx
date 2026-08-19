@@ -40,6 +40,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         { href: '/leadership', label: t('nav.leadership') },
         { href: '/elders', label: t('nav.elders') },
         { href: '/about', label: t('nav.about') },
+        { href: '/vision-mission', label: t('nav.visionMission') },
       ],
     },
     {

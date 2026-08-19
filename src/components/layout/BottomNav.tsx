@@ -22,6 +22,7 @@ import {
   Bell,
   GraduationCap,
   Briefcase,
+  Sparkles,
 } from 'lucide-react';
 
 export const BottomNav: React.FC = () => {
@@ -39,6 +40,7 @@ export const BottomNav: React.FC = () => {
 
   const drawerLinks = [
     { href: '/employment', labelKey: 'nav.employment', icon: Briefcase },
+    { href: '/vision-mission', labelKey: 'nav.visionMission', icon: Sparkles },
     { href: '/events', labelKey: 'nav.events', icon: Calendar },
     { href: '/live-chat', labelKey: 'nav.liveChat', icon: MessageSquare },
     { href: '/members', labelKey: 'nav.members', icon: Users },

@@ -15,4 +15,6 @@ export { EducationSection } from './EducationSection';
 export { EducationCategorySection } from './EducationCategorySection';
 export { EmploymentSection } from './EmploymentSection';
 export { EmploymentCategorySection } from './EmploymentCategorySection';
+export { VisionMissionSection } from './VisionMissionSection';
+export { VisionMissionCategorySection } from './VisionMissionCategorySection';
 export { AdminPanel } from './AdminPanel';
