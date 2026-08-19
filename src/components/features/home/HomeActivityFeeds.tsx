@@ -61,8 +61,8 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
           <div>
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#E0DCCF]/60 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 flex items-center justify-center flex-shrink-0">
-                  <Volume2 className="w-4 h-4" />
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Volume2 className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="text-xs sm:text-sm font-extrabold text-[#2C3327] dark:text-white tracking-tight">
@@ -141,8 +141,8 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
           <div>
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#E0DCCF]/60 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0">
-                  <HeartHandshake className="w-4 h-4" />
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <HeartHandshake className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="text-xs sm:text-sm font-extrabold text-[#2C3327] dark:text-white tracking-tight">
@@ -205,8 +205,8 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
           <div>
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#E0DCCF]/60 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center flex-shrink-0">
-                  <Calendar className="w-4 h-4" />
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-600 to-fuchsia-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Calendar className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="text-xs sm:text-sm font-extrabold text-[#2C3327] dark:text-white tracking-tight">
@@ -277,8 +277,8 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
           <div>
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#E0DCCF]/60 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center flex-shrink-0">
-                  <ImageIcon className="w-4 h-4" />
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-600 to-orange-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <ImageIcon className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h3 className="text-xs sm:text-sm font-extrabold text-[#2C3327] dark:text-white tracking-tight">

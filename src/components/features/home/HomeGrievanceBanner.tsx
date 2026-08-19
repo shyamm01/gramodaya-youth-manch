@@ -30,8 +30,8 @@ export const HomeGrievanceBanner: React.FC<HomeGrievanceBannerProps> = ({
         <div className="absolute top-0 right-0 w-64 h-32 bg-amber-500/10 dark:bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
 
         <div className="flex items-center gap-3.5 min-w-0 z-10">
-          <div className="relative w-11 h-11 rounded-2xl bg-amber-500/15 dark:bg-amber-500/25 border border-amber-400/30 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
-            <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+          <div className="relative w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-600 to-orange-600 shadow-sm flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+            <AlertTriangle className="w-5 h-5 text-white" />
             {newComplaintsCount > 0 && (
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full ring-2 ring-white dark:ring-[#111726] animate-pulse" />
             )}

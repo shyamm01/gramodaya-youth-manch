@@ -12,5 +12,7 @@ export { AboutSection } from './AboutSection';
 export { EldersSection } from './EldersSection';
 export { LiveChatSection } from './LiveChatSection';
 export { EducationSection } from './EducationSection';
+export { EducationCategorySection } from './EducationCategorySection';
 export { EmploymentSection } from './EmploymentSection';
+export { EmploymentCategorySection } from './EmploymentCategorySection';
 export { AdminPanel } from './AdminPanel';

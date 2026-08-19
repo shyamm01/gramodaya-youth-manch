@@ -35,8 +35,8 @@ export const HomeMemberSearch: React.FC<HomeMemberSearchProps> = ({
         <CardHeader className="p-4 sm:p-5 pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0">
-                <Search className="w-4 h-4" />
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <Search className="w-5 h-5 text-white" />
               </div>
               <div>
                 <CardTitle className="text-xs sm:text-sm font-extrabold text-[#2C3327] dark:text-white tracking-tight">

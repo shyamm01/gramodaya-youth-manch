@@ -21,8 +21,8 @@ export const HomeLeadership: React.FC<HomeLeadershipProps> = ({ admins }) => {
     <section className="max-w-5xl mx-auto px-4 sm:px-6">
       <div className="flex items-center justify-between mb-3.5">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0">
-            <UserCheck className="w-4 h-4" />
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+            <UserCheck className="w-5 h-5 text-white" />
           </div>
           <div>
             <h3 className="text-xs sm:text-sm font-extrabold text-[#2C3327] dark:text-white tracking-tight">
