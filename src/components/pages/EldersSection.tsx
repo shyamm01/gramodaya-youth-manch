@@ -52,7 +52,7 @@ export const EldersSection: React.FC = () => {
   const elders = fetchedElders || contextElders;
 
   return (
-    <div className="py-6 px-4 sm:px-6 max-w-7xl mx-auto transition-colors duration-200">
+    <div className="max-w-7xl mx-auto transition-colors duration-200">
       <div className="text-center mb-8">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#E8F2EC] dark:bg-emerald-950/60 text-[#1E3A2F] dark:text-emerald-300 text-xs font-bold mb-3 border border-[#B3D6C2] dark:border-emerald-800">
           <Users className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />

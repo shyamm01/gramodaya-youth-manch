@@ -72,7 +72,7 @@ export const EmploymentSection: React.FC = () => {
   const { t } = useApp();
 
   return (
-    <div className="py-6 px-4 sm:px-6 max-w-4xl mx-auto space-y-6 transition-colors duration-200">
+    <div className="max-w-4xl mx-auto space-y-6 transition-colors duration-200">
       <div className="relative overflow-hidden bg-[#0B130E] dark:bg-[#070B12] text-white rounded-3xl p-6 sm:p-12 border border-[#3B4F3D] dark:border-slate-800 shadow-md">
         {/* Decorative ambient glow */}
         <div className="absolute -top-10 left-1/4 w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
@@ -112,15 +112,15 @@ export const EmploymentSection: React.FC = () => {
 
         return (
           <section key={category.headingKey} className="space-y-3">
-            <div className="w-full flex justify-between items-center px-1">
-              <h2 className="text-sm sm:text-base font-black text-[#2C3327] dark:text-white flex items-center gap-2">
+            <div className="w-full flex justify-between items-center gap-2 px-1">
+              <h2 className="text-sm sm:text-base font-black text-[#2C3327] dark:text-white flex items-center gap-2 min-w-0 leading-snug">
                 <CategoryIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                 <span>{t(category.headingKey)}</span>
               </h2>
 
               <Link
                 href={`/employment/${category.slug}`}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
+                className="flex items-center gap-1.5 shrink-0 whitespace-nowrap px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
               >
                 <span>{t('common.showMore')}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -133,20 +133,21 @@ export const EmploymentSection: React.FC = () => {
                 return (
                   <Card
                     key={item.titleKey}
-                    className="p-4 sm:p-5 flex flex-col items-start gap-3 h-full"
+                    className="p-4 sm:p-5 flex flex-col gap-3 h-full"
                   >
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shrink-0 shadow-sm">
-                      <ItemIcon className="w-6 h-6 text-white" />
-                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="size-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shrink-0 shadow-sm">
+                        <ItemIcon className="size-5 text-white" />
+                      </div>
 
-                    <div className="flex-1">
-                      <h3 className="text-xs sm:text-sm font-bold text-[#2C3327] dark:text-white mb-1">
+                      <h3 className="min-w-0 text-xs sm:text-sm font-bold text-[#2C3327] dark:text-white line-clamp-2">
                         {t(item.titleKey)}
                       </h3>
-                      <p className="text-[11px] sm:text-xs text-[#8C8675] dark:text-slate-400 leading-relaxed">
-                        {t(item.descKey)}
-                      </p>
                     </div>
+
+                    <p className="text-[11px] sm:text-xs text-[#8C8675] dark:text-slate-400 leading-relaxed line-clamp-2">
+                      {t(item.descKey)}
+                    </p>
 
                     <Link href="/helpline" className="w-full mt-auto">
                       <Button
@@ -166,15 +167,6 @@ export const EmploymentSection: React.FC = () => {
           </section>
         );
       })}
-
-      <div className="flex justify-center pt-2">
-        <Link href="/helpline">
-          <Button variant="default" size="default" className="px-5 py-2.5 rounded-xl font-bold cursor-pointer">
-            <PhoneCall className="w-4 h-4 mr-1.5" />
-            <span>{t('employment.contactCta')}</span>
-          </Button>
-        </Link>
-      </div>
     </div>
   );
 };

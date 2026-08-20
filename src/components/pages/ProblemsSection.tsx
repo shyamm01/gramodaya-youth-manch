@@ -157,7 +157,7 @@ export const ProblemsSection: React.FC = () => {
   };
 
   return (
-    <div className="py-6 px-4 sm:px-6 max-w-7xl mx-auto transition-colors duration-200">
+    <div className="max-w-7xl mx-auto transition-colors duration-200">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>

@@ -49,7 +49,7 @@ export const AboutSection: React.FC = () => {
   const villageSettings = aboutData?.village || contextVillageSettings;
 
   return (
-    <div className="py-6 px-4 sm:px-6 max-w-5xl mx-auto space-y-6 transition-colors duration-200">
+    <div className="max-w-5xl mx-auto space-y-6 transition-colors duration-200">
       {/* Top Banner */}
       <div className="bg-gradient-to-br from-[#18281E] via-[#24382B] to-[#1B3025] dark:from-[#0B1528] dark:via-[#0C1E19] dark:to-[#080C14] text-white rounded-3xl p-6 sm:p-10 border border-[#3B4F3D] dark:border-slate-800 shadow-md text-center space-y-4">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 text-amber-300 text-xs font-black border border-amber-400/30">

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { PhoneCall, ArrowRight, ArrowLeft } from 'lucide-react';
+import { ArrowRight, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useApp } from '../../context/AppContext';
 import { Card, Button } from '../ui';
@@ -29,7 +29,7 @@ export const EmploymentCategorySection: React.FC<{ slug: string }> = ({ slug }) 
   const CategoryIcon = category.icon;
 
   return (
-    <div className="py-6 px-4 sm:px-6 max-w-7xl mx-auto transition-colors duration-200">
+    <div className="max-w-7xl mx-auto transition-colors duration-200">
       <Link
         href="/employment"
         className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-400 mb-5 hover:underline"
@@ -55,20 +55,21 @@ export const EmploymentCategorySection: React.FC<{ slug: string }> = ({ slug }) 
           return (
             <Card
               key={item.titleKey}
-              className="p-4 sm:p-5 flex flex-col items-start gap-3 h-full"
+              className="p-4 sm:p-5 flex flex-col gap-3 h-full"
             >
-              <div className="size-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shrink-0 shadow-sm">
-                <ItemIcon className="size-5 text-white" />
-              </div>
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shrink-0 shadow-sm">
+                  <ItemIcon className="size-5 text-white" />
+                </div>
 
-              <div className="flex-1">
-                <h3 className="text-xs sm:text-sm font-bold text-[#2C3327] dark:text-white mb-1">
+                <h3 className="min-w-0 text-xs sm:text-sm font-bold text-[#2C3327] dark:text-white line-clamp-2">
                   {t(item.titleKey)}
                 </h3>
-                <p className="text-[11px] sm:text-xs text-[#8C8675] dark:text-slate-400 leading-relaxed">
-                  {t(item.descKey)}
-                </p>
               </div>
+
+              <p className="text-[11px] sm:text-xs text-[#8C8675] dark:text-slate-400 leading-relaxed">
+                {t(item.descKey)}
+              </p>
 
               <Link href="/helpline" className="w-full mt-auto">
                 <Button
@@ -83,15 +84,6 @@ export const EmploymentCategorySection: React.FC<{ slug: string }> = ({ slug }) 
             </Card>
           );
         })}
-      </div>
-
-      <div className="flex justify-center pt-6">
-        <Link href="/helpline">
-          <Button variant="default" size="default" className="px-5 py-2.5 rounded-xl font-bold cursor-pointer">
-            <PhoneCall className="w-4 h-4 mr-1.5" />
-            <span>{t('employment.contactCta')}</span>
-          </Button>
-        </Link>
       </div>
     </div>
   );

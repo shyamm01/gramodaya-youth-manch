@@ -3,7 +3,6 @@
 import React from "react";
 import {
   GraduationCap,
-  PhoneCall,
   Award,
   School,
   Laptop,
@@ -19,14 +18,36 @@ import {
   ClipboardList,
   MessageCircle,
   ArrowRight,
+  type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useApp } from "../../context/AppContext";
 import { Card, Button } from "../ui";
 
-export const CATEGORIES = [
+/** Whose programme an item is. Items without a scope are government schemes. */
+export type SchemeScope = "gramodaya" | "government";
+
+export interface CategoryItem {
+  titleKey: string;
+  descKey: string;
+  icon: LucideIcon;
+  /** Omit for government schemes; set to "gramodaya" for the Manch's own. */
+  scope?: SchemeScope;
+}
+
+export interface Category {
+  slug: string;
+  headingKey: string;
+  /** One-paragraph description shown at the top of the category page. */
+  overviewKey: string;
+  icon: LucideIcon;
+  items: CategoryItem[];
+}
+
+export const CATEGORIES: Category[] = [
   {
     slug: "digital",
+    overviewKey: "education.cat.digital.overview",
     headingKey: "education.cat.digital",
     icon: Laptop,
     items: [
@@ -49,6 +70,7 @@ export const CATEGORIES = [
   },
   {
     slug: "career-guidance",
+    overviewKey: "education.cat.careerGuidance.overview",
     headingKey: "education.cat.careerGuidance",
     icon: Compass,
     items: [
@@ -76,6 +98,7 @@ export const CATEGORIES = [
   },
   {
     slug: "scholarships",
+    overviewKey: "education.cat.scholarships.overview",
     headingKey: "education.cat.scholarships",
     icon: Award,
     items: [
@@ -103,6 +126,7 @@ export const CATEGORIES = [
   },
   {
     slug: "institutions",
+    overviewKey: "education.cat.institutions.overview",
     headingKey: "education.cat.institutions",
     icon: School,
     items: [
@@ -131,7 +155,7 @@ export const EducationSection: React.FC = () => {
   const { t } = useApp();
 
   return (
-    <div className="py-6 px-4 sm:px-6 max-w-7xl mx-auto transition-colors duration-200">
+    <div className="max-w-7xl mx-auto transition-colors duration-200">
       <div className="relative w-full flex flex-col items-start justify-start mb-6">
         <div className="relative w-full flex items-start justify-start">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-400/30 shadow-lg shadow-emerald-500/10 shrink-0">
@@ -158,15 +182,15 @@ export const EducationSection: React.FC = () => {
               key={category.headingKey}
               className="w-full flex flex-col gap-3"
             >
-              <div className="w-full flex justify-between items-center">
-                <h2 className="text-sm sm:text-base font-black text-[#2C3327] dark:text-white flex items-center gap-2 px-1">
+              <div className="w-full flex justify-between items-center gap-2">
+                <h2 className="text-sm sm:text-base font-black text-[#2C3327] dark:text-white flex items-center gap-2 px-1 min-w-0 leading-snug">
                   <CategoryIcon className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   <span>{t(category.headingKey)}</span>
                 </h2>
 
                 <Link
                   href={`/education/${category.slug}`}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
+                  className="flex items-center gap-1.5 shrink-0 whitespace-nowrap px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
                 >
                   <span>{t("common.showMore")}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
@@ -179,20 +203,21 @@ export const EducationSection: React.FC = () => {
                   return (
                     <Card
                       key={item.titleKey}
-                      className="p-4 sm:p-5 flex flex-col items-start gap-3 h-full"
+                      className="p-4 sm:p-5 flex flex-col gap-3 h-full"
                     >
-                      <div className="size-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shrink-0 shadow-sm">
-                        <ItemIcon className="size-5 text-white" />
-                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="size-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shrink-0 shadow-sm">
+                          <ItemIcon className="size-5 text-white" />
+                        </div>
 
-                      <div className="flex-1">
-                        <h3 className="text-xs sm:text-sm font-bold text-[#2C3327] dark:text-white mb-1">
+                        <h3 className="min-w-0 text-xs sm:text-sm font-bold text-[#2C3327] dark:text-white line-clamp-2">
                           {t(item.titleKey)}
                         </h3>
-                        <p className="text-[11px] sm:text-xs text-[#8C8675] dark:text-slate-400 leading-relaxed">
-                          {t(item.descKey)}
-                        </p>
                       </div>
+
+                      <p className="text-[11px] sm:text-xs text-[#8C8675] dark:text-slate-400 leading-relaxed line-clamp-2">
+                        {t(item.descKey)}
+                      </p>
 
                       <Link href="/helpline" className="w-full mt-auto">
                         <Button
@@ -211,19 +236,6 @@ export const EducationSection: React.FC = () => {
             </section>
           );
         })}
-      </div>
-
-      <div className="flex justify-center pt-2">
-        <Link href="/helpline">
-          <Button
-            variant="default"
-            size="default"
-            className="px-5 py-2.5 rounded-xl font-bold cursor-pointer"
-          >
-            <PhoneCall className="w-4 h-4 mr-1.5" />
-            <span>{t("education.contactCta")}</span>
-          </Button>
-        </Link>
       </div>
     </div>
   );
