@@ -86,9 +86,6 @@ export const HomeSection: React.FC = () => {
 
       {/* 2. Containerized Dynamic Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
-        {/* Vision & Mission — links out to the dedicated page */}
-        <HomeVisionMissionBanner />
-
         {/* Live Activity Feeds (Announcements, Social Work, Events, Gallery) — each card independent */}
         <HomeActivityFeeds
           announcements={announcementsList}
@@ -117,6 +114,9 @@ export const HomeSection: React.FC = () => {
 
         {/* Leadership & Main Executives Showcase */}
         <HomeLeadership admins={admins} />
+
+        {/* Vision & Mission — last section, links out to the dedicated page */}
+        <HomeVisionMissionBanner />
       </div>
     </div>
   );
