@@ -17,6 +17,13 @@ export const hi: Record<string, string> = {
   'nav.visionMission': 'विज़न एवं मिशन',
   'nav.admin': 'एडमिन पैनल',
 
+  // Short nav labels — the mobile bottom bar has ~1 word of room per tab
+  'nav.short.home': 'मुख्य',
+  'nav.short.education': 'शिक्षा',
+  'nav.short.problems': 'शिकायत',
+  'nav.short.socialWork': 'कल्याण',
+  'nav.short.employment': 'रोजगार',
+
   // Header / Top Bar
   'header.village': 'ग्राम',
   'header.gramPanchayat': 'ग्राम पंचायत',
@@ -24,7 +31,7 @@ export const hi: Record<string, string> = {
   'header.share': 'शेयर करें',
   'header.copied': 'कॉपी हुआ',
   'header.adminPanel': 'एडमिन पैनल',
-  'header.adminLogin': '🔐 एडमिन लॉगिन',
+  'header.adminLogin': 'एडमिन लॉगिन',
   'header.supabaseSetup': '⚡ सुपाबेस सेटअप',
   'header.more': 'अन्य',
   'header.menu': 'मेन्यू',
@@ -37,7 +44,7 @@ export const hi: Record<string, string> = {
   'footer.security': 'सुरक्षित एडमिनिस्ट्रेशन',
   'footer.securityDesc': 'ग्राम समस्याओं का समाधान, डिजिटल आईडी कार्ड एवं संगठन रिकॉर्ड।',
   'footer.adminDashboard': 'प्रशासनिक डैशबोर्ड',
-  'footer.authAdminLogin': '🔐 अधिकृत Admin Login',
+  'footer.authAdminLogin': 'अधिकृत एडमिन लॉगिन',
   'footer.dedicated': 'ग्रामीण युवा सशक्तिकरण हेतु समर्पित',
   'footer.liveChat': '💬 लाइव संवाद मंच',
   'footer.loading': 'पोर्टल लोड हो रहा है, कृपया प्रतीक्षा करें...',
@@ -58,7 +65,7 @@ export const hi: Record<string, string> = {
   'common.share': 'शेयर करें',
   'common.login': 'लॉगिन',
   'common.logout': 'लॉगआउट',
-  'common.adminLogin': '🔐 एडमिन लॉगिन',
+  'common.adminLogin': 'एडमिन लॉगिन',
   'common.memberLogin': '📱 सदस्य लॉगिन',
   'common.joinManch': 'संगठन से जुड़ें',
   'common.online': 'सक्रिय',
@@ -70,6 +77,7 @@ export const hi: Record<string, string> = {
   'common.inProgress': 'प्रक्रियाधीन',
   'common.new': 'नवीन',
   'common.more': 'अधिक',
+  'nav.moreOptions': 'अन्य विकल्प',
   'common.urgent': 'अति-आवश्यक',
   'common.call': 'कॉल',
   'common.whatsapp': 'व्हाट्सएप',
@@ -106,6 +114,7 @@ export const hi: Record<string, string> = {
   'home.noMemberFoundSub': 'कृपया नाम या 10 अंकों का मोबाइल नंबर दोबारा जांचें।',
   'home.grievanceTitle': 'जन शिकायत निवारण',
   'home.grievanceSubtitle': 'गांव से संबंधित किसी भी समस्या को दर्ज करें अथवा अपनी शिकायत की प्रगति देखें',
+  'home.noGrievances': 'अभी कोई शिकायत दर्ज नहीं है।',
   'home.leadershipTitle': 'कार्यकारिणी समिति',
   'home.leadershipSubtitle': 'मंच के प्रमुख पदाधिकारी एवं मार्गदर्शक',
 

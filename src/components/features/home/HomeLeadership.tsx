@@ -18,15 +18,15 @@ export const HomeLeadership: React.FC<HomeLeadershipProps> = ({ admins }) => {
   if (!admins || admins.length === 0) return null;
 
   return (
-    <section className="max-w-5xl mx-auto px-4 sm:px-6">
+    <section className="max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-3.5">
         <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-            <UserCheck className="w-5 h-5 text-white" />
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+            <UserCheck className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-white" />
           </div>
           <div>
             <h3 className="text-xs sm:text-sm font-extrabold text-[#2C3327] dark:text-white tracking-tight">
-              {t('nav.leadership')} ({t('home.leadershipTitle')})
+              {t('home.leadershipTitle')}
             </h3>
             <span className="text-[10px] text-[#8C8675] dark:text-slate-400 font-medium">
               {t('home.leadershipSubtitle')}

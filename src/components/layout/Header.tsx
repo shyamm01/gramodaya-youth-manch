@@ -26,6 +26,13 @@ import {
   CreditCard,
   ChevronDown,
   Sparkles,
+  Users,
+  UserCheck,
+  Award,
+  Info,
+  Bell,
+  Image as ImageIcon,
+  PhoneCall,
 } from "lucide-react";
 
 // Primary nav — visible in desktop header
@@ -37,6 +44,20 @@ const PRIMARY_NAV = [
   { href: "/social-work", labelKey: "nav.socialWork", icon: Heart },
   { href: "/events", labelKey: "nav.events", icon: Calendar },
   { href: "/live-chat", labelKey: "nav.liveChat", icon: MessageCircle },
+];
+
+// Secondary nav — everything that isn't a bottom-nav tab or a primary link.
+// Reachable on mobile only through the menu below, so it can't be dropped
+// without orphaning these routes.
+const SECONDARY_NAV = [
+  { href: "/vision-mission", labelKey: "nav.visionMission", icon: Sparkles },
+  { href: "/members", labelKey: "nav.members", icon: Users },
+  { href: "/leadership", labelKey: "nav.leadership", icon: UserCheck },
+  { href: "/elders", labelKey: "nav.elders", icon: Award },
+  { href: "/announcements", labelKey: "nav.announcements", icon: Bell },
+  { href: "/gallery", labelKey: "nav.gallery", icon: ImageIcon },
+  { href: "/about", labelKey: "nav.about", icon: Info },
+  { href: "/helpline", labelKey: "nav.helpline", icon: PhoneCall },
 ];
 
 export const Header: React.FC = () => {
@@ -146,7 +167,7 @@ export const Header: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 w-full bg-white dark:bg-[#0F172A] border-b border-[#E0DCCF] dark:border-slate-800 transition-colors duration-200 shadow-xs">
       {/* ── Top Utility Bar: Language + Theme ── */}
-      <div className="w-full bg-[#F7F5F0] dark:bg-slate-900/60 border-b border-[#E0DCCF] dark:border-slate-800">
+      <div className="hidden sm:block w-full bg-[#F7F5F0] dark:bg-slate-900/60 border-b border-[#E0DCCF] dark:border-slate-800">
         <div className="max-w-full mx-auto px-4 sm:px-6 h-8 flex items-center justify-end gap-1.5">
           <LanguageSelector compact={true} />
           <ThemeToggle compact={true} />
@@ -154,22 +175,22 @@ export const Header: React.FC = () => {
       </div>
 
       <div className="max-w-full mx-auto px-4 sm:px-6">
-        <div className="flex items-center justify-between h-14">
+        <div className="flex items-center justify-between gap-3 h-14">
           {/* ── Logo + Name ── */}
           <Link
             href="/"
-            className="flex items-center gap-2.5 cursor-pointer group flex-shrink-0"
+            className="flex items-center gap-2.5 cursor-pointer group min-w-0"
           >
-            <div className="w-9 h-9 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center border-2 border-[#4B634D] dark:border-emerald-600 group-hover:scale-105 transition-transform">
+            <div className="w-9 h-9 flex-shrink-0 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center border-2 border-[#4B634D] dark:border-emerald-600 group-hover:scale-105 transition-transform">
               <GymLogo className="w-full h-full" />
             </div>
-            <div className="hidden sm:block">
-              <h1 className="text-sm sm:text-base font-black text-[#2C3327] dark:text-white tracking-tight leading-tight">
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-base font-black text-[#2C3327] dark:text-white tracking-tight leading-tight line-clamp-2 sm:line-clamp-1">
                 {lang === "en"
                   ? villageSettings.orgName
                   : villageSettings.orgNameHindi}
               </h1>
-              <p className="text-[10px] text-[#8C8675] dark:text-slate-500 font-semibold leading-none">
+              <p className="hidden sm:block text-[10px] text-[#8C8675] dark:text-slate-500 font-semibold leading-none">
                 {lang === "en"
                   ? villageSettings.slogan || villageSettings.tagline
                   : villageSettings.sloganHindi}
@@ -200,7 +221,7 @@ export const Header: React.FC = () => {
           </nav>
 
           {/* ── Right Actions ── */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             {(!supabaseUrl || supabaseUrl.includes("example.supabase")) && (
               <button
                 onClick={() => setIsSupabaseSetupOpen(true)}
@@ -374,7 +395,7 @@ export const Header: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <Link
                   href="/auth/login"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white shadow-2xs active:scale-95"
+                  className="flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white shadow-2xs active:scale-95"
                   title={lang === "en" ? "Sign In" : "लॉगिन करें"}
                 >
                   <User className="w-3.5 h-3.5" />
@@ -400,26 +421,55 @@ export const Header: React.FC = () => {
 
         {/* ── Mobile Dropdown ── */}
         {mobileMenuOpen && (
-          <nav className="lg:hidden pt-2 pb-3 border-t border-[#E0DCCF] dark:border-slate-800 grid grid-cols-2 gap-1.5 animate-fade-in">
-            {PRIMARY_NAV.map((item) => {
-              const active = isLinkActive(item.href);
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    active
-                      ? "bg-[#1E3A2F] dark:bg-emerald-900/80 text-white"
-                      : "bg-[#F7F5F0] dark:bg-slate-800 text-[#2C3327] dark:text-slate-200 hover:bg-[#E2DDD2] dark:hover:bg-slate-700"
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  {t(item.labelKey)}
-                </Link>
-              );
-            })}
+          <nav className="lg:hidden pt-2 pb-3 border-t border-[#E0DCCF] dark:border-slate-800 animate-fade-in">
+            <div className="sm:hidden flex items-center justify-end gap-1.5 pb-2 mb-2 border-b border-[#E0DCCF] dark:border-slate-800">
+              <LanguageSelector compact={true} />
+              <ThemeToggle compact={true} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5">
+              {PRIMARY_NAV.map((item) => {
+                const active = isLinkActive(item.href);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      active
+                        ? "bg-[#1E3A2F] dark:bg-emerald-900/80 text-white"
+                        : "bg-[#F7F5F0] dark:bg-slate-800 text-[#2C3327] dark:text-slate-200 hover:bg-[#E2DDD2] dark:hover:bg-slate-700"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {t(item.labelKey)}
+                  </Link>
+                );
+              })}
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5 mt-1.5 pt-2 border-t border-[#E0DCCF] dark:border-slate-800">
+              {SECONDARY_NAV.map((item) => {
+                const active = isLinkActive(item.href);
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      active
+                        ? "bg-[#1E3A2F] dark:bg-emerald-900/80 text-white"
+                        : "bg-[#F7F5F0] dark:bg-slate-800 text-[#2C3327] dark:text-slate-200 hover:bg-[#E2DDD2] dark:hover:bg-slate-700"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="min-w-0 truncate">{t(item.labelKey)}</span>
+                  </Link>
+                );
+              })}
+            </div>
           </nav>
         )}
       </div>

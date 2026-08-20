@@ -30,7 +30,7 @@ export const HomeMemberSearch: React.FC<HomeMemberSearchProps> = ({
     : [];
 
   return (
-    <section className="max-w-5xl mx-auto px-4 sm:px-6">
+    <section className="max-w-5xl mx-auto">
       <Card className="rounded-2xl border border-[#E0DCCF]/80 dark:border-slate-800/80 bg-white dark:bg-[#111726] shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
         <CardHeader className="p-4 sm:p-5 pb-3">
           <div className="flex items-center justify-between">

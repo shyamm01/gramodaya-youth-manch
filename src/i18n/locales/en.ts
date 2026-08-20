@@ -17,6 +17,13 @@ export const en: Record<string, string> = {
   'nav.visionMission': 'Vision & Mission',
   'nav.admin': 'Admin Panel',
 
+  // Short nav labels — the mobile bottom bar has ~1 word of room per tab
+  'nav.short.home': 'Home',
+  'nav.short.education': 'Education',
+  'nav.short.problems': 'Grievance',
+  'nav.short.socialWork': 'Welfare',
+  'nav.short.employment': 'Employment',
+
   // Header / Top Bar
   'header.village': 'Village',
   'header.gramPanchayat': 'Gram Panchayat',
@@ -24,7 +31,7 @@ export const en: Record<string, string> = {
   'header.share': 'Share',
   'header.copied': 'Copied!',
   'header.adminPanel': 'Admin Panel',
-  'header.adminLogin': '🔐 Admin Login',
+  'header.adminLogin': 'Admin Login',
   'header.supabaseSetup': '⚡ Supabase Setup',
   'header.more': 'More',
   'header.menu': 'Menu',
@@ -37,7 +44,7 @@ export const en: Record<string, string> = {
   'footer.security': 'Administration & Security',
   'footer.securityDesc': 'Village grievance redressal, digital ID cards and organization records.',
   'footer.adminDashboard': 'Admin Dashboard',
-  'footer.authAdminLogin': '🔐 Authorized Admin Login',
+  'footer.authAdminLogin': 'Authorized Admin Login',
   'footer.dedicated': 'Dedicated to Rural Youth Empowerment',
   'footer.liveChat': '💬 Live Discussion Forum',
   'footer.loading': 'Portal is loading, please wait...',
@@ -58,7 +65,7 @@ export const en: Record<string, string> = {
   'common.share': 'Share',
   'common.login': 'Login',
   'common.logout': 'Logout',
-  'common.adminLogin': '🔐 Admin Login',
+  'common.adminLogin': 'Admin Login',
   'common.memberLogin': '📱 Member Login',
   'common.joinManch': 'Join Manch',
   'common.online': 'Online',
@@ -70,6 +77,7 @@ export const en: Record<string, string> = {
   'common.inProgress': 'In Progress',
   'common.new': 'New',
   'common.more': 'More',
+  'nav.moreOptions': 'More Options',
   'common.urgent': 'Urgent',
   'common.call': 'Call',
   'common.whatsapp': 'WhatsApp',
@@ -106,6 +114,7 @@ export const en: Record<string, string> = {
   'home.noMemberFoundSub': 'Please check the spelling or 10-digit mobile number.',
   'home.grievanceTitle': 'Grievance Redressal Portal',
   'home.grievanceSubtitle': 'Register any village-related issue or track the progress of your grievance.',
+  'home.noGrievances': 'No grievances have been filed at this time.',
   'home.leadershipTitle': 'Executive Leadership Team',
   'home.leadershipSubtitle': 'Key office bearers and mentors of Gramodaya Youth Manch',
 

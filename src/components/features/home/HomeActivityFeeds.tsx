@@ -15,6 +15,7 @@ import {
 import { Card, Badge, Skeleton } from '../../ui';
 import { PublicInfo, SocialWork, EventItem, GalleryItem, Announcement } from '../../../types';
 import { useApp } from '../../../context/AppContext';
+import { FEED_LIMIT, RAIL_ITEM_WIDTH, RAIL_CARD, FeedRail, RailSkeleton, EmptyFeed } from './FeedRail';
 
 interface HomeActivityFeedsProps {
   announcements?: Announcement[] | any[];
@@ -27,46 +28,6 @@ interface HomeActivityFeedsProps {
   approvedGalleryPhotos: GalleryItem[] | any[];
   galleryLoading?: boolean;
 }
-
-/** How many items each feed previews before the user has to tap "All". */
-const FEED_LIMIT = 5;
-
-/**
- * One rail item's width: a fixed card that scrolls on narrow screens, and from
- * `lg` up exactly a fifth of the rail (minus the four 0.625rem gaps) so all
- * FEED_LIMIT items fit across the full-width section without scrolling.
- */
-const RAIL_ITEM_WIDTH = 'w-[190px] sm:w-[210px] lg:w-[calc((100%_-_2.5rem)/5)]';
-
-/**
- * Horizontal, snap-scrolling rail. The negative margins let cards bleed to the
- * edge of the parent Card's padding so a partially visible card hints that the
- * rail scrolls.
- */
-const FeedRail: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="flex items-stretch gap-2.5 overflow-x-auto overscroll-x-contain snap-x snap-mandatory -mx-4 sm:-mx-5 px-4 sm:px-5 pb-2 -mb-2">
-    {children}
-  </div>
-);
-
-/** Shared look for one item card inside a rail. */
-const RAIL_CARD =
-  `snap-start shrink-0 ${RAIL_ITEM_WIDTH} flex flex-col p-3 bg-[#F8F6F0] dark:bg-[#0B0F17] hover:bg-[#F2EFE8] dark:hover:bg-[#0F1522] rounded-xl border border-[#E0DCCF]/70 dark:border-slate-800 transition-colors`;
-
-const RailSkeleton: React.FC = () => (
-  <FeedRail>
-    {[0, 1, 2, 3, 4].map((i) => (
-      <Skeleton key={i} className={`shrink-0 ${RAIL_ITEM_WIDTH} h-24 rounded-xl`} />
-    ))}
-  </FeedRail>
-);
-
-const EmptyFeed: React.FC<{ icon: React.ElementType; label: string }> = ({ icon: Icon, label }) => (
-  <div className="text-center py-8 px-4 rounded-xl bg-[#FBF9F5] dark:bg-[#0B0F17]/60 border border-dashed border-[#E0DCCF] dark:border-slate-800/80">
-    <Icon className="w-6 h-6 mx-auto text-[#A59F8E] dark:text-slate-600 mb-1.5 opacity-60" />
-    <p className="text-xs text-[#8C8675] dark:text-slate-400 font-medium">{label}</p>
-  </div>
-);
 
 export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
   announcements = [],
@@ -85,7 +46,7 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
   const locale = lang === 'en' ? 'en-IN' : 'hi-IN';
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-4">
+    <div className="max-w-5xl mx-auto space-y-4">
       {/* ── FULL-WIDTH ACTIVITY SECTIONS, one per feed ── */}
       <div className="space-y-4 sm:space-y-5">
 
@@ -94,14 +55,14 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
           <div>
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#E0DCCF]/60 dark:border-slate-800">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <Volume2 className="w-5 h-5 text-white" />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Volume2 className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-white" />
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-xs sm:text-sm font-extrabold text-[#2C3327] dark:text-white tracking-tight">
                     {t('nav.announcements')}
                   </h3>
-                  <span className="block text-[10px] text-[#8C8675] dark:text-slate-400 font-medium line-clamp-1">
+                  <span className="text-[10px] text-[#8C8675] dark:text-slate-400 font-medium line-clamp-1">
                     {t('home.noticesSubtitle')}
                   </span>
                 </div>
@@ -163,14 +124,14 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
           <div>
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#E0DCCF]/60 dark:border-slate-800">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <HeartHandshake className="w-5 h-5 text-white" />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <HeartHandshake className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-white" />
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-xs sm:text-sm font-extrabold text-[#2C3327] dark:text-white tracking-tight">
                     {t('nav.socialWork')}
                   </h3>
-                  <span className="block text-[10px] text-[#8C8675] dark:text-slate-400 font-medium line-clamp-1">
+                  <span className="text-[10px] text-[#8C8675] dark:text-slate-400 font-medium line-clamp-1">
                     {t('home.socialWorkSubtitle')}
                   </span>
                 </div>
@@ -217,14 +178,14 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
           <div>
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#E0DCCF]/60 dark:border-slate-800">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-purple-600 to-fuchsia-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <Calendar className="w-5 h-5 text-white" />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-purple-600 to-fuchsia-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <Calendar className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-white" />
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-xs sm:text-sm font-extrabold text-[#2C3327] dark:text-white tracking-tight">
                     {t('nav.events')}
                   </h3>
-                  <span className="block text-[10px] text-[#8C8675] dark:text-slate-400 font-medium line-clamp-1">
+                  <span className="text-[10px] text-[#8C8675] dark:text-slate-400 font-medium line-clamp-1">
                     {t('home.eventsSubtitle')}
                   </span>
                 </div>
@@ -279,14 +240,14 @@ export const HomeActivityFeeds: React.FC<HomeActivityFeedsProps> = ({
           <div>
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-[#E0DCCF]/60 dark:border-slate-800">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-600 to-orange-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-                  <ImageIcon className="w-5 h-5 text-white" />
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-br from-amber-600 to-orange-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                  <ImageIcon className="w-4.5 h-4.5 sm:w-5 sm:h-5 text-white" />
                 </div>
                 <div className="min-w-0">
                   <h3 className="text-xs sm:text-sm font-extrabold text-[#2C3327] dark:text-white tracking-tight">
                     {t('nav.gallery')}
                   </h3>
-                  <span className="block text-[10px] text-[#8C8675] dark:text-slate-400 font-medium line-clamp-1">
+                  <span className="text-[10px] text-[#8C8675] dark:text-slate-400 font-medium line-clamp-1">
                     {t('home.gallerySubtitle')}
                   </span>
                 </div>

@@ -9,11 +9,11 @@ import {
   fetchHomeEvents,
   fetchHomeSocialWork,
   fetchHomeGallery,
+  fetchHomeComplaints,
 } from '../../store/slices/homeSlice';
 import { InviteMemberModal } from '../modals/InviteMemberModal';
 import {
   HomeHero,
-  HomeMemberSearch,
   HomeGrievanceBanner,
   HomeLeadership,
   HomeActivityFeeds,
@@ -31,6 +31,7 @@ export const HomeSection: React.FC = () => {
   const eventsCard = useAppSelector((state) => state.home.events);
   const socialWorkCard = useAppSelector((state) => state.home.socialWork);
   const galleryCard = useAppSelector((state) => state.home.gallery);
+  const complaintsCard = useAppSelector((state) => state.home.complaints);
 
   const isLoggedIn = Boolean(
     authSession.isMemberLoggedIn || authSession.isAdminLoggedIn || authSession.supabaseUserId
@@ -47,6 +48,7 @@ export const HomeSection: React.FC = () => {
     dispatch(fetchHomeEvents());
     dispatch(fetchHomeSocialWork());
     dispatch(fetchHomeGallery());
+    dispatch(fetchHomeComplaints());
   }, [dispatch]);
 
   const activeMembersCount =
@@ -64,9 +66,10 @@ export const HomeSection: React.FC = () => {
     events.filter((e) => e.status === 'PUBLISHED' || (e.status as string) === 'upcoming');
   const galleryList = galleryCard.data?.gallery ?? gallery.filter((g) => g.status === 'published');
   const announcementsList = announcementsCard.data?.announcements ?? announcements;
+  const latestComplaints = complaintsCard.data?.complaints ?? complaints;
 
   return (
-    <div className="space-y-8 sm:space-y-12 pb-16 transition-colors duration-200">
+    <div className="space-y-8 sm:space-y-12 transition-colors duration-200">
       {/* Invite / Add Member Modal for logged in users */}
       <InviteMemberModal
         isOpen={isInviteModalOpen}
@@ -85,7 +88,7 @@ export const HomeSection: React.FC = () => {
       />
 
       {/* 2. Containerized Dynamic Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
         {/* Live Activity Feeds (Announcements, Social Work, Events, Gallery) — each card independent */}
         <HomeActivityFeeds
           announcements={announcementsList}
@@ -99,17 +102,13 @@ export const HomeSection: React.FC = () => {
           galleryLoading={galleryCard.status === 'loading' && !galleryCard.data}
         />
 
-        {/* Quick Member Directory Search & Actions */}
-        <HomeMemberSearch
-          members={members}
-          activeMembersCount={activeMembersCount}
-        />
-
         {/* Grievance Redressal Banner */}
         <HomeGrievanceBanner
           newComplaintsCount={newComplaintsCount}
           resolvedComplaintsCount={resolvedComplaintsCount}
           loading={stats.status === 'loading' && !stats.data}
+          complaints={latestComplaints}
+          complaintsLoading={complaintsCard.status === 'loading' && !complaintsCard.data}
         />
 
         {/* Leadership & Main Executives Showcase */}

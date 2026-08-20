@@ -24,6 +24,7 @@ export interface HomeState {
   events: CardState<{ events: any[] }>;
   socialWork: CardState<{ socialWorks: any[] }>;
   gallery: CardState<{ gallery: any[] }>;
+  complaints: CardState<{ complaints: any[] }>;
 }
 
 const initialState: HomeState = {
@@ -32,6 +33,7 @@ const initialState: HomeState = {
   events: emptyCard(),
   socialWork: emptyCard(),
   gallery: emptyCard(),
+  complaints: emptyCard(),
 };
 
 const notAlreadyLoaded = (status: CardStatus) => status !== 'loading' && status !== 'succeeded';
@@ -74,7 +76,7 @@ export const fetchHomeEvents = createAsyncThunk(
   'home/fetchEvents',
   async (_, { rejectWithValue }) => {
     try {
-      const data = await apiClient.get('/api/events', { headers: { 'X-Limit': '3' } });
+      const data = await apiClient.get('/api/events', { headers: { 'X-Limit': '5' } });
       if (!data?.success) return rejectWithValue(data?.error || 'कार्यक्रम लोड करने में त्रुटि हुई।');
       return data;
     } catch (err: any) {
@@ -88,7 +90,7 @@ export const fetchHomeSocialWork = createAsyncThunk(
   'home/fetchSocialWork',
   async (_, { rejectWithValue }) => {
     try {
-      const data = await apiClient.get('/api/social-work', { headers: { 'X-Limit': '4' } });
+      const data = await apiClient.get('/api/social-work', { headers: { 'X-Limit': '5' } });
       if (!data?.success) return rejectWithValue(data?.error || 'सामाजिक कार्य लोड करने में त्रुटि हुई।');
       return data;
     } catch (err: any) {
@@ -110,6 +112,21 @@ export const fetchHomeGallery = createAsyncThunk(
     }
   },
   { condition: (_, { getState }) => notAlreadyLoaded((getState() as RootState).home.gallery.status) }
+);
+
+export const fetchHomeComplaints = createAsyncThunk(
+  'home/fetchComplaints',
+  async (_, { rejectWithValue }) => {
+    try {
+      // /api/complaints orders by id desc, so the first 5 are the latest filed.
+      const data = await apiClient.get('/api/complaints', { headers: { 'X-Limit': '5' } });
+      if (!data?.success) return rejectWithValue(data?.error || 'शिकायतें लोड करने में त्रुटि हुई।');
+      return data;
+    } catch (err: any) {
+      return rejectWithValue(err.message || 'नेटवर्क त्रुटि हुई।');
+    }
+  },
+  { condition: (_, { getState }) => notAlreadyLoaded((getState() as RootState).home.complaints.status) }
 );
 
 function attachCardLifecycle<T>(
@@ -143,6 +160,7 @@ export const homeSlice = createSlice({
     attachCardLifecycle(builder, 'events', fetchHomeEvents);
     attachCardLifecycle(builder, 'socialWork', fetchHomeSocialWork);
     attachCardLifecycle(builder, 'gallery', fetchHomeGallery);
+    attachCardLifecycle(builder, 'complaints', fetchHomeComplaints);
   },
 });
 

@@ -56,7 +56,7 @@ export const HomeSkeleton: React.FC = () => (
       </div>
     </section>
 
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 space-y-8 sm:space-y-12">
       <div className="max-w-5xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
         {Array.from({ length: 4 }).map((_, i) => (
           <FeedCardSkeleton key={i} />
