@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { GymLogo } from "../common/GymLogo";
 import { SupabaseSetupScreen } from "../features/SupabaseSetupScreen";
@@ -62,6 +62,7 @@ const SECONDARY_NAV = [
 
 export const Header: React.FC = () => {
   const pathname = usePathname();
+  const router = useRouter();
   const {
     t,
     lang,
@@ -155,13 +156,22 @@ export const Header: React.FC = () => {
     setProfileDropdownOpen(false);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setProfileDropdownOpen(false);
+
+    // Await the sign-out: it clears the Supabase and JWT cookies, and a
+    // refresh fired before that lands would re-render the page still signed in.
     if (authSession.isAdminLoggedIn) {
-      adminLogout();
+      await adminLogout();
     } else {
-      memberLogout();
+      await memberLogout();
     }
+
+    // Clearing client state is not enough on server-rendered pages like
+    // /dashboard, which receive the profile as props from the server. Navigate
+    // away, then refresh to drop the cached authenticated render.
+    router.replace("/");
+    router.refresh();
   };
 
   return (
