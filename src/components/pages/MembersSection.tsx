@@ -122,7 +122,7 @@ export const MembersSection: React.FC = () => {
   ]);
 
   return (
-    <div className="py-6 sm:py-8 px-4 sm:px-6 max-w-7xl mx-auto space-y-6 transition-colors duration-200">
+    <div className="max-w-7xl mx-auto space-y-6 transition-colors duration-200">
       {/* 1. Header Banner & Action CTAs */}
       <MemberHeaderBanner
         activeMembersCount={activeMembers.length}

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import {
   Lock,
@@ -46,11 +47,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const {
     authSession,
     currentMemberMobile,
-    setIsAdminLoginModalOpen,
-    setIsMemberLoginModalOpen,
     setIsJoinModalOpen,
     lang,
   } = useApp();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const isSuperAdmin = Boolean(
     checkIsSuperAdmin(authSession) ||
@@ -213,7 +214,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           {/* Action buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button
-              onClick={() => setIsAdminLoginModalOpen(true)}
+              onClick={() => router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`)}
               className="w-full sm:w-auto px-7 py-3.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-2xl text-xs sm:text-sm transition shadow-lg shadow-purple-600/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
             >
               <KeyRound className="w-4 h-4" />
@@ -265,7 +266,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button
-              onClick={() => setIsAdminLoginModalOpen(true)}
+              onClick={() => router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`)}
               className="w-full sm:w-auto px-7 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl text-xs sm:text-sm transition shadow-lg shadow-amber-600/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95"
             >
               <KeyRound className="w-4 h-4" />

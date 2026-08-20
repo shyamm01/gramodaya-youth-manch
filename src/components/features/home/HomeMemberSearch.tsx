@@ -30,13 +30,13 @@ export const HomeMemberSearch: React.FC<HomeMemberSearchProps> = ({
     : [];
 
   return (
-    <section className="max-w-5xl mx-auto px-4 sm:px-6">
+    <section className="max-w-5xl mx-auto">
       <Card className="rounded-2xl border border-[#E0DCCF]/80 dark:border-slate-800/80 bg-white dark:bg-[#111726] shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
         <CardHeader className="p-4 sm:p-5 pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center flex-shrink-0">
-                <Search className="w-4 h-4" />
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                <Search className="w-5 h-5 text-white" />
               </div>
               <div>
                 <CardTitle className="text-xs sm:text-sm font-extrabold text-[#2C3327] dark:text-white tracking-tight">
@@ -118,7 +118,7 @@ export const HomeMemberSearch: React.FC<HomeMemberSearchProps> = ({
                           <a
                             href={`tel:+91${cleanDigits}`}
                             className="p-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg transition-transform duration-200 active:scale-95 cursor-pointer shadow-xs"
-                            title="Call"
+                            title={t('common.call')}
                           >
                             <Phone className="w-3.5 h-3.5" />
                           </a>
@@ -127,7 +127,7 @@ export const HomeMemberSearch: React.FC<HomeMemberSearchProps> = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="p-1.5 bg-[#25D366] hover:bg-[#20bd5a] text-white rounded-lg transition-transform duration-200 active:scale-95 cursor-pointer shadow-xs"
-                            title="WhatsApp"
+                            title={t('common.whatsapp')}
                           >
                             <WhatsAppIcon className="w-3.5 h-3.5" />
                           </a>

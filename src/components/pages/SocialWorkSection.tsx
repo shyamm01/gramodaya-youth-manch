@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { HeartHandshake, Plus, Calendar, MapPin, Trash2, Share2 } from 'lucide-react';
 import {
@@ -21,7 +22,6 @@ export const SocialWorkSection: React.FC = () => {
     authSession,
     isApprovedMember,
     currentMemberMobile,
-    setIsMemberLoginModalOpen,
     canDeleteContent,
     updateSocialWorkStatus,
     deleteSocialWork,
@@ -29,6 +29,8 @@ export const SocialWorkSection: React.FC = () => {
     lang,
     villageSettings,
   } = useApp();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [fetchedSocialWorks, setFetchedSocialWorks] = useState<any[] | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -131,7 +133,7 @@ export const SocialWorkSection: React.FC = () => {
   };
 
   return (
-    <div className="py-6 px-4 sm:px-6 max-w-7xl mx-auto transition-colors duration-200">
+    <div className="max-w-7xl mx-auto transition-colors duration-200">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[#2C3327] dark:text-white tracking-tight flex items-center gap-2">
@@ -148,7 +150,7 @@ export const SocialWorkSection: React.FC = () => {
           size="default"
           onClick={() => {
             if (!authSession.isAdminLoggedIn && !authSession.isMemberLoggedIn) {
-              setIsMemberLoginModalOpen(true);
+              router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`);
             } else if (!isApprovedMember) {
               setUnapprovedAlert(true);
             } else {

@@ -6,13 +6,17 @@ import { validateRequestBody, socialWorkCreateSchema } from "@/src/lib/validatio
 import { logAuditAction } from "@/src/lib/authUtils";
 import { requireAuth } from "@/src/lib/jwtAuth";
 import { ensureSupabaseUrl } from "@/src/lib/supabaseStorage";
+import { getRequestLimit } from "@/src/lib/requestParams";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const db = getDb();
     if (!db) return NextResponse.json({ success: true, socialWorks: [] });
 
-    const rows = await db.select().from(schema.socialWorks).orderBy(desc(schema.socialWorks.id));
+    const limit = getRequestLimit(req);
+
+    const baseQuery = db.select().from(schema.socialWorks).orderBy(desc(schema.socialWorks.id));
+    const rows = limit ? await baseQuery.limit(limit) : await baseQuery;
 
     const formatted = rows.map((s) => ({
       id: String(s.id),

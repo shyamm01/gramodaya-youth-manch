@@ -2,25 +2,15 @@ import { NextResponse } from 'next/server';
 import { storageService } from '@/src/lib/storage';
 import { getDb } from '@/src/db';
 import * as schema from '@/src/db/schema';
-import { verifyJwtToken } from '@/src/lib/jwtAuth';
+import { requireAuth } from '@/src/lib/jwtAuth';
 
 /**
  * Storage Cleanup & Garbage Collector API (SOLID / Dependency Inversion)
  */
 export async function POST(req: Request) {
   try {
-    const authHeader = req.headers.get('Authorization') || '';
-    const adminToken = req.headers.get('x-admin-token') || '';
-    const token = authHeader.replace(/^Bearer\s+/i, '');
-
-    // Authorization check
-    let isAuthorized = adminToken === 'admin_active';
-    if (!isAuthorized && token) {
-      const decoded = await verifyJwtToken(token);
-      if (decoded && (decoded.isAdmin || decoded.role === 'ADMIN' || decoded.systemRole === 'SUPER_ADMIN')) {
-        isAuthorized = true;
-      }
-    }
+    const auth = await requireAuth(req, undefined, 'ADMIN');
+    if (!auth.success) return auth.response;
 
     const db = getDb();
     if (!db) {

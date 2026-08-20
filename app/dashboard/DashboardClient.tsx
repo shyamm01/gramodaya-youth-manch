@@ -106,7 +106,7 @@ export function DashboardClient({
   villages = [],
 }: DashboardClientProps) {
   const router = useRouter();
-  const { lang, setAuthSession, setSelectedIdCardMember } = useApp();
+  const { lang, memberLogout, setSelectedIdCardMember } = useApp();
   const isEn = lang === "en";
 
   const {
@@ -531,16 +531,7 @@ export function DashboardClient({
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
-      await supabase.auth.signOut();
-      localStorage.removeItem("gym_auth");
-      localStorage.removeItem("gym_token");
-      setAuthSession({
-        isMemberLoggedIn: false,
-        isAdminLoggedIn: false,
-        token: null,
-        email: null,
-        supabaseUserId: null,
-      });
+      await memberLogout();
       toastSuccess(
         isEn
           ? "You have logged out successfully."
@@ -567,9 +558,7 @@ export function DashboardClient({
     user.email?.split("@")[0] ||
     (isEn ? "Community Member" : "ग्राम सदस्य");
   const effectiveSystemRole =
-    profile?.systemRole ||
-    user.systemRole ||
-    (user.email === "shyamvaranpal95060@gmail.com" ? "SUPER_ADMIN" : "MEMBER");
+    profile?.systemRole || user.systemRole || "MEMBER";
   const effectiveRole =
     profile?.role ||
     user.role ||

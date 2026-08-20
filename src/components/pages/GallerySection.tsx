@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { Image as ImageIcon, Plus, Trash2, Check, Edit2 } from 'lucide-react';
 import {
@@ -21,9 +22,10 @@ export const GallerySection: React.FC = () => {
     deleteGalleryItem,
     authSession,
     isApprovedMember,
-    setIsMemberLoginModalOpen,
     t,
   } = useApp();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [fetchedGallery, setFetchedGallery] = useState<any[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -129,7 +131,7 @@ export const GallerySection: React.FC = () => {
     : gallery.filter((item) => item.status === 'published');
 
   return (
-    <div className="py-6 px-4 sm:px-6 max-w-7xl mx-auto transition-colors duration-200">
+    <div className="max-w-7xl mx-auto transition-colors duration-200">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-black text-[#2C3327] dark:text-white tracking-tight flex items-center gap-2">
@@ -146,7 +148,7 @@ export const GallerySection: React.FC = () => {
           size="default"
           onClick={() => {
             if (!authSession.isAdminLoggedIn && !authSession.isMemberLoggedIn) {
-              setIsMemberLoginModalOpen(true);
+              router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`);
             } else if (!isApprovedMember) {
               setUnapprovedAlert(true);
             } else {

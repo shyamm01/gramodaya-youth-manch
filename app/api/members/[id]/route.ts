@@ -23,8 +23,18 @@ export async function PUT(
     const isSelf = String(currentUser.id) === String(id) || normalizeMobile(currentUser.mobile) === normalizeMobile(body.mobile || '');
     const isSuperOrAdmin = currentUser.role === 'SUPER_ADMIN' || currentUser.role === 'ADMIN';
 
-    // If changing roles, village, or status of someone else, require admin permissions
-    if (!isSelf && !isSuperOrAdmin) {
+    // Privileged fields (role, status, village) can never be self-service, even on your own
+    // record — otherwise a member could PUT their own id with { systemRole: 'SUPER_ADMIN' }.
+    const changesPrivilegedFields =
+      body.systemRole !== undefined ||
+      body.role !== undefined ||
+      body.status !== undefined ||
+      body.villageId !== undefined;
+
+    if (changesPrivilegedFields && !isSuperOrAdmin) {
+      const permAuth = await requireAuth(req, undefined, 'ADMIN');
+      if (!permAuth.success) return permAuth.response;
+    } else if (!isSelf && !isSuperOrAdmin) {
       const permAuth = await requireAuth(req, 'members:update');
       if (!permAuth.success) return permAuth.response;
     }
@@ -54,17 +64,24 @@ export async function PUT(
         profileUpdateData.status = status;
         profileUpdateData.isApproved = status === 'active';
       }
+      const VALID_SYSTEM_ROLES = ['MEMBER', 'ADMIN', 'SUPER_ADMIN'];
+      const VALID_ROLES = ['MEMBER', 'ADMIN'];
+
       if (body.systemRole !== undefined) {
-        profileUpdateData.systemRole = body.systemRole;
-        profileUpdateData.role = (body.systemRole === 'SUPER_ADMIN' || body.systemRole === 'ADMIN') ? 'ADMIN' : 'MEMBER';
+        if (VALID_SYSTEM_ROLES.includes(body.systemRole)) {
+          profileUpdateData.systemRole = body.systemRole;
+          profileUpdateData.role = body.systemRole === 'MEMBER' ? 'MEMBER' : 'ADMIN';
+        }
+        // else: unrecognized system_role value — ignored rather than silently coerced
       } else if (role !== undefined) {
-        if (role === 'SUPER_ADMIN' || role === 'DISTRICT_ADMIN' || role === 'PANCHAYAT_ADMIN' || role === 'VILLAGE_ADMIN' || role === 'VILLAGE_MODERATOR' || role === 'ADMIN' || role === 'GUEST') {
+        if (VALID_SYSTEM_ROLES.includes(role)) {
           profileUpdateData.systemRole = role;
-          profileUpdateData.role = (role === 'SUPER_ADMIN' || role === 'ADMIN') ? 'ADMIN' : 'MEMBER';
-        } else {
+          profileUpdateData.role = role === 'MEMBER' ? 'MEMBER' : 'ADMIN';
+        } else if (VALID_ROLES.includes(role)) {
           profileUpdateData.role = role;
           profileUpdateData.systemRole = role;
         }
+        // else: unrecognized role value (e.g. legacy DISTRICT_ADMIN/VILLAGE_ADMIN/GUEST) — ignored
       }
       if (photoUrl !== undefined) {
         profileUpdateData.avatarUrl = photoUrl;

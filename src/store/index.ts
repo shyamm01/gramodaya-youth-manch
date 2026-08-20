@@ -1,6 +1,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
 import villageReducer from './slices/villageSlice';
+import homeReducer from './slices/homeSlice';
 import uiReducer from './slices/uiSlice';
 import communityReducer from './slices/communitySlice';
 import membersReducer from './slices/membersSlice';
@@ -19,6 +20,7 @@ export const store = configureStore({
   reducer: {
     auth: authReducer,
     village: villageReducer,
+    home: homeReducer,
     ui: uiReducer,
     community: communityReducer,
     members: membersReducer,

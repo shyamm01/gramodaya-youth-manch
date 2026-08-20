@@ -4,13 +4,17 @@ import * as schema from "@/src/db/schema";
 import { desc } from "drizzle-orm";
 import { validateRequestBody, complaintCreateSchema } from "@/src/lib/validations";
 import { logAuditAction } from "@/src/lib/authUtils";
+import { getRequestLimit } from "@/src/lib/requestParams";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const db = getDb();
     if (!db) return NextResponse.json({ success: true, complaints: [] });
 
-    const rows = await db.select().from(schema.complaints).orderBy(desc(schema.complaints.id));
+    const limit = getRequestLimit(req);
+
+    const baseQuery = db.select().from(schema.complaints).orderBy(desc(schema.complaints.id));
+    const rows = limit ? await baseQuery.limit(limit) : await baseQuery;
 
     const formatted = rows.map((c) => ({
       id: String(c.id),

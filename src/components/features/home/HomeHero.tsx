@@ -13,6 +13,7 @@ import {
   Send,
 } from "lucide-react";
 import { VillageBadge } from "../../common";
+import { Skeleton } from "../../ui";
 import { useApp } from "../../../context/AppContext";
 
 interface HomeHeroProps {
@@ -23,6 +24,8 @@ interface HomeHeroProps {
   resolvedComplaintsCount: number;
   socialWorksCount: number;
   eventsCount: number;
+  /** True only until the /api/home/stats card has data for the first time. */
+  statsLoading?: boolean;
 }
 
 export const HomeHero: React.FC<HomeHeroProps> = ({
@@ -33,6 +36,7 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
   resolvedComplaintsCount,
   socialWorksCount,
   eventsCount,
+  statsLoading = false,
 }) => {
   const { villageSettings, t, lang } = useApp();
   const isEn = lang === 'en';
@@ -132,7 +136,11 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
                 </div>
                 <div className="text-left min-w-0">
                   <span className="block text-lg sm:text-xl font-black text-white leading-none tracking-tight drop-shadow">
-                    {stat.value || "0"}
+                    {statsLoading ? (
+                      <Skeleton className="h-4 w-6 bg-white/15" />
+                    ) : (
+                      stat.value || "0"
+                    )}
                   </span>
                   <span className="text-[10px] sm:text-[11px] font-bold text-slate-300 dark:text-slate-400 truncate block mt-1">
                     {stat.label}
@@ -144,38 +152,38 @@ export const HomeHero: React.FC<HomeHeroProps> = ({
         </div>
 
         {/* Modern CTA Action Buttons */}
-        <div className="flex flex-wrap items-center justify-center gap-3.5 pt-2">
+        <div className="w-full mx-auto flex flex-row sm:flex-wrap items-stretch sm:items-center justify-center gap-2.5 sm:gap-3.5 pt-2">
           {/* If Logged In: Show "Add Member" button */}
           {isLoggedIn ? (
             <button
               type="button"
               onClick={onAddMemberClick}
-              className="group relative inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-bold shadow-xl shadow-emerald-600/30 hover:shadow-emerald-500/50 border border-emerald-400/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
+              className="group relative flex-1 min-w-0 sm:flex-none inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-7 py-3 sm:py-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs sm:text-sm font-bold shadow-xl shadow-emerald-600/30 hover:shadow-emerald-500/50 border border-emerald-400/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
             >
-              <UserPlus className="w-4 h-4 transition-transform group-hover:scale-110" />
-              <span>{isEn ? 'Add Member' : 'सदस्य जोड़ें'}</span>
-              <Send className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 opacity-90" />
+              <UserPlus className="w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110" />
+              <span className="truncate">{isEn ? 'Add Member' : 'सदस्य जोड़ें'}</span>
+              <Send className="hidden sm:block w-3.5 h-3.5 transition-transform group-hover:translate-x-1 opacity-90" />
             </button>
           ) : (
             /* If Not Logged In: Show "Join Organization" button linking directly to /auth/signup */
             <Link
               href="/auth/signup"
-              className="group relative inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-sm font-bold shadow-xl shadow-amber-600/30 hover:shadow-amber-500/50 border border-amber-400/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
+              className="group relative flex-1 min-w-0 sm:flex-none inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-7 py-3 sm:py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white text-xs sm:text-sm font-bold shadow-xl shadow-amber-600/30 hover:shadow-amber-500/50 border border-amber-400/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
             >
-              <UserPlus className="w-4 h-4 transition-transform group-hover:scale-110" />
-              <span>{isEn ? 'Join Organization' : 'संगठन से जुड़ें'}</span>
-              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1 opacity-90" />
+              <UserPlus className="w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110" />
+              <span className="truncate">{isEn ? 'Join Organization' : 'संगठन से जुड़ें'}</span>
+              <ArrowRight className="hidden sm:block w-3.5 h-3.5 transition-transform group-hover:translate-x-1 opacity-90" />
             </Link>
           )}
 
           {/* Secondary View Members Button */}
           <Link
             href="/members"
-            className="group inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 dark:bg-white/10 dark:hover:bg-white/20 text-white border border-white/25 hover:border-emerald-400/50 backdrop-blur-xl text-sm font-bold shadow-lg transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
+            className="group flex-1 min-w-0 sm:flex-none inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-3 sm:py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 dark:bg-white/10 dark:hover:bg-white/20 text-white border border-white/25 hover:border-emerald-400/50 backdrop-blur-xl text-xs sm:text-sm font-bold shadow-lg transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
           >
-            <Users className="w-4 h-4 text-emerald-400 transition-transform group-hover:scale-110" />
-            <span>{isEn ? 'View Members' : 'सदस्य निर्देशिका'}</span>
-            <ArrowRight className="w-3.5 h-3.5 text-stone-300 transition-transform group-hover:translate-x-1" />
+            <Users className="w-4 h-4 flex-shrink-0 text-emerald-400 transition-transform group-hover:scale-110" />
+            <span className="truncate">{isEn ? 'View Members' : 'सदस्य निर्देशिका'}</span>
+            <ArrowRight className="hidden sm:block w-3.5 h-3.5 text-stone-300 transition-transform group-hover:translate-x-1" />
           </Link>
         </div>
       </div>

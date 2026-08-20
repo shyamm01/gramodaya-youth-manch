@@ -6,13 +6,17 @@ import { validateRequestBody, eventCreateSchema } from "@/src/lib/validations";
 import { logAuditAction } from "@/src/lib/authUtils";
 import { requireAuth } from "@/src/lib/jwtAuth";
 import { ensureSupabaseUrl } from "@/src/lib/supabaseStorage";
+import { getRequestLimit } from "@/src/lib/requestParams";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const db = getDb();
     if (!db) return NextResponse.json({ success: true, events: [] });
 
-    const rows = await db.select().from(schema.events).orderBy(desc(schema.events.id));
+    const limit = getRequestLimit(req);
+
+    const baseQuery = db.select().from(schema.events).orderBy(desc(schema.events.id));
+    const rows = limit ? await baseQuery.limit(limit) : await baseQuery;
 
     const formatted = rows.map((e) => ({
       id: String(e.id),

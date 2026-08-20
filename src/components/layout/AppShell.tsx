@@ -5,16 +5,16 @@ import { useApp } from '../../context/AppContext';
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
 import { BackButtonHeader } from '../common/BackButtonHeader';
-import { UnifiedLoginModal } from '../modals/UnifiedLoginModal';
 import { MyProfileModal } from '../modals/MyProfileModal';
 import { MemberChatModal } from '../modals/MemberChatModal';
 import { DigitalIdCard } from '../features/DigitalIdCard';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Shield, Lock } from 'lucide-react';
 
 export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
+  const router = useRouter();
   const {
     t,
     lang,
@@ -22,7 +22,6 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     isLoading,
     isMyProfileModalOpen,
     setIsMyProfileModalOpen,
-    setIsAdminLoginModalOpen,
     selectedChatPartner,
     setSelectedChatPartner,
     selectedIdCardMember,
@@ -33,16 +32,28 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const isAdminRoute = pathname?.startsWith('/super-admin') || pathname?.startsWith('/admin');
   const isHomePage = pathname === '/' || pathname === '';
 
-  const footerLinks = [
-    { href: '/', label: t('nav.home') },
-    { href: '/members', label: t('nav.members') },
-    { href: '/problems', label: t('nav.problems') },
-    { href: '/social-work', label: t('nav.socialWork') },
-    { href: '/events', label: t('nav.events') },
-    { href: '/gallery', label: t('nav.gallery') },
-    { href: '/elders', label: t('nav.elders') },
-    { href: '/helpline', label: t('nav.helpline') },
-    { href: '/about', label: t('nav.about') },
+  const footerModules = [
+    {
+      heading: t('footer.community'),
+      links: [
+        { href: '/members', label: t('nav.members') },
+        { href: '/leadership', label: t('nav.leadership') },
+        { href: '/elders', label: t('nav.elders') },
+        { href: '/about', label: t('nav.about') },
+        { href: '/vision-mission', label: t('nav.visionMission') },
+      ],
+    },
+    {
+      heading: t('footer.noticesMedia'),
+      links: [
+        { href: '/announcements', label: t('nav.announcements') },
+        { href: '/gallery', label: t('nav.gallery') },
+      ],
+    },
+    {
+      heading: t('footer.support'),
+      links: [{ href: '/helpline', label: t('nav.helpline') }],
+    },
   ];
 
   if (isLoading) {
@@ -66,7 +77,6 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         {children}
 
         {/* Global Modals for admin actions */}
-        <UnifiedLoginModal />
         <MyProfileModal
           isOpen={isMyProfileModalOpen}
           onClose={() => setIsMyProfileModalOpen(false)}
@@ -99,7 +109,6 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       <BottomNav />
 
       {/* Global Modals */}
-      <UnifiedLoginModal />
       <MyProfileModal
         isOpen={isMyProfileModalOpen}
         onClose={() => setIsMyProfileModalOpen(false)}
@@ -118,8 +127,10 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       )}
 
       {/* Footer */}
-      <footer className="bg-[#1B4332] dark:bg-[#0F141C] text-white py-12 px-4 sm:px-6 lg:px-8 border-t border-[#2D6A4F] dark:border-[#1E293B] transition-colors">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
+      {/* Hidden on mobile: BottomNav already provides navigation there, and a
+          long desktop-style footer works against the "feels like an app" goal. */}
+      <footer className="hidden md:block bg-[#1B4332] dark:bg-[#0F141C] text-white py-12 px-4 sm:px-6 lg:px-8 border-t border-[#2D6A4F] dark:border-[#1E293B] transition-colors">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           <div className="space-y-3">
             <h3 className="text-lg font-bold text-amber-400">
               {lang === 'en'
@@ -134,41 +145,25 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             </p>
           </div>
 
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
-              {t('footer.navigation')}
-            </h4>
-            <ul className="space-y-1 text-xs">
-              {footerLinks.slice(0, 5).map((l) => (
-                <li key={l.href}>
-                  <Link
-                    href={l.href}
-                    className="text-[#E0DCCF] hover:text-white hover:underline transition"
-                  >
-                    {l.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="space-y-2">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
-              {t('footer.community')}
-            </h4>
-            <ul className="space-y-1 text-xs">
-              {footerLinks.slice(5).map((l) => (
-                <li key={l.href}>
-                  <Link
-                    href={l.href}
-                    className="text-[#E0DCCF] hover:text-white hover:underline transition"
-                  >
-                    {l.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {footerModules.map((module) => (
+            <div key={module.heading} className="space-y-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                {module.heading}
+              </h4>
+              <ul className="space-y-1 text-xs">
+                {module.links.map((l) => (
+                  <li key={l.href}>
+                    <Link
+                      href={l.href}
+                      className="text-[#E0DCCF] hover:text-white hover:underline transition"
+                    >
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
 
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
@@ -190,7 +185,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 </div>
               ) : (
                 <button
-                  onClick={() => setIsAdminLoginModalOpen(true)}
+                  onClick={() => router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`)}
                   className="inline-flex items-center gap-2 px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition border border-white/20 cursor-pointer"
                 >
                   <Lock className="w-3.5 h-3.5 text-amber-300" />

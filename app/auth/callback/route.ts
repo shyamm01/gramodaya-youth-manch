@@ -16,6 +16,15 @@ export async function GET(request: NextRequest) {
     next = '/dashboard';
   }
 
+  // Supabase/Google can attach an error directly to the callback (e.g. rejected redirect URL)
+  const upstreamError = searchParams.get('error_description') || searchParams.get('error');
+  if (upstreamError) {
+    console.error('Auth callback upstream error:', upstreamError);
+    return NextResponse.redirect(
+      `${origin}/auth/error?reason=oauth_failed&error_description=${encodeURIComponent(upstreamError)}`
+    );
+  }
+
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -34,8 +43,11 @@ export async function GET(request: NextRequest) {
     }
 
     console.error('Auth callback exchange error:', error.message);
+    return NextResponse.redirect(
+      `${origin}/auth/error?reason=callback_failed&error_description=${encodeURIComponent(error.message)}`
+    );
   }
 
-  // If code is missing or exchange fails, redirect to error page
+  // If code is missing, redirect to error page
   return NextResponse.redirect(`${origin}/auth/error?reason=callback_failed`);
 }

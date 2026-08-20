@@ -17,21 +17,6 @@ export interface AuthState {
 
 // ── 1. ASYNC THUNKS (createAsyncThunk with Axios) ──
 
-export const loginUser = createAsyncThunk(
-  'auth/loginUser',
-  async (credentials: { identifier: string; password: string }, { rejectWithValue }) => {
-    try {
-      const data = await apiClient.post('/api/auth/login', credentials);
-      if (!data?.success) {
-        return rejectWithValue(data?.error || 'लॉगिन करने में त्रुटि हुई।');
-      }
-      return data;
-    } catch (err: any) {
-      return rejectWithValue(err.message || 'नेटवर्क त्रुटि हुई।');
-    }
-  }
-);
-
 export const registerUser = createAsyncThunk(
   'auth/registerUser',
   async (memberData: Record<string, any>, { rejectWithValue }) => {
@@ -55,18 +40,6 @@ export const fetchCurrentUser = createAsyncThunk(
       if (!data?.authenticated) {
         return rejectWithValue('Unauthenticated');
       }
-      return data;
-    } catch (err: any) {
-      return rejectWithValue(err.message);
-    }
-  }
-);
-
-export const logoutUser = createAsyncThunk(
-  'auth/logoutUser',
-  async (_, { rejectWithValue }) => {
-    try {
-      const data = await apiClient.post('/api/auth/logout');
       return data;
     } catch (err: any) {
       return rejectWithValue(err.message);
@@ -202,51 +175,6 @@ export const authSlice = createSlice({
     },
   },
   extraReducers: (builder) => {
-    // 1. loginUser Thunk
-    builder
-      .addCase(loginUser.pending, (state) => {
-        state.status = 'loading';
-        state.error = null;
-      })
-      .addCase(loginUser.fulfilled, (state, action) => {
-        state.status = 'succeeded';
-        const payload = action.payload;
-        const user = payload.user;
-        const effectiveRole = user?.systemRole || user?.role || (user?.isAdmin ? 'ADMIN' : 'MEMBER');
-        const isAdm = Boolean(user?.isAdmin || effectiveRole === 'SUPER_ADMIN' || effectiveRole === 'ADMIN');
-
-        state.user = user;
-        state.token = payload.token;
-        state.role = effectiveRole;
-        state.systemRole = effectiveRole;
-        state.isAuthenticated = true;
-        state.isAdmin = isAdm;
-        state.isSuperAdmin = effectiveRole === 'SUPER_ADMIN';
-
-        if (typeof window !== 'undefined' && payload.token) {
-          localStorage.setItem('gym_token', payload.token);
-          localStorage.setItem(
-            'gym_auth',
-            JSON.stringify({
-              isAdminLoggedIn: isAdm,
-              isMemberLoggedIn: true,
-              role: effectiveRole,
-              systemRole: effectiveRole,
-              adminId: isAdm ? user?.id : undefined,
-              adminName: isAdm ? user?.name : undefined,
-              adminMobile: isAdm ? user?.mobile : undefined,
-              currentMember: user,
-              currentMemberMobile: user?.mobile,
-              token: payload.token,
-            })
-          );
-        }
-      })
-      .addCase(loginUser.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = (action.payload as string) || action.error.message || 'Login failed';
-      });
-
     // 2. registerUser Thunk
     builder
       .addCase(registerUser.pending, (state) => {
@@ -300,23 +228,6 @@ export const authSlice = createSlice({
         state.isAuthenticated = true;
         state.isAdmin = isAdm;
         state.isSuperAdmin = u.systemRole === 'SUPER_ADMIN' || u.isSuperAdmin;
-      }
-    });
-
-    // 4. logoutUser Thunk
-    builder.addCase(logoutUser.fulfilled, (state) => {
-      state.user = null;
-      state.token = null;
-      state.role = null;
-      state.systemRole = null;
-      state.permissions = [];
-      state.isAuthenticated = false;
-      state.isAdmin = false;
-      state.isSuperAdmin = false;
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('gym_token');
-        localStorage.removeItem('gym_auth');
-        localStorage.removeItem('gym_member_mobile');
       }
     });
   },

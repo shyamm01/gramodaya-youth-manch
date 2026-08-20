@@ -101,6 +101,29 @@ async function enrichUserFromProfile(user: JwtUserPayload): Promise<JwtUserPaylo
       const defaultPerms = ROLE_DEFAULT_PERMISSIONS[sysRole] || [];
       const allPerms = Array.from(new Set([...defaultPerms, ...customPerms, ...(user.permissions || [])])) as PermissionCode[];
 
+      // Fetch the villages this user is explicitly granted a role in (public.user_village_roles).
+      // SUPER_ADMIN is left unrestricted (undefined) — permission checks elsewhere already
+      // treat an empty/absent accessibleVillages list as "no village restriction".
+      let accessibleVillages: string[] | undefined;
+      if (!isSuper) {
+        try {
+          const villageRoleRows = await sql`
+            SELECT village_id FROM public.user_village_roles WHERE user_id = ${p.id}
+          `;
+          const villageIds = new Set<string>(
+            villageRoleRows.map((r: any) => String(r.village_id))
+          );
+          if (p.village_id) {
+            villageIds.add(String(p.village_id));
+          }
+          if (villageIds.size > 0) {
+            accessibleVillages = Array.from(villageIds);
+          }
+        } catch (villageRoleErr) {
+          // Ignore — falls back to no restriction rather than blocking the user out.
+        }
+      }
+
       return {
         ...user,
         id: String(p.id),
@@ -114,6 +137,7 @@ async function enrichUserFromProfile(user: JwtUserPayload): Promise<JwtUserPaylo
         isAdmin: isAdm,
         isSuperAdmin: isSuper,
         permissions: allPerms,
+        accessibleVillages: accessibleVillages || user.accessibleVillages,
       };
     }
   } catch (err) {
@@ -155,7 +179,7 @@ export async function verifyJwtToken(token: string): Promise<JwtUserPayload | nu
         const metadata = user.user_metadata || {};
         const appMetadata = user.app_metadata || {};
         const role = (appMetadata.role || metadata.role || 'MEMBER') as SystemRole;
-        const isSuper = role === 'SUPER_ADMIN' || user.email === 'shyamvaranpal95060@gmail.com' || user.email === 'admin@gramodayarasoolpur.org';
+        const isSuper = role === 'SUPER_ADMIN';
         const isAdm = isSuper || role === 'ADMIN';
 
         const baseUser: JwtUserPayload = {
@@ -205,7 +229,7 @@ export function clearAuthCookie(response: Response) {
 }
 
 /**
- * Extract token from Request (Authorization header, x-admin-token, or cookies)
+ * Extract token from Request (Authorization header or cookies)
  */
 export function extractTokenFromRequest(req: Request): string | null {
   // 1. Authorization header
@@ -237,31 +261,15 @@ export async function authenticateRequest(
   | { success: true; user: JwtUserPayload }
   | { success: false; status: number; error: string }
 > {
-  const adminTokenHeader = req.headers.get('x-admin-token');
   let token = extractTokenFromRequest(req);
   let user: JwtUserPayload | null = null;
 
-  // 1. Allow active admin session header as fallback for system maintenance
-  if (adminTokenHeader === 'admin_active' && !token) {
-    user = {
-      sub: 'system_admin',
-      id: '1',
-      name: 'System Admin',
-      mobile: '9999999999',
-      role: 'SUPER_ADMIN',
-      systemRole: 'SUPER_ADMIN',
-      isAdmin: true,
-      isSuperAdmin: true,
-      permissions: ROLE_DEFAULT_PERMISSIONS['SUPER_ADMIN'],
-    };
-  }
-
-  // 2. Try verifying extracted token
-  if (!user && token) {
+  // 1. Try verifying extracted token
+  if (token) {
     user = await verifyJwtToken(token);
   }
 
-  // 3. If still no user, check Supabase Server Client cookie session
+  // 2. If still no user, check Supabase Server Client cookie session
   if (!user) {
     try {
       const supabase = await createServerSupabaseClient();
@@ -274,7 +282,7 @@ export async function authenticateRequest(
         const metadata = sbUser.user_metadata || {};
         const appMetadata = sbUser.app_metadata || {};
         const role = (appMetadata.role || metadata.role || 'MEMBER') as SystemRole;
-        const isSuper = role === 'SUPER_ADMIN' || sbUser.email === 'shyamvaranpal95060@gmail.com' || sbUser.email === 'admin@gramodayarasoolpur.org';
+        const isSuper = role === 'SUPER_ADMIN';
         const isAdm = isSuper || role === 'ADMIN';
 
         const baseUser: JwtUserPayload = {
@@ -306,7 +314,7 @@ export async function authenticateRequest(
     };
   }
 
-  // 4. RBAC: Check Role requirement
+  // 3. RBAC: Check Role requirement
   if (requiredRole) {
     if (requiredRole === 'SUPER_ADMIN' && user.role !== 'SUPER_ADMIN' && !user.isSuperAdmin) {
       return {
@@ -329,7 +337,7 @@ export async function authenticateRequest(
     }
   }
 
-  // 5. RBAC: Check Permission requirement
+  // 4. RBAC: Check Permission requirement
   if (requiredPermission) {
     const isSuper = user.role === 'SUPER_ADMIN' || user.isSuperAdmin;
     const hasPerm =

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { ComplaintCategory, ComplaintStatus } from '../../types';
 import { AlertTriangle, Plus, MapPin, Phone, Trash2 } from 'lucide-react';
@@ -37,7 +38,6 @@ export const ProblemsSection: React.FC = () => {
     authSession,
     isApprovedMember,
     currentMemberMobile,
-    setIsMemberLoginModalOpen,
     canEditContent,
     canDeleteContent,
     updateComplaintStatus,
@@ -46,6 +46,8 @@ export const ProblemsSection: React.FC = () => {
     lang,
     villageSettings,
   } = useApp();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [fetchedComplaints, setFetchedComplaints] = useState<any[] | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -155,7 +157,7 @@ export const ProblemsSection: React.FC = () => {
   };
 
   return (
-    <div className="py-6 px-4 sm:px-6 max-w-7xl mx-auto transition-colors duration-200">
+    <div className="max-w-7xl mx-auto transition-colors duration-200">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
@@ -176,7 +178,7 @@ export const ProblemsSection: React.FC = () => {
           size="default"
           onClick={() => {
             if (!authSession.isAdminLoggedIn && !authSession.isMemberLoggedIn) {
-              setIsMemberLoginModalOpen(true);
+              router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`);
             } else if (!isApprovedMember) {
               setUnapprovedAlert(true);
             } else {

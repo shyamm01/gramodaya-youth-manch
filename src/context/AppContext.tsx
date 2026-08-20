@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { supabase } from '../lib/supabase';
+import { createClient } from '@/lib/supabase/client';
 import {
   Admin,
   Member,
@@ -40,8 +40,8 @@ import {
   setPublicInfos as reduxSetPublicInfos,
   setGroupMessages as reduxSetGroupMessages,
 } from '../store/slices/communitySlice';
-import { setCredentials as reduxSetCredentials, logout as reduxLogout } from '../store/slices/authSlice';
-import { updateVillageSettings as reduxUpdateVillageSettings, setVillagesList as reduxSetVillagesList } from '../store/slices/villageSlice';
+import { logout as reduxLogout, fetchCurrentUser } from '../store/slices/authSlice';
+import { updateVillageSettings as reduxUpdateVillageSettings, fetchVillagesList } from '../store/slices/villageSlice';
 import {
   OFFICIAL_VILLAGE,
   INITIAL_VILLAGES,
@@ -77,30 +77,13 @@ interface AppContextType {
   stats: AppStats;
   authSession: AuthSession;
   setAuthSession: React.Dispatch<React.SetStateAction<AuthSession>>;
-  isAdminLoginModalOpen: boolean;
-  setIsAdminLoginModalOpen: (open: boolean) => void;
-  isMemberLoginModalOpen: boolean;
-  setIsMemberLoginModalOpen: (open: boolean) => void;
   isJoinModalOpen: boolean;
   setIsJoinModalOpen: (open: boolean) => void;
   isMyProfileModalOpen: boolean;
   setIsMyProfileModalOpen: (open: boolean) => void;
-  userLogin: (user: any, token: string, role?: string) => void;
-  memberLogin: (mobile: string, otpOrPassword?: string) => Promise<{ success: boolean; member?: Member; error?: string }>;
-  memberLogout: () => void;
+  memberLogout: () => Promise<void>;
   isLoading: boolean;
   refreshData: (force?: boolean) => Promise<void>;
-  sendAdminOtp: (mobile: string) => Promise<{ success: boolean; message?: string; otp?: string; error?: string }>;
-  verifyAdminOtp: (
-    mobile: string,
-    otp: string
-  ) => Promise<{ success: boolean; resetToken?: string; error?: string }>;
-  sendMemberOtp: (mobile: string) => Promise<{ success: boolean; message?: string; otp?: string; error?: string }>;
-  verifyMemberOtp: (
-    mobile: string,
-    otp: string,
-    name?: string
-  ) => Promise<{ success: boolean; member?: Member; error?: string }>;
   resetMemberPassword: (mobile: string, otp: string, newPassword: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   resetAdminPassword: (mobile: string, otp: string, newPassword: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   setAdminPassword: (
@@ -108,11 +91,7 @@ interface AppContextType {
     resetToken: string,
     password: string
   ) => Promise<{ success: boolean; admin?: Admin; error?: string }>;
-  adminLogin: (
-    mobile: string,
-    password: string
-  ) => Promise<{ success: boolean; admin?: Admin; needsOtp?: boolean; error?: string }>;
-  adminLogout: () => void;
+  adminLogout: () => Promise<void>;
   addMember: (
     nameOrData:
       | string
@@ -219,14 +198,43 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
+  const supabase = useMemo(() => createClient(), []);
   const [activeSection, setActiveSectionState] = useState<string>("home");
   const [historyStack, setHistoryStack] = useState<string[]>([]);
   const [lang, setLangState] = useState<string>("hi");
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [currentMemberMobile, setCurrentMemberMobileState] = useState<string | null>(null);
-  const isFetchingAuthMeRef = useRef(false);
   const isFetchingDataRef = useRef(false);
   const lastDataFetchTimeRef = useRef<number>(0);
+  // Single-flight caches so concurrent callers (Supabase auth listener, session
+  // restore, refreshData) share one in-flight Redux thunk dispatch instead of
+  // each firing its own /api/auth/me or /api/villages request.
+  const authMeInFlightRef = useRef<Promise<any> | null>(null);
+  const villagesInFlightRef = useRef<Promise<Village[] | null> | null>(null);
+
+  const fetchAuthMeOnce = useCallback((): Promise<any> => {
+    if (!authMeInFlightRef.current) {
+      authMeInFlightRef.current = (store.dispatch(fetchCurrentUser() as any) as any)
+        .unwrap()
+        .catch(() => null)
+        .finally(() => {
+          authMeInFlightRef.current = null;
+        });
+    }
+    return authMeInFlightRef.current;
+  }, []);
+
+  const fetchVillagesOnce = useCallback((): Promise<Village[] | null> => {
+    if (!villagesInFlightRef.current) {
+      villagesInFlightRef.current = (store.dispatch(fetchVillagesList() as any) as any)
+        .unwrap()
+        .catch(() => null)
+        .finally(() => {
+          villagesInFlightRef.current = null;
+        });
+    }
+    return villagesInFlightRef.current;
+  }, []);
 
   const setLang = (newLang: string) => {
     setLangState(newLang);
@@ -256,8 +264,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [integrations, setIntegrations] = useState<ApiIntegration[]>([]);
 
   const [authSession, setAuthSession] = useState<AuthSession>({ isAdminLoggedIn: false, isMemberLoggedIn: false });
-  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState<boolean>(false);
-  const [isMemberLoginModalOpen, setIsMemberLoginModalOpen] = useState<boolean>(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState<boolean>(false);
   const [isMyProfileModalOpen, setIsMyProfileModalOpen] = useState<boolean>(false);
   const [selectedChatPartner, setSelectedChatPartner] = useState<Member | null>(null);
@@ -320,33 +326,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     const hydrateRbacSession = async () => {
       try {
-        const res = await fetch('/api/auth/me', { credentials: 'include' });
-        if (res.ok) {
-          const data = await res.json();
-          if (data?.authenticated && data.user) {
-            const u = data.user;
-            const isSuper = u.isSuperAdmin || u.systemRole === 'SUPER_ADMIN';
-            const isAdm = Boolean(isSuper || u.isAdmin || u.role === 'ADMIN' || u.systemRole === 'ADMIN');
-            setAuthSession((prev) => ({
-              ...prev,
-              isAdminLoggedIn: isAdm,
-              isMemberLoggedIn: true,
-              supabaseUserId: u.supabaseUserId || prev.supabaseUserId,
-              role: u.role || (isAdm ? 'ADMIN' : 'MEMBER'),
-              systemRole: u.systemRole || (isSuper ? 'SUPER_ADMIN' : isAdm ? 'ADMIN' : 'MEMBER'),
-              adminMobile: isAdm ? u.mobile : prev.adminMobile,
-              adminName: isAdm ? u.name : prev.adminName,
-              adminId: isAdm ? u.id : prev.adminId,
-              adminVillageId: u.villageId || prev.adminVillageId,
-              currentMemberMobile: u.mobile || prev.currentMemberMobile,
-              currentMember: u,
-              email: u.email || prev.email,
-              permissions: u.permissions || prev.permissions || [],
-              token: data.token || prev.token,
-            }));
-            if (data.user.mobile) {
-              setCurrentMemberMobileState(data.user.mobile);
-            }
+        const data = await fetchAuthMeOnce();
+        if (data?.authenticated && data.user) {
+          const u = data.user;
+          const isSuper = u.isSuperAdmin || u.systemRole === 'SUPER_ADMIN';
+          const isAdm = Boolean(isSuper || u.isAdmin || u.role === 'ADMIN' || u.systemRole === 'ADMIN');
+          setAuthSession((prev) => ({
+            ...prev,
+            isAdminLoggedIn: isAdm,
+            isMemberLoggedIn: true,
+            supabaseUserId: u.supabaseUserId || prev.supabaseUserId,
+            role: u.role || (isAdm ? 'ADMIN' : 'MEMBER'),
+            systemRole: u.systemRole || (isSuper ? 'SUPER_ADMIN' : isAdm ? 'ADMIN' : 'MEMBER'),
+            adminMobile: isAdm ? u.mobile : prev.adminMobile,
+            adminName: isAdm ? u.name : prev.adminName,
+            adminId: isAdm ? u.id : prev.adminId,
+            adminVillageId: u.villageId || prev.adminVillageId,
+            currentMemberMobile: u.mobile || prev.currentMemberMobile,
+            currentMember: u,
+            email: u.email || prev.email,
+            permissions: u.permissions || prev.permissions || [],
+            token: data.token || prev.token,
+          }));
+          if (data.user.mobile) {
+            setCurrentMemberMobileState(data.user.mobile);
           }
         }
       } catch (e) {
@@ -416,11 +419,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setLangState(savedLang);
       }
 
-      if (isFetchingAuthMeRef.current) return;
-      isFetchingAuthMeRef.current = true;
-
-      fetch("/api/auth/me", { credentials: "include" })
-        .then((res) => (res.ok ? res.json() : null))
+      fetchAuthMeOnce()
         .then((data) => {
           if (data?.authenticated && data.user) {
             const u = data.user;
@@ -451,9 +450,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })
         .catch(() => {
           /* ignore network errors during initial check */
-        })
-        .finally(() => {
-          isFetchingAuthMeRef.current = false;
         });
     }
   }, []);
@@ -467,64 +463,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } else {
         localStorage.removeItem('gym_member_mobile');
       }
-    }
-  };
-
-  const memberLogin = async (mobileOrEmail: string, otpOrPassword?: string) => {
-    try {
-      const cleanMobile = mobileOrEmail.replace(/\D/g, '').slice(-10);
-      const supabaseEmail = mobileOrEmail.includes('@')
-        ? mobileOrEmail.trim()
-        : `${cleanMobile || mobileOrEmail.trim()}@gym.org`;
-
-      let supabaseUserId = '';
-      let supabaseToken = '';
-
-      if (otpOrPassword) {
-        const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
-          email: supabaseEmail,
-          password: otpOrPassword,
-        });
-
-        if (authData?.session?.user) {
-          supabaseUserId = authData.session.user.id;
-          supabaseToken = authData.session.access_token;
-        } else if (authErr) {
-          console.warn('Supabase auth signin notice:', authErr.message);
-        }
-      }
-
-      const res = await fetch('/api/member/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile: mobileOrEmail, password: otpOrPassword, supabaseUserId }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error || 'लॉगिन करने में त्रुटि हुई।' };
-      }
-
-      const member = data.member;
-      const verifiedMobile = member.mobile ? member.mobile.replace(/\D/g, '').slice(-10) : cleanMobile;
-
-      setCurrentMemberMobile(verifiedMobile);
-      const newAuth: AuthSession = {
-        ...authSession,
-        isMemberLoggedIn: true,
-        currentMemberId: member.id,
-        currentMemberMobile: verifiedMobile,
-        currentMemberName: member.name,
-        currentMemberPhoto: member.photoUrl,
-        supabaseUserId: supabaseUserId || member.supabaseUserId || `sb_${verifiedMobile}`,
-        role: authSession.isAdminLoggedIn ? 'ADMIN' : 'MEMBER',
-      };
-      setAuthSession(newAuth);
-      localStorage.setItem('gym_auth', JSON.stringify(newAuth));
-
-      await refreshData();
-      return { success: true, member };
-    } catch (e) {
-      return { success: false, error: "सर्वर या नेटवर्क कनेक्शन त्रुटि।" };
     }
   };
 
@@ -635,9 +573,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (currentMemberMobile) {
         headers['x-member-mobile'] = currentMemberMobile;
       }
-      if (authSession.isAdminLoggedIn) {
-        headers['x-admin-token'] = 'admin_active';
-      }
 
       return fetch(url, {
         ...init,
@@ -645,7 +580,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         credentials: 'include',
       });
     },
-    [authSession.isAdminLoggedIn, authSession.token, currentMemberMobile]
+    [authSession.token, currentMemberMobile]
   );
 
   const refreshData = async (force = false, retryCount = 0) => {
@@ -658,51 +593,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isFetchingDataRef.current = true;
 
     try {
-      const [authRes, villagesRes] = await Promise.all([
-        authenticatedFetch('/api/auth/me').catch(() => null),
-        authenticatedFetch('/api/villages').catch(() => null),
+      const [authData, villagesList] = await Promise.all([
+        fetchAuthMeOnce(),
+        fetchVillagesOnce(),
       ]);
 
-      if (authRes && authRes.ok) {
-        const authData = await authRes.json();
-        if (authData?.user) {
-          const user = authData.user;
-          const isAdm = Boolean(
-            authData.isAdmin ||
-            user.isAdmin ||
-            user.systemRole === 'SUPER_ADMIN' ||
-            user.systemRole === 'ADMIN'
-          );
-          setAuthSession((prev) => ({
-            ...prev,
-            isAdminLoggedIn: isAdm,
-            isMemberLoggedIn: true,
-            role: user.role,
-            systemRole: user.systemRole,
-            adminMobile: isAdm ? user.mobile : prev.adminMobile,
-            adminName: isAdm ? user.name : prev.adminName,
-            adminId: isAdm ? user.id : prev.adminId,
-            adminVillageId: user.villageId,
-            currentMemberMobile: user.mobile,
-            currentMember: user,
-            email: user.email,
-            permissions: user.permissions || [],
-          }));
-          if (user.permissions) setUserPermissions(user.permissions);
-        }
+      if (authData?.user) {
+        const user = authData.user;
+        const isAdm = Boolean(
+          authData.isAdmin ||
+          user.isAdmin ||
+          user.systemRole === 'SUPER_ADMIN' ||
+          user.systemRole === 'ADMIN'
+        );
+        setAuthSession((prev) => ({
+          ...prev,
+          isAdminLoggedIn: isAdm,
+          isMemberLoggedIn: true,
+          role: user.role,
+          systemRole: user.systemRole,
+          adminMobile: isAdm ? user.mobile : prev.adminMobile,
+          adminName: isAdm ? user.name : prev.adminName,
+          adminId: isAdm ? user.id : prev.adminId,
+          adminVillageId: user.villageId,
+          currentMemberMobile: user.mobile,
+          currentMember: user,
+          email: user.email,
+          permissions: user.permissions || [],
+        }));
+        if (user.permissions) setUserPermissions(user.permissions);
       }
 
-      if (villagesRes && villagesRes.ok) {
-        const vData = await villagesRes.json();
-        if (vData?.villages && Array.isArray(vData.villages)) {
-          setVillages(vData.villages);
-          store.dispatch(reduxSetVillagesList(vData.villages));
-          const currentV =
-            vData.villages.find((v: any) => v.id === activeVillageId) || vData.villages[0];
-          if (currentV) {
-            setVillageSettings(currentV);
-            store.dispatch(reduxUpdateVillageSettings(currentV));
-          }
+      if (villagesList && Array.isArray(villagesList) && villagesList.length > 0) {
+        setVillages(villagesList);
+        const currentV =
+          villagesList.find((v: any) => v.id === activeVillageId) || villagesList[0];
+        if (currentV) {
+          setVillageSettings(currentV as any);
+          store.dispatch(reduxUpdateVillageSettings(currentV as any));
         }
       }
 
@@ -889,110 +817,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Auth OTP Handlers
-  const sendAdminOtp = async (mobile: string) => {
-    try {
-      const res = await fetch('/api/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile, role: 'ADMIN' }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error || 'ओटीपी भेजने में विफल।' };
-      }
-      return { success: true, message: data.message, otp: data.otp };
-    } catch (e) {
-      return { success: false, error: 'सर्वर कनेक्शन त्रुटि। कृपया पुनः प्रयास करें।' };
-    }
-  };
-
-  const verifyAdminOtp = async (mobile: string, otp: string) => {
-    try {
-      const res = await fetch('/api/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile, otp }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error || 'अमान्य ओटीपी कोड।' };
-      }
-      return { success: true, resetToken: data.token };
-    } catch (e) {
-      return { success: false, error: 'सर्वर कनेक्शन त्रुटि।' };
-    }
-  };
-
-  const sendMemberOtp = async (mobile: string) => {
-    try {
-      const res = await fetch('/api/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile, role: 'MEMBER' }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error || 'ओटीपी भेजने में विफल।' };
-      }
-      return { success: true, message: data.message, otp: data.otp };
-    } catch (e) {
-      return { success: false, error: 'सर्वर या नेटवर्क कनेक्शन त्रुटि।' };
-    }
-  };
-
-  const verifyMemberOtp = async (mobile: string, otp: string, name?: string) => {
-    try {
-      const res = await fetch('/api/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile, otp, name }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        return { success: false, error: data.error || 'अमान्य ओटीपी कोड दर्ज किया गया।' };
-      }
-
-      if (data.isAdmin && data.admin) {
-        const newAuth: AuthSession = {
-          ...authSession,
-          isAdminLoggedIn: true,
-          adminMobile: data.admin.mobile,
-          adminName: data.admin.name,
-          adminId: data.admin.id,
-          email: data.admin.email || mobile,
-          role: 'ADMIN',
-        };
-        setAuthSession(newAuth);
-        localStorage.setItem('gym_auth', JSON.stringify(newAuth));
-        await refreshData();
-        return { success: true, admin: data.admin, isAdmin: true };
-      }
-
-      const member = data.member;
-      const cleanMobile = member.mobile ? member.mobile.replace(/\D/g, '').slice(-10) : mobile.replace(/\D/g, '').slice(-10);
-
-      setCurrentMemberMobile(cleanMobile);
-      const newAuth: AuthSession = {
-        ...authSession,
-        isMemberLoggedIn: true,
-        currentMemberId: member.id,
-        currentMemberMobile: cleanMobile,
-        currentMemberName: member.name,
-        currentMemberPhoto: member.photoUrl,
-        supabaseUserId: member.supabaseUserId || `sb_${cleanMobile}`,
-        role: 'MEMBER',
-      };
-      setAuthSession(newAuth);
-      localStorage.setItem('gym_auth', JSON.stringify(newAuth));
-
-      await refreshData();
-      return { success: true, member, isAdmin: false };
-    } catch (e) {
-      return { success: false, error: 'सर्वर से जुड़ने में त्रुटि।' };
-    }
-  };
-
   const resetMemberPassword = async (mobile: string, otp: string, newPassword: string) => {
     try {
       const res = await fetch('/api/member/reset-password', {
@@ -1061,84 +885,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const adminLogin = async (emailOrMobile: string, password: string) => {
-    try {
-      if (!emailOrMobile.trim()) {
-        return { success: false, error: 'कृपया ईमेल या मोबाइल नंबर दर्ज करें।' };
-      }
-      if (!password) {
-        return { success: false, error: 'कृपया पासवर्ड दर्ज करें।' };
-      }
-
-      // 1. Try Supabase Auth if email format is provided
-      let supabaseAuthSuccess = false;
-      let authEmail = '';
-
-      if (emailOrMobile.includes('@')) {
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-          email: emailOrMobile.trim(),
-          password,
-        });
-
-        if (!authError && authData?.session) {
-          supabaseAuthSuccess = true;
-          authEmail = authData.user?.email || emailOrMobile.trim();
-        }
-      }
-
-      // 2. Query backend to verify authorized admin in database
-      const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mobile: emailOrMobile.trim(),
-          emailOrMobile: emailOrMobile.trim(),
-          password,
-          supabaseAuthSuccess,
-        }),
-      });
-
-      let data: any = null;
-      try {
-        const text = await res.text();
-        data = JSON.parse(text);
-      } catch (parseErr) {
-        data = null;
-      }
-
-      if (!res.ok || !data) {
-        return {
-          success: false,
-          error: data?.error || 'सर्वर प्रतिक्रिया असामान्य है। लॉगिन विफल।',
-        };
-      }
-
-      if (!data.admin) {
-        return {
-          success: false,
-          error: 'यह खाता एडमिन पैनल के लिए अधिकृत नहीं है।',
-        };
-      }
-
-      const newAuthSession: AuthSession = {
-        isAdminLoggedIn: true,
-        adminMobile: data.admin.mobile,
-        adminName: data.admin.name,
-        adminId: data.admin.id,
-        email: authEmail || data.admin.email || emailOrMobile.trim(),
-      };
-
-      setAuthSession(newAuthSession);
-      localStorage.setItem('gym_auth', JSON.stringify(newAuthSession));
-      changeActiveSection('admin-panel');
-
-      return { success: true, admin: data.admin };
-    } catch (e: any) {
-      console.warn('Admin login exception handled:', e?.message || e);
-      return { success: false, error: 'सर्वर या नेटवर्क त्रुटि। कृपया पुनः प्रयास करें।' };
-    }
-  };
-
   const adminLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
@@ -1152,40 +898,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('gym_token');
     if (activeSection === 'admin-panel') {
       changeActiveSection('home');
-    }
-  };
-
-  const userLogin = (user: any, token: string, role?: string) => {
-    const isAdm = Boolean(role === 'SUPER_ADMIN' || role === 'ADMIN' || user?.isAdmin || user?.systemRole === 'SUPER_ADMIN' || user?.systemRole === 'ADMIN');
-    const effectiveRole = role || user?.systemRole || user?.role || (isAdm ? 'ADMIN' : 'MEMBER');
-    const newAuthSession: AuthSession = {
-      isAdminLoggedIn: isAdm,
-      isMemberLoggedIn: true,
-      role: effectiveRole,
-      systemRole: effectiveRole,
-      adminMobile: isAdm ? user?.mobile : undefined,
-      adminName: isAdm ? user?.name : undefined,
-      adminId: isAdm ? user?.id : undefined,
-      currentMemberMobile: user?.mobile,
-      currentMember: user,
-      email: user?.email,
-      permissions: user?.permissions || [],
-      token,
-    };
-    setAuthSession(newAuthSession);
-    if (user?.mobile) {
-      setCurrentMemberMobileState(user.mobile);
-    }
-    store.dispatch(
-      reduxSetCredentials({
-        user,
-        token,
-        role: effectiveRole as any,
-      })
-    );
-    localStorage.setItem('gym_auth', JSON.stringify(newAuthSession));
-    if (token) {
-      localStorage.setItem('gym_token', token);
     }
   };
 
@@ -2109,27 +1821,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         stats,
         authSession,
         setAuthSession,
-        isAdminLoginModalOpen,
-        setIsAdminLoginModalOpen,
-        isMemberLoginModalOpen,
-        setIsMemberLoginModalOpen,
         isJoinModalOpen,
         setIsJoinModalOpen,
         isMyProfileModalOpen,
         setIsMyProfileModalOpen,
-        userLogin,
-        memberLogin,
         memberLogout,
         isLoading,
         refreshData,
-        sendAdminOtp,
-        verifyAdminOtp,
-        sendMemberOtp,
-        verifyMemberOtp,
         resetMemberPassword,
         resetAdminPassword,
         setAdminPassword,
-        adminLogin,
         adminLogout,
         addMember,
         approveMember,
