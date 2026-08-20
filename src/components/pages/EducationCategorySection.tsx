@@ -110,7 +110,7 @@ export const EducationCategorySection: React.FC<{ slug: string }> = ({ slug }) =
         </h1>
       </div>
 
-      <p className="max-w-3xl mb-8 text-sm sm:text-base text-[#6B6554] dark:text-slate-300 leading-relaxed">
+      <p className="w-full mb-8 text-sm sm:text-base text-[#6B6554] dark:text-slate-300 leading-relaxed">
         {t(category.overviewKey)}
       </p>
 
