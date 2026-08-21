@@ -21,7 +21,7 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    redirect('/auth/login?next=/dashboard');
+    redirect('/auth/login?next=/');
   }
 
   // Fetch application profile from public.profiles
