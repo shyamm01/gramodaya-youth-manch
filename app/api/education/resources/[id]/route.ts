@@ -43,7 +43,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const validation = await validateRequestBody(req, educationResourceUpdateSchema);
     if (!validation.success) return validation.response;
 
-    const updated = await updateResource(id, validation.data);
+    const updated = await updateResource(id, validation.data, currentUser as any);
 
     logAuditAction(
       `Updated Education Resource: ${updated.title}`,
@@ -71,7 +71,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const { id } = await params;
     const body = await req.json().catch(() => ({} as any));
 
-    const deleted = await deleteResource(id);
+    const deleted = await deleteResource(id, currentUser as any);
 
     logAuditAction(
       `Deleted Education Resource: ${deleted.title}`,

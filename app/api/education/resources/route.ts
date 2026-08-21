@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     const validation = await validateRequestBody(req, educationResourceCreateSchema);
     if (!validation.success) return validation.response;
 
-    const created = await createResource(validation.data, currentUser.id);
+    const created = await createResource(validation.data, currentUser.id, currentUser as any);
 
     logAuditAction(
       `Created Education Resource: ${created.title}`,

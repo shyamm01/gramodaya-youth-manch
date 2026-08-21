@@ -21,7 +21,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const validation = await validateRequestBody(req, educationEnquiryUpdateSchema);
     if (!validation.success) return validation.response;
 
-    const updated = await updateEnquiry(id, validation.data);
+    const updated = await updateEnquiry(id, validation.data, currentUser as any);
 
     logAuditAction(
       `Updated Education Enquiry #${updated.id} (${updated.status})`,
@@ -49,7 +49,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const { id } = await params;
     const body = await req.json().catch(() => ({} as any));
 
-    const deleted = await deleteEnquiry(id);
+    const deleted = await deleteEnquiry(id, currentUser as any);
 
     logAuditAction(
       `Deleted Education Enquiry #${deleted.id}`,

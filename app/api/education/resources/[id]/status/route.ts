@@ -28,7 +28,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       );
     }
 
-    const updated = await setResourceStatus(id, parsed.data);
+    const updated = await setResourceStatus(id, parsed.data, currentUser as any);
 
     logAuditAction(
       `Updated Education Resource status to "${parsed.data}" (${updated.title})`,

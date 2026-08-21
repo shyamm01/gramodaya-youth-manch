@@ -15,6 +15,8 @@ import { resolveVillageId } from '@/src/lib/villageContext';
 import { getRequestLimit } from '@/src/lib/requestParams';
 import { logAuditAction } from '@/src/lib/authUtils';
 
+const ENQUIRY_STATUSES = ['new', 'in_progress', 'resolved', 'closed', 'all'] as const;
+
 export async function GET(req: Request) {
   try {
     const auth = await requireAuth(req, 'education:manage');
@@ -24,9 +26,16 @@ export async function GET(req: Request) {
     const offsetRaw = Number(url.searchParams.get('offset'));
     const villageId = await resolveVillageId(req);
 
+    // Same reason as the content filters: an unknown enum label reaching the
+    // WHERE clause is a 500 rather than an empty list.
+    const requestedStatus = url.searchParams.get('status');
+    const status = ENQUIRY_STATUSES.includes(requestedStatus as any)
+      ? (requestedStatus as any)
+      : 'all';
+
     const enquiries = await listEnquiries({
       villageId,
-      status: (url.searchParams.get('status') as any) || 'all',
+      status,
       resourceId: toNumericId(url.searchParams.get('resourceId')),
       mobile: url.searchParams.get('mobile') || undefined,
       limit: getRequestLimit(req),

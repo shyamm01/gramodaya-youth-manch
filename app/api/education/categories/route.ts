@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     const validation = await validateRequestBody(req, educationCategoryCreateSchema);
     if (!validation.success) return validation.response;
 
-    const created = await createCategory(validation.data, currentUser.id);
+    const created = await createCategory(validation.data, currentUser.id, currentUser as any);
 
     logAuditAction(
       `Created Education Category: ${created.name}`,

@@ -13,6 +13,25 @@ import { getRequestLimit } from '../requestParams';
 import type { EducationStatusFilter, ResourceFilters } from './service';
 
 const CONTENT_STATUSES = ['draft', 'pending', 'published', 'archived', 'all'] as const;
+const SCOPES = ['gramodaya', 'government'] as const;
+const RESOURCE_TYPES = [
+  'scheme',
+  'scholarship',
+  'course',
+  'institution',
+  'guidance',
+  'resource',
+  'other',
+] as const;
+
+/** Unknown enum values must be ignored, not handed to Postgres — an invalid
+ *  enum label in a WHERE clause is a 500, not an empty result set. */
+function pickEnum<T extends string>(raw: string | null, allowed: readonly T[]): T | undefined {
+  return raw && (allowed as readonly string[]).includes(raw) ? (raw as T) : undefined;
+}
+
+/** Hard ceiling so ?limit=100000 cannot ask the database for everything. */
+const MAX_PAGE_SIZE = 200;
 
 export interface EducationRequestScope {
   villageId: number;
@@ -35,11 +54,11 @@ export async function resolveEducationScope(req: Request): Promise<EducationRequ
     return { villageId, includeGlobal, status: 'published', canSeeUnpublished: false };
   }
 
+  // Deliberately education:manage, not education:view — every MEMBER holds
+  // education:view by default, and drafts are not member-visible content.
   const auth = await authenticateRequest(req);
   const canSeeUnpublished =
-    auth.success === true &&
-    (hasUserPermission(auth.user as any, 'education:view') ||
-      hasUserPermission(auth.user as any, 'education:manage'));
+    auth.success === true && hasUserPermission(auth.user as any, 'education:manage');
 
   const isKnownStatus = (CONTENT_STATUSES as readonly string[]).includes(requestedStatus);
 
@@ -63,11 +82,11 @@ export function parseResourceFilters(req: Request, scope: EducationRequestScope)
     status: scope.status,
     categoryId: Number.isFinite(categoryIdRaw) && categoryIdRaw > 0 ? categoryIdRaw : undefined,
     categorySlug: url.searchParams.get('category') || url.searchParams.get('categorySlug') || undefined,
-    scope: (url.searchParams.get('scope') as 'gramodaya' | 'government') || undefined,
-    type: url.searchParams.get('type') || undefined,
+    scope: pickEnum(url.searchParams.get('scope'), SCOPES),
+    type: pickEnum(url.searchParams.get('type'), RESOURCE_TYPES),
     search: url.searchParams.get('q') || url.searchParams.get('search') || undefined,
     tag: url.searchParams.get('tag') || undefined,
-    limit: getRequestLimit(req),
+    limit: Math.min(getRequestLimit(req) ?? MAX_PAGE_SIZE, MAX_PAGE_SIZE),
     offset: Number.isFinite(offsetRaw) && offsetRaw > 0 ? offsetRaw : undefined,
     includeLinks: url.searchParams.get('includeLinks') !== 'false',
   };

@@ -45,6 +45,20 @@ export interface EnquiryFilters {
   offset?: number;
 }
 
+/**
+ * The subset of the authenticated user this layer needs. Routes already check
+ * the permission code; this is about *which village's* content the caller may
+ * touch, which the permission code alone does not express.
+ */
+export interface EducationActor {
+  id?: string;
+  systemRole?: string;
+  isSuperAdmin?: boolean;
+  isAdmin?: boolean;
+  villageId?: string;
+  accessibleVillages?: string[];
+}
+
 export class EducationError extends Error {
   status: number;
   constructor(message: string, status = 400) {
@@ -102,6 +116,27 @@ async function resolveVillageRef(villageId: unknown): Promise<number | null> {
     return village ? village.id : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Guards village-scoped rows: an admin granted village A must not be able to
+ * edit or delete village B's education content just because they hold
+ * education:manage. Platform-wide rows (village_id IS NULL) are left to the
+ * permission check alone, as is a token that carries no village grants at all
+ * (better than locking a legitimate admin out of the module entirely).
+ */
+export function assertVillageAccess(actor: EducationActor | undefined, villageId: number | null | undefined) {
+  if (villageId === null || villageId === undefined) return;
+  if (!actor) return;
+  if (actor.isSuperAdmin || actor.systemRole === 'SUPER_ADMIN') return;
+
+  const granted = new Set(
+    [...(actor.accessibleVillages || []), actor.villageId].filter(Boolean).map(String)
+  );
+  if (granted.size === 0) return;
+  if (!granted.has(String(villageId))) {
+    throw new EducationError("You do not have access to this village's education content.", 403);
   }
 }
 
@@ -198,6 +233,9 @@ export async function getCategory(idOrSlug: string, opts: EducationScopeOptions 
     .select()
     .from(schema.educationCategories)
     .where(and(...conditions))
+    // Slugs are unique per village but not across villages — order so the same
+    // request always resolves to the same row.
+    .orderBy(asc(schema.educationCategories.id))
     .limit(1);
 
   return row || null;
@@ -233,9 +271,14 @@ export async function getEducationTree(
   return scoped.map((c) => ({ ...c, resources: byCategory.get(Number(c.id)) || [] }));
 }
 
-export async function createCategory(values: Record<string, any>, createdBy?: string) {
+export async function createCategory(
+  values: Record<string, any>,
+  createdBy?: string,
+  actor?: EducationActor
+) {
   const db = getEducationDb();
   const villageId = await resolveVillageRef(values.villageId);
+  assertVillageAccess(actor, villageId);
   const slug = values.slug || slugify(values.name || values.nameHindi || '', 'category');
 
   const clash = await db
@@ -277,10 +320,15 @@ export async function createCategory(values: Record<string, any>, createdBy?: st
   return inserted;
 }
 
-export async function updateCategory(idOrSlug: string, values: Record<string, any>) {
+export async function updateCategory(
+  idOrSlug: string,
+  values: Record<string, any>,
+  actor?: EducationActor
+) {
   const db = getEducationDb();
   const existing = await getCategoryAnyScope(idOrSlug);
   if (!existing) throw new EducationError('Education category not found.', 404);
+  assertVillageAccess(actor, existing.villageId);
 
   const patch: Record<string, any> = { updatedAt: new Date() };
   const textFields = [
@@ -297,11 +345,34 @@ export async function updateCategory(idOrSlug: string, values: Record<string, an
       patch[field] = typeof values[field] === 'string' ? values[field].trim() || null : values[field];
     }
   }
-  if (values.slug !== undefined) patch.slug = slugify(values.slug, 'category');
+  if (values.slug !== undefined) {
+    const nextSlug = slugify(values.slug, 'category');
+    const nextVillageId =
+      values.villageId !== undefined ? await resolveVillageRef(values.villageId) : existing.villageId;
+    const [clash] = await db
+      .select({ id: schema.educationCategories.id })
+      .from(schema.educationCategories)
+      .where(
+        and(
+          eq(schema.educationCategories.slug, nextSlug),
+          nextVillageId === null
+            ? isNull(schema.educationCategories.villageId)
+            : eq(schema.educationCategories.villageId, nextVillageId)
+        )
+      )
+      .limit(1);
+    if (clash && clash.id !== existing.id) {
+      throw new EducationError(`A category with slug "${nextSlug}" already exists.`, 409);
+    }
+    patch.slug = nextSlug;
+  }
   if (values.displayOrder !== undefined) patch.displayOrder = values.displayOrder;
   if (values.status !== undefined) patch.status = values.status;
   if (values.metadata !== undefined) patch.metadata = values.metadata;
-  if (values.villageId !== undefined) patch.villageId = await resolveVillageRef(values.villageId);
+  if (values.villageId !== undefined) {
+    patch.villageId = await resolveVillageRef(values.villageId);
+    assertVillageAccess(actor, patch.villageId);
+  }
   // `name` is NOT NULL — never let a blank string through.
   if (patch.name === null) delete patch.name;
 
@@ -325,14 +396,16 @@ export async function getCategoryAnyScope(idOrSlug: string) {
         ? eq(schema.educationCategories.id, Number(idOrSlug))
         : eq(schema.educationCategories.slug, idOrSlug)
     )
+    .orderBy(asc(schema.educationCategories.id))
     .limit(1);
   return row || null;
 }
 
-export async function deleteCategory(idOrSlug: string) {
+export async function deleteCategory(idOrSlug: string, actor?: EducationActor) {
   const db = getEducationDb();
   const existing = await getCategoryAnyScope(idOrSlug);
   if (!existing) throw new EducationError('Education category not found.', 404);
+  assertVillageAccess(actor, existing.villageId);
 
   // Resources (and their links) cascade with the category.
   await db.delete(schema.educationCategories).where(eq(schema.educationCategories.id, existing.id));
@@ -343,23 +416,31 @@ export async function deleteCategory(idOrSlug: string) {
 // RESOURCES
 // ============================================================================
 
-export async function listResources(
-  filters: ResourceFilters & { categoryIds?: number[] } = {}
-) {
-  const db = getEducationDb();
+/**
+ * Resolves ?category=<slug> to ids once, so the list query and the count query
+ * can never disagree about which rows they are talking about.
+ * Returns null when the slug matches nothing (caller should return nothing).
+ */
+async function resolveFilterCategoryIds(
+  filters: ResourceFilters & { categoryIds?: number[] }
+): Promise<number[] | undefined | null> {
+  if (filters.categoryIds) return filters.categoryIds;
+  if (!filters.categorySlug) return undefined;
 
-  let categoryIds = filters.categoryIds;
-  if (!categoryIds && filters.categorySlug) {
-    const category = await getCategory(filters.categorySlug, {
-      villageId: filters.villageId,
-      includeGlobal: filters.includeGlobal,
-      status: 'all',
-    });
-    if (!category) return [];
-    categoryIds = [category.id];
-  }
+  const category = await getCategory(filters.categorySlug, {
+    villageId: filters.villageId,
+    includeGlobal: filters.includeGlobal,
+    status: 'all',
+  });
+  return category ? [category.id] : null;
+}
 
-  const conditions = [
+/** Every WHERE clause a resource query applies — shared by list and count. */
+function buildResourceConditions(
+  filters: ResourceFilters,
+  categoryIds?: number[]
+): SQL[] {
+  return [
     villageCondition(schema.educationResources.villageId, filters),
     statusCondition(schema.educationResources.status, filters.status),
     filters.categoryId ? eq(schema.educationResources.categoryId, filters.categoryId) : undefined,
@@ -375,6 +456,17 @@ export async function listResources(
       : undefined,
     filters.tag ? sql`${schema.educationResources.tags} @> ${JSON.stringify([filters.tag])}::jsonb` : undefined,
   ].filter(Boolean) as SQL[];
+}
+
+export async function listResources(
+  filters: ResourceFilters & { categoryIds?: number[] } = {}
+) {
+  const db = getEducationDb();
+
+  const categoryIds = await resolveFilterCategoryIds(filters);
+  if (categoryIds === null) return [];
+
+  const conditions = buildResourceConditions(filters, categoryIds);
 
   let query = db
     .select()
@@ -413,13 +505,13 @@ export async function listResources(
 
 export async function countResources(filters: ResourceFilters = {}) {
   const db = getEducationDb();
-  const conditions = [
-    villageCondition(schema.educationResources.villageId, filters),
-    statusCondition(schema.educationResources.status, filters.status),
-    filters.categoryId ? eq(schema.educationResources.categoryId, filters.categoryId) : undefined,
-    filters.scope ? eq(schema.educationResources.scope, filters.scope) : undefined,
-    filters.type ? eq(schema.educationResources.type, filters.type as any) : undefined,
-  ].filter(Boolean) as SQL[];
+
+  // Must apply exactly the filters listResources does, or the pagination total
+  // reported alongside a filtered page is a different number entirely.
+  const categoryIds = await resolveFilterCategoryIds(filters);
+  if (categoryIds === null) return 0;
+
+  const conditions = buildResourceConditions(filters, categoryIds);
 
   const [row] = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -445,6 +537,9 @@ export async function getResource(
     .select()
     .from(schema.educationResources)
     .where(and(...conditions))
+    // Resource slugs are unique per category, so a slug lookup can be
+    // ambiguous across categories — resolve it deterministically.
+    .orderBy(asc(schema.educationResources.id))
     .limit(1);
 
   if (!row) return null;
@@ -534,9 +629,15 @@ function resourceContentPatch(values: Record<string, any>) {
   return patch;
 }
 
-export async function createResource(values: Record<string, any>, createdBy?: string) {
+export async function createResource(
+  values: Record<string, any>,
+  createdBy?: string,
+  actor?: EducationActor
+) {
   const db = getEducationDb();
   const categoryId = await resolveCategoryId(values);
+  const villageId = await resolveVillageRef(values.villageId);
+  assertVillageAccess(actor, villageId);
   const baseSlug = values.slug || slugify(values.title || values.titleHindi || '', 'resource');
   const slug = await uniqueResourceSlug(categoryId, baseSlug);
 
@@ -555,7 +656,7 @@ export async function createResource(values: Record<string, any>, createdBy?: st
     .values({
       ...content,
       categoryId,
-      villageId: await resolveVillageRef(values.villageId),
+      villageId,
       slug,
       createdBy: await resolveCreatedBy(createdBy),
     } as any)
@@ -565,10 +666,15 @@ export async function createResource(values: Record<string, any>, createdBy?: st
   return { ...inserted, links };
 }
 
-export async function updateResource(id: string, values: Record<string, any>) {
+export async function updateResource(
+  id: string,
+  values: Record<string, any>,
+  actor?: EducationActor
+) {
   const db = getEducationDb();
   const existing = await getResource(id, { status: 'all', includeLinks: false });
   if (!existing) throw new EducationError('Education resource not found.', 404);
+  assertVillageAccess(actor, existing.villageId);
 
   const patch: Record<string, any> = { ...resourceContentPatch(values), updatedAt: new Date() };
   // NOT NULL columns — drop them instead of writing a null.
@@ -579,7 +685,10 @@ export async function updateResource(id: string, values: Record<string, any>) {
   if (values.categoryId !== undefined || values.categorySlug !== undefined) {
     patch.categoryId = await resolveCategoryId(values);
   }
-  if (values.villageId !== undefined) patch.villageId = await resolveVillageRef(values.villageId);
+  if (values.villageId !== undefined) {
+    patch.villageId = await resolveVillageRef(values.villageId);
+    assertVillageAccess(actor, patch.villageId);
+  }
   if (values.slug !== undefined) {
     patch.slug = await uniqueResourceSlug(
       patch.categoryId ?? existing.categoryId,
@@ -601,10 +710,11 @@ export async function updateResource(id: string, values: Record<string, any>) {
   return { ...updated, links };
 }
 
-export async function setResourceStatus(id: string, status: string) {
+export async function setResourceStatus(id: string, status: string, actor?: EducationActor) {
   const db = getEducationDb();
   const existing = await getResource(id, { status: 'all', includeLinks: false });
   if (!existing) throw new EducationError('Education resource not found.', 404);
+  assertVillageAccess(actor, existing.villageId);
 
   const [updated] = await db
     .update(schema.educationResources)
@@ -615,10 +725,11 @@ export async function setResourceStatus(id: string, status: string) {
   return updated;
 }
 
-export async function deleteResource(id: string) {
+export async function deleteResource(id: string, actor?: EducationActor) {
   const db = getEducationDb();
   const existing = await getResource(id, { status: 'all', includeLinks: false });
   if (!existing) throw new EducationError('Education resource not found.', 404);
+  assertVillageAccess(actor, existing.villageId);
 
   await db.delete(schema.educationResources).where(eq(schema.educationResources.id, existing.id));
   return existing;
@@ -722,10 +833,22 @@ export async function createEnquiry(values: Record<string, any>, userId?: string
   return inserted;
 }
 
-export async function updateEnquiry(id: string, values: Record<string, any>) {
+export async function updateEnquiry(
+  id: string,
+  values: Record<string, any>,
+  actor?: EducationActor
+) {
   const db = getEducationDb();
   const numId = Number(id);
   if (!Number.isFinite(numId)) throw new EducationError('Invalid enquiry id.', 400);
+
+  const [existing] = await db
+    .select({ villageId: schema.educationEnquiries.villageId })
+    .from(schema.educationEnquiries)
+    .where(eq(schema.educationEnquiries.id, numId))
+    .limit(1);
+  if (!existing) throw new EducationError('Education enquiry not found.', 404);
+  assertVillageAccess(actor, existing.villageId);
 
   const patch: Record<string, any> = { updatedAt: new Date() };
   if (values.status !== undefined) {
@@ -733,7 +856,9 @@ export async function updateEnquiry(id: string, values: Record<string, any>) {
     patch.resolvedAt =
       values.status === 'resolved' || values.status === 'closed' ? new Date() : null;
   }
-  if (values.assignedTo !== undefined) patch.assignedTo = values.assignedTo || null;
+  // assigned_to is a profiles FK — an id with no profile row must not blow up
+  // the whole update.
+  if (values.assignedTo !== undefined) patch.assignedTo = await resolveCreatedBy(values.assignedTo);
   if (values.response !== undefined) patch.response = values.response?.trim() || null;
 
   const [updated] = await db
@@ -746,10 +871,18 @@ export async function updateEnquiry(id: string, values: Record<string, any>) {
   return updated;
 }
 
-export async function deleteEnquiry(id: string) {
+export async function deleteEnquiry(id: string, actor?: EducationActor) {
   const db = getEducationDb();
   const numId = Number(id);
   if (!Number.isFinite(numId)) throw new EducationError('Invalid enquiry id.', 400);
+
+  const [existing] = await db
+    .select({ villageId: schema.educationEnquiries.villageId })
+    .from(schema.educationEnquiries)
+    .where(eq(schema.educationEnquiries.id, numId))
+    .limit(1);
+  if (!existing) throw new EducationError('Education enquiry not found.', 404);
+  assertVillageAccess(actor, existing.villageId);
 
   const [deleted] = await db
     .delete(schema.educationEnquiries)
