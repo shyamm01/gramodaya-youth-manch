@@ -214,6 +214,116 @@ export const groupMessageSchema = z.object({
   villageId: z.union([z.string(), z.number()]).optional(),
 });
 
+/**
+ * 10. EDUCATION MODULE SCHEMAS
+ *
+ * Every content field except the title is optional, so an admin can publish a
+ * bare card now and fill in eligibility/benefits/links later. `metadata` is an
+ * open bag for fields the module grows into without a schema change.
+ */
+export const educationStatusSchema = z.enum(['draft', 'pending', 'published', 'archived']);
+export const educationScopeSchema = z.enum(['gramodaya', 'government']);
+export const educationResourceTypeSchema = z.enum([
+  'scheme',
+  'scholarship',
+  'course',
+  'institution',
+  'guidance',
+  'resource',
+  'other',
+]);
+export const educationEnquiryStatusSchema = z.enum(['new', 'in_progress', 'resolved', 'closed']);
+
+export const educationLinkSchema = z.object({
+  label: z.string().min(1, 'Link label is required').max(150),
+  labelHindi: z.string().max(150).optional(),
+  url: z.string().url('Link must be a valid URL'),
+  type: z.enum(['portal', 'pdf', 'video', 'form', 'contact', 'other']).default('portal'),
+  displayOrder: z.number().int().min(0).optional(),
+});
+
+export const educationCategoryCreateSchema = z.object({
+  slug: z
+    .string()
+    .max(120)
+    .regex(/^[a-z0-9-]+$/, 'Slug may contain lowercase letters, numbers and hyphens only')
+    .optional(),
+  name: z.string().min(2, 'Category name must be at least 2 characters').max(150),
+  nameHindi: z.string().max(150).optional(),
+  nameKey: z.string().max(150).optional(),
+  overview: z.string().max(5000).optional(),
+  overviewHindi: z.string().max(5000).optional(),
+  overviewKey: z.string().max(150).optional(),
+  icon: z.string().max(60).optional(),
+  displayOrder: z.number().int().min(0).optional(),
+  status: educationStatusSchema.optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
+  villageId: z.union([z.string(), z.number()]).nullable().optional(),
+  adminName: z.string().optional(),
+  adminMobile: z.string().optional(),
+});
+
+export const educationCategoryUpdateSchema = educationCategoryCreateSchema.partial();
+
+export const educationResourceCreateSchema = z.object({
+  categoryId: z.union([z.string(), z.number()]).optional(),
+  categorySlug: z.string().max(120).optional(),
+  slug: z
+    .string()
+    .max(160)
+    .regex(/^[a-z0-9-]+$/, 'Slug may contain lowercase letters, numbers and hyphens only')
+    .optional(),
+  title: z.string().min(2, 'Title must be at least 2 characters').max(200),
+  titleHindi: z.string().max(200).optional(),
+  titleKey: z.string().max(150).optional(),
+  description: z.string().max(5000).optional(),
+  descriptionHindi: z.string().max(5000).optional(),
+  descriptionKey: z.string().max(150).optional(),
+  icon: z.string().max(60).optional(),
+  scope: educationScopeSchema.optional(),
+  type: educationResourceTypeSchema.optional(),
+  status: educationStatusSchema.optional(),
+  eligibility: z.string().max(5000).optional(),
+  benefits: z.string().max(5000).optional(),
+  howToApply: z.string().max(5000).optional(),
+  documentsRequired: z.array(z.string().max(200)).max(50).optional(),
+  tags: z.array(z.string().max(60)).max(30).optional(),
+  provider: z.string().max(200).optional(),
+  externalUrl: z.string().url('External URL must be a valid URL').optional().or(z.literal('')),
+  photoUrl: z.string().optional().or(z.literal('')),
+  contactName: z.string().max(150).optional(),
+  contactMobile: z.string().max(15).optional().or(z.literal('')),
+  startDate: z.string().optional().or(z.literal('')),
+  endDate: z.string().optional().or(z.literal('')),
+  displayOrder: z.number().int().min(0).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
+  links: z.array(educationLinkSchema).max(20).optional(),
+  villageId: z.union([z.string(), z.number()]).nullable().optional(),
+  adminName: z.string().optional(),
+  adminMobile: z.string().optional(),
+});
+
+export const educationResourceUpdateSchema = educationResourceCreateSchema.partial();
+
+export const educationEnquiryCreateSchema = z.object({
+  name: z.string().min(2, 'Name must be at least 2 characters').max(150),
+  mobile: mobileSchema,
+  email: z.string().email('Invalid email address').optional().or(z.literal('')),
+  studentClass: z.string().max(60).optional(),
+  message: z.string().min(5, 'Please describe what help you need'),
+  resourceId: z.union([z.string(), z.number()]).optional(),
+  categoryId: z.union([z.string(), z.number()]).optional(),
+  villageId: z.union([z.string(), z.number()]).optional(),
+});
+
+export const educationEnquiryUpdateSchema = z.object({
+  status: educationEnquiryStatusSchema.optional(),
+  assignedTo: z.string().uuid('assignedTo must be a user id').nullable().optional(),
+  response: z.string().max(5000).optional(),
+  adminName: z.string().optional(),
+  adminMobile: z.string().optional(),
+});
+
 export type ValidationResult<T> =
   | { success: true; data: T; response?: never }
   | { success: false; response: NextResponse; data?: never };

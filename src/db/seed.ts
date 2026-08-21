@@ -15,6 +15,7 @@ import {
   publicInfos,
   chatRooms,
 } from './schema';
+import { seedEducationContent } from './seedEducation';
 import { loadStore } from '../lib/serverStore';
 import { eq } from 'drizzle-orm';
 
@@ -298,6 +299,10 @@ export async function seedDatabase() {
         })
         .onConflictDoNothing();
     }
+
+    // 15. Seed Education Module (platform-wide categories & schemes)
+    console.log('Seeding education categories and schemes...');
+    await seedEducationContent();
 
     console.log('Seeding completed successfully! All entities populated with normalized relations.');
   } catch (error) {

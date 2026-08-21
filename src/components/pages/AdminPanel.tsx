@@ -9,6 +9,7 @@ import {
   AdminActivityChart,
   AdminMemberTrendChart,
   AdminHelpdeskSection,
+  AdminEducationSection,
 } from '../admin';
 
 import {
@@ -1934,7 +1935,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          TAB 10: SETTINGS & DATABASE RESET
+          TAB 10: EDUCATION MODULE (categories, schemes, enquiries)
+      ───────────────────────────────────────────────────────────── */}
+      {activeTab === 'education' && <AdminEducationSection />}
+
+      {/* ─────────────────────────────────────────────────────────────
+          TAB 11: SETTINGS & DATABASE RESET
       ───────────────────────────────────────────────────────────── */}
       {activeTab === 'settings' && (
         <div className="space-y-8 animate-fade-in max-w-4xl">

@@ -19,6 +19,7 @@ import {
   PanelLeft,
   LayoutDashboard,
   Award,
+  GraduationCap,
   Globe,
   PhoneCall,
   Database,
@@ -66,6 +67,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     { id: 'social-work', label: 'Social Works', icon: HeartHandshake, count: stats.pendingSocialWork },
     { id: 'announcements', label: 'Announcements', icon: Volume2, count: null },
     { id: 'events', label: 'Events & Plans', icon: Calendar, count: null },
+    { id: 'education', label: 'Education', icon: GraduationCap, count: null },
   ];
 
   const managementNavItems = [

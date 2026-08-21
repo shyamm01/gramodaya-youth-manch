@@ -10,6 +10,7 @@ export type AppModuleId =
   | 'announcements'
   | 'public_info'
   | 'elders'
+  | 'education'
   | 'chat'
   | 'audit'
   | 'settings';
@@ -71,14 +72,19 @@ export const ALL_SYSTEM_PERMISSIONS: SystemPermissionDef[] = [
   // 9. Elders Care Module
   { code: 'elders:manage', name: 'बुजुर्ग सूची प्रबंधन', module: 'elders', description: 'Manage village elder care registry' },
   
-  // 10. Live Chat Module
+  // 10. Education Module
+  { code: 'education:view', name: 'शिक्षा सामग्री देखना', module: 'education', description: 'View education categories, schemes and enquiries' },
+  { code: 'education:manage', name: 'शिक्षा योजना प्रबंधन', module: 'education', description: 'Create and edit education categories, schemes and resources' },
+  { code: 'education:publish', name: 'शिक्षा सामग्री प्रकाशन', module: 'education', description: 'Publish, archive or delete education content and resolve enquiries' },
+
+  // 11. Live Chat Module
   { code: 'chat:participate', name: 'लाइव चैट में संवाद', module: 'chat', description: 'Send messages in community chat' },
   { code: 'chat:moderate', name: 'चैट मॉडरेशन', module: 'chat', description: 'Delete inappropriate messages and manage rooms' },
   
-  // 11. Audit Module
+  // 12. Audit Module
   { code: 'audit:view', name: 'ऑडिट लॉग्स देखना', module: 'audit', description: 'Inspect system activity and admin audit logs' },
   
-  // 12. Settings & Integrations Module
+  // 13. Settings & Integrations Module
   { code: 'permissions:manage', name: 'अनुमति प्रबंधन (User Permissions)', module: 'settings', description: 'Manage user-level permission overrides' },
   { code: 'integrations:manage', name: 'सिस्टम एकीकरण', module: 'settings', description: 'Configure database, Supabase and external APIs' },
 ];
@@ -148,6 +154,13 @@ export const SYSTEM_MODULES: ModuleDefinition[] = [
     permissions: ALL_SYSTEM_PERMISSIONS.filter((p) => p.module === 'elders'),
   },
   {
+    id: 'education',
+    nameHindi: 'शिक्षा एवं मार्गदर्शन',
+    nameEnglish: 'Education & Guidance',
+    description: 'छात्रवृत्ति, सरकारी योजनाएं, कैरियर मार्गदर्शन एवं शिक्षा सहायता',
+    permissions: ALL_SYSTEM_PERMISSIONS.filter((p) => p.module === 'education'),
+  },
+  {
     id: 'chat',
     nameHindi: 'लाइव चैट',
     nameEnglish: 'Live Chat',
@@ -191,6 +204,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     'announcements:publish',
     'public_info:manage',
     'elders:manage',
+    'education:view',
+    'education:manage',
+    'education:publish',
     'chat:participate',
     'chat:moderate',
     'audit:view',
@@ -200,6 +216,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<SystemRole, PermissionCode[]> = {
     'complaints:view',
     'complaints:create',
     'gallery:upload',
+    'education:view',
     'chat:participate',
   ],
 };

@@ -169,6 +169,13 @@
       "when": 1786731963000,
       "tag": "0023_normalize_and_relate_enums",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1787308056641,
+      "tag": "0024_create_education_tables",
+      "breakpoints": true
     }
   ]
 }

@@ -9,3 +9,4 @@ export * from './AdminMemberTrendChart';
 export * from './AdminLocationSelector';
 export * from './AdminQuickCreateModal';
 export * from './AdminHelpdeskSection';
+export * from './AdminEducationSection';

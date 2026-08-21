@@ -249,6 +249,116 @@ export function formatPublicInfo(p: any) {
 }
 
 /**
+ * Transformer: Education Resource Link Model -> Standardized DTO
+ */
+export function formatEducationLink(l: any) {
+  if (!l) return null;
+  return {
+    id: String(l.id),
+    resourceId: String(l.resourceId),
+    label: l.label,
+    labelHindi: l.labelHindi || '',
+    url: l.url,
+    type: l.type,
+    displayOrder: l.displayOrder ?? 0,
+  };
+}
+
+/**
+ * Transformer: Education Resource Model -> Standardized DTO
+ * `links` is only present when the caller joined them in.
+ */
+export function formatEducationResource(r: any) {
+  if (!r) return null;
+  return {
+    id: String(r.id),
+    categoryId: String(r.categoryId),
+    categorySlug: r.categorySlug || r.category?.slug || undefined,
+    villageId: r.villageId ? String(r.villageId) : undefined,
+    slug: r.slug,
+    title: r.title,
+    titleHindi: r.titleHindi || '',
+    titleKey: r.titleKey || undefined,
+    description: r.description || '',
+    descriptionHindi: r.descriptionHindi || '',
+    descriptionKey: r.descriptionKey || undefined,
+    icon: r.icon || 'BookOpen',
+    scope: r.scope,
+    type: r.type,
+    status: r.status,
+    eligibility: r.eligibility || '',
+    benefits: r.benefits || '',
+    howToApply: r.howToApply || '',
+    documentsRequired: r.documentsRequired || [],
+    tags: r.tags || [],
+    provider: r.provider || '',
+    externalUrl: r.externalUrl || '',
+    photoUrl: r.photoUrl || '',
+    contactName: r.contactName || '',
+    contactMobile: r.contactMobile || '',
+    startDate: r.startDate || undefined,
+    endDate: r.endDate || undefined,
+    displayOrder: r.displayOrder ?? 0,
+    metadata: r.metadata || undefined,
+    ...(r.links ? { links: r.links.map(formatEducationLink) } : {}),
+    createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : undefined,
+    updatedAt: r.updatedAt ? new Date(r.updatedAt).toISOString() : undefined,
+  };
+}
+
+/**
+ * Transformer: Education Category Model -> Standardized DTO
+ * `resources` is only present when the caller asked for the nested tree.
+ */
+export function formatEducationCategory(c: any) {
+  if (!c) return null;
+  return {
+    id: String(c.id),
+    villageId: c.villageId ? String(c.villageId) : undefined,
+    slug: c.slug,
+    name: c.name,
+    nameHindi: c.nameHindi || '',
+    nameKey: c.nameKey || undefined,
+    overview: c.overview || '',
+    overviewHindi: c.overviewHindi || '',
+    overviewKey: c.overviewKey || undefined,
+    icon: c.icon || 'GraduationCap',
+    displayOrder: c.displayOrder ?? 0,
+    status: c.status,
+    metadata: c.metadata || undefined,
+    ...(c.resourceCount !== undefined ? { resourceCount: Number(c.resourceCount) } : {}),
+    ...(c.resources ? { resources: c.resources.map(formatEducationResource) } : {}),
+    createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : undefined,
+    updatedAt: c.updatedAt ? new Date(c.updatedAt).toISOString() : undefined,
+  };
+}
+
+/**
+ * Transformer: Education Enquiry Model -> Standardized DTO
+ */
+export function formatEducationEnquiry(e: any) {
+  if (!e) return null;
+  return {
+    id: String(e.id),
+    villageId: e.villageId ? String(e.villageId) : undefined,
+    resourceId: e.resourceId ? String(e.resourceId) : undefined,
+    categoryId: e.categoryId ? String(e.categoryId) : undefined,
+    userId: e.userId ? String(e.userId) : undefined,
+    name: e.name,
+    mobile: e.mobile,
+    email: e.email || '',
+    studentClass: e.studentClass || '',
+    message: e.message,
+    status: e.status,
+    assignedTo: e.assignedTo ? String(e.assignedTo) : undefined,
+    response: e.response || '',
+    resolvedAt: e.resolvedAt ? new Date(e.resolvedAt).toISOString() : undefined,
+    createdAt: e.createdAt ? new Date(e.createdAt).toISOString() : undefined,
+    updatedAt: e.updatedAt ? new Date(e.updatedAt).toISOString() : undefined,
+  };
+}
+
+/**
  * Transformer: Group Message Model -> Standardized DTO
  */
 export function formatGroupMessage(gm: any) {
