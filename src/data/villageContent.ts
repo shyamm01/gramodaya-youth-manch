@@ -37,6 +37,7 @@ export interface SocialWorkSeed {
 
 export interface ComplaintSeed {
   title: string;
+  titleHindi: string;
   category:
     | 'Water'
     | 'Road'
@@ -51,7 +52,13 @@ export interface ComplaintSeed {
     | 'Government Service'
     | 'Other';
   description: string;
+  descriptionHindi: string;
   location: string;
+  locationHindi: string;
+  ward?: string;
+  wardHindi?: string;
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  photoUrl?: string;
   reporterName: string;
   reporterMobile: string;
   status: 'NEW' | 'ACTION IN PROGRESS' | 'RESOLVED';
@@ -150,67 +157,115 @@ export const SOCIAL_WORK_SEEDS: SocialWorkSeed[] = [
 
 export const COMPLAINT_SEEDS: ComplaintSeed[] = [
   {
-    title: 'हैंडपंप से गंदा पानी आ रहा है',
+    title: 'Contaminated muddy water from public handpump',
+    titleHindi: 'हैंडपंप से गंदा पानी आ रहा है',
     category: 'Water',
+    priority: 'urgent',
+    photoUrl: 'https://images.unsplash.com/photo-1541888946425-d0fbb18086f6?w=800&auto=format&fit=crop&q=80',
     description:
+      'The public handpump in the Eastern Tola has been discharging muddy and unpotable water for several days. As a result, local families are forced to fetch clean drinking water from distant sources. A broken platform foundation is likely allowing surface runoff to seep inside. Immediate inspection and repair or re-boring is required.',
+    descriptionHindi:
       'पूर्वी टोले के हैंडपंप से कुछ दिनों से मटमैला पानी निकल रहा है, जिससे आसपास के परिवारों को पीने का पानी दूर से लाना पड़ रहा है। संभवतः प्लेटफॉर्म टूटा होने के कारण ऊपर का पानी भीतर जा रहा है। मरम्मत अथवा बोरिंग की जांच आवश्यक है।',
-    location: 'पूर्वी टोला',
-    reporterName: 'ग्रामवासी',
+    location: 'Eastern Tola',
+    locationHindi: 'पूर्वी टोला',
+    ward: 'Ward 3',
+    wardHindi: 'वार्ड 3',
+    reporterName: 'Village Resident',
     reporterMobile: HELPLINE,
     status: 'ACTION IN PROGRESS',
     daysAgo: 4,
   },
   {
-    title: 'मुख्य मार्ग पर स्ट्रीट लाइट बंद',
+    title: 'Main road streetlights non-functional for weeks',
+    titleHindi: 'मुख्य मार्ग पर स्ट्रीट लाइट बंद',
     category: 'Electricity',
+    priority: 'high',
+    photoUrl: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=800&auto=format&fit=crop&q=80',
     description:
+      'Four solar street lights installed between the Panchayat Bhavan and the Primary School have been non-functional for multiple weeks. After dusk, this key stretch becomes completely dark, posing safety risks for school girls, commuters, and elderly villagers.',
+    descriptionHindi:
       'पंचायत भवन से विद्यालय तक के मार्ग पर लगी चार स्ट्रीट लाइटें कई सप्ताह से बंद हैं। संध्या के बाद यह मार्ग पूर्णतः अंधेरे में रहता है, जिससे छात्राओं एवं वरिष्ठ नागरिकों के आवागमन में कठिनाई होती है।',
-    location: 'मुख्य मार्ग',
-    reporterName: 'ग्रामवासी',
+    location: 'Main Road',
+    locationHindi: 'मुख्य मार्ग',
+    ward: 'Ward 1',
+    wardHindi: 'वार्ड 1',
+    reporterName: 'Village Resident',
     reporterMobile: HELPLINE,
     status: 'NEW',
     daysAgo: 2,
   },
   {
-    title: 'नाली का पानी मार्ग पर बह रहा है',
+    title: 'Drainage water overflowing onto village pathway',
+    titleHindi: 'नाली का पानी मार्ग पर बह रहा है',
     category: 'Sanitation',
+    priority: 'high',
+    photoUrl: 'https://images.unsplash.com/photo-1516738901171-8eb4fc13bd20?w=800&auto=format&fit=crop&q=80',
     description:
+      'A major blockage and broken wall in the southern lane drainage channel is causing filthy wastewater to flood directly onto the road. This has created a severe stench and increased mosquito breeding. Desilting and mason repairs are urgently requested.',
+    descriptionHindi:
       'दक्षिणी टोले में नाली अवरुद्ध होने के कारण गंदा पानी मार्ग पर फैल रहा है, जिससे दुर्गंध एवं मच्छरों की समस्या बढ़ गई है। नाली की सफाई तथा जहां वह टूटी है वहां मरम्मत अपेक्षित है।',
-    location: 'दक्षिणी टोला',
-    reporterName: 'ग्रामवासी',
+    location: 'Southern Tola',
+    locationHindi: 'दक्षिणी टोला',
+    ward: 'Ward 4',
+    wardHindi: 'वार्ड 4',
+    reporterName: 'Village Resident',
     reporterMobile: HELPLINE,
     status: 'NEW',
     daysAgo: 1,
   },
   {
-    title: 'विद्यालय में शिक्षक की अनुपस्थिति',
+    title: 'Continuous teacher absence in Primary School classes 4 and 5',
+    titleHindi: 'विद्यालय में शिक्षक की अनुपस्थिति',
     category: 'Education',
+    priority: 'medium',
+    photoUrl: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=800&auto=format&fit=crop&q=80',
     description:
+      'The assigned teacher for grades 4 and 5 at the Primary School has been absent without notice for several consecutive days, forcing students of both classes to sit together in a single room. We request the chapter to escalate this matter to the Block Education Officer (BEO).',
+    descriptionHindi:
       'प्राथमिक विद्यालय में कक्षा चार एवं पांच के लिए नियुक्त शिक्षक कई दिनों से अनुपस्थित हैं, जिससे दोनों कक्षाएं एक साथ बैठाई जा रही हैं। खंड शिक्षा अधिकारी तक बात पहुंचाई जाए, यह अनुरोध है।',
-    location: 'प्राथमिक विद्यालय',
-    reporterName: 'अभिभावक',
+    location: 'Primary School Campus',
+    locationHindi: 'प्राथमिक विद्यालय',
+    ward: 'Ward 2',
+    wardHindi: 'वार्ड 2',
+    reporterName: 'Parent Group',
     reporterMobile: HELPLINE,
     status: 'ACTION IN PROGRESS',
     daysAgo: 9,
   },
   {
-    title: 'सामुदायिक शौचालय की सफाई नहीं हो रही',
+    title: 'Irregular maintenance and lack of water at Community Toilet',
+    titleHindi: 'सामुदायिक शौचालय की सफाई नहीं हो रही',
     category: 'Cleanliness',
+    priority: 'medium',
+    photoUrl: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=800&auto=format&fit=crop&q=80',
     description:
-      'सामुदायिक शौचालय की नियमित सफाई न होने से उसका उपयोग कठिन हो गया है तथा पानी की टंकी भी प्रायः खाली रहती है। सफाईकर्मी की नियुक्ति एवं जल आपूर्ति की व्यवस्था की जाए।',
-    location: 'सामुदायिक शौचालय',
-    reporterName: 'ग्रामवासी',
+      'Due to irregular cleaning and empty overhead water tanks, the community toilet complex had become unusable. Following GYM representation to the Gram Pradhan, a designated sanitation worker has been assigned and the water pump repaired.',
+    descriptionHindi:
+      'सामुदायिक शौचालय की नियमित सफाई न होने से उसका उपयोग कठिन हो गया था तथा पानी की टंकी भी प्रायः खाली रहती थी। ग्राम प्रधान से समन्वय के बाद सफाईकर्मी की नियमित ड्यूटी एवं जल आपूर्ति की व्यवस्था पूर्ण कर दी गई है।',
+    location: 'Community Toilet Complex',
+    locationHindi: 'सामुदायिक शौचालय',
+    ward: 'Ward 2',
+    wardHindi: 'वार्ड 2',
+    reporterName: 'Village Resident',
     reporterMobile: HELPLINE,
     status: 'RESOLVED',
     daysAgo: 21,
   },
   {
-    title: 'आवारा पशुओं से फसल की क्षति',
+    title: 'Stray cattle damaging standing crops at village border',
+    titleHindi: 'आवारा पशुओं से फसल की क्षति',
     category: 'Animal-related',
+    priority: 'high',
+    photoUrl: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=800&auto=format&fit=crop&q=80',
     description:
+      'Herds of stray cattle enter the agricultural fields along the village periphery during late night hours, inflicting heavy damage on standing wheat and vegetable crops. We collectively urge authorities to arrange transport to the nearby Gaushala shelter.',
+    descriptionHindi:
       'आवारा पशुओं के झुंड रात्रि में खेतों में घुसकर खड़ी फसल को क्षति पहुंचा रहे हैं। कई किसानों ने अलग-अलग शिकायत की है; गोवंश आश्रय स्थल तक इनकी व्यवस्था कराई जाए, यह सामूहिक अनुरोध है।',
-    location: 'ग्राम सीमा के खेत',
-    reporterName: 'किसान समूह',
+    location: 'Village Border Fields',
+    locationHindi: 'ग्राम सीमा के खेत',
+    ward: 'Ward 5',
+    wardHindi: 'वार्ड 5',
+    reporterName: 'Farmer Group',
     reporterMobile: HELPLINE,
     status: 'NEW',
     daysAgo: 6,

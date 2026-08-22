@@ -12,13 +12,13 @@
  * to every chapter at once. It seeds into the first village in the table.
  */
 import { getDb } from './index';
-import { announcements, complaints, socialWorks, villages } from './schema';
+import { announcements, complaints, complaintAttachments, socialWorks, villages } from './schema';
 import {
   ANNOUNCEMENT_SEEDS,
   COMPLAINT_SEEDS,
   SOCIAL_WORK_SEEDS,
 } from '../data/villageContent';
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, or } from 'drizzle-orm';
 
 /** Relative dates keep the seeded lists from looking abandoned over time. */
 function dateDaysAgo(days: number): string {
@@ -106,11 +106,18 @@ export async function seedVillageContent() {
     const values = {
       villageId,
       title: seed.title,
+      titleHindi: seed.titleHindi,
       category: seed.category,
+      priority: seed.priority || 'medium',
       description: seed.description,
+      descriptionHindi: seed.descriptionHindi,
       location: seed.location,
+      locationHindi: seed.locationHindi,
+      ward: seed.ward || null,
+      wardHindi: seed.wardHindi || null,
       reporterName: seed.reporterName,
       reporterMobile: seed.reporterMobile,
+      photoUrl: seed.photoUrl || null,
       status: seed.status,
       isActive: true,
       resolvedAt: seed.status === 'RESOLVED' ? new Date() : null,
@@ -119,17 +126,43 @@ export async function seedVillageContent() {
     const [existing] = await db
       .select({ id: complaints.id })
       .from(complaints)
-      .where(and(eq(complaints.villageId, villageId), eq(complaints.title, seed.title)))
+      .where(
+        and(
+          eq(complaints.villageId, villageId),
+          or(eq(complaints.title, seed.title), eq(complaints.titleHindi, seed.titleHindi))
+        )
+      )
       .limit(1);
 
+    let complaintId: number;
     if (existing) {
+      complaintId = existing.id;
       await db
         .update(complaints)
         .set({ ...values, updatedAt: new Date() })
         .where(eq(complaints.id, existing.id));
     } else {
-      await db.insert(complaints).values(values);
+      const [inserted] = await db.insert(complaints).values(values).returning({ id: complaints.id });
+      complaintId = inserted.id;
     }
+
+    if (seed.photoUrl) {
+      const [existingAtt] = await db
+        .select({ id: complaintAttachments.id })
+        .from(complaintAttachments)
+        .where(and(eq(complaintAttachments.complaintId, complaintId), eq(complaintAttachments.url, seed.photoUrl)))
+        .limit(1);
+
+      if (!existingAtt) {
+        await db.insert(complaintAttachments).values({
+          complaintId,
+          type: 'photo',
+          url: seed.photoUrl,
+          caption: seed.title,
+        });
+      }
+    }
+
     complaintsSeeded++;
   }
 
