@@ -11,6 +11,7 @@ import {
   BarChart2,
   Activity,
   ArrowUpRight,
+  ArrowDownRight,
   Sparkles,
 } from 'lucide-react';
 
@@ -58,7 +59,7 @@ export const AdminMemberTrendChart: React.FC = () => {
         const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
         
         const count = scopedMembers.filter(m => m.createdAt && m.createdAt.startsWith(dateStr)).length;
-        days.push({ label, rawDate: dateStr, count, baseline: Math.max(1, count + (i % 2 === 0 ? 2 : 1)) });
+        days.push({ label, rawDate: dateStr, count });
       }
       return days;
     }
@@ -71,9 +72,18 @@ export const AdminMemberTrendChart: React.FC = () => {
         const dateStr = d.toISOString().split('T')[0];
         const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-        const count = scopedMembers.filter(m => m.createdAt && m.createdAt.startsWith(dateStr.substring(0, 7))).length;
-        const simulatedAdds = Math.max(1, (count % 7) + (30 - i) % 4 + 1);
-        points.push({ label, rawDate: dateStr, count: simulatedAdds, baseline: simulatedAdds * 2 });
+        // Registrations in the three days this point stands for. The previous
+        // version derived a number arithmetically from the loop index and
+        // showed it as real onboarding data.
+        const windowStart = new Date(d);
+        const windowEnd = new Date(d);
+        windowEnd.setDate(windowEnd.getDate() + 3);
+        const count = scopedMembers.filter((m) => {
+          if (!m.createdAt) return false;
+          const created = new Date(m.createdAt);
+          return created >= windowStart && created < windowEnd;
+        }).length;
+        points.push({ label, rawDate: dateStr, count });
       }
       return points;
     }
@@ -88,15 +98,18 @@ export const AdminMemberTrendChart: React.FC = () => {
       const yearMonth = `${year}-${month}`;
       const label = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
 
-      // Count actual members registered in that month
-      const actualCount = scopedMembers.filter(m => m.createdAt && m.createdAt.startsWith(yearMonth)).length;
-      // Provide realistic minimums for clear visualization
-      const displayCount = Math.max(actualCount, actualCount === 0 ? (i === 0 ? scopedMembers.length : Math.max(1, Math.round(scopedMembers.length / (i + 1)))) : actualCount);
+      // Members actually registered in that month. A month with no signups
+      // plots as zero: the chart used to substitute an invented figure for
+      // empty months "for clear visualization", which made one member read as
+      // six registrations and a rising trend on the admin dashboard.
+      const actualCount = scopedMembers.filter(
+        (m) => m.createdAt && m.createdAt.startsWith(yearMonth)
+      ).length;
 
       months.push({
         label,
         rawDate: yearMonth,
-        count: displayCount,
+        count: actualCount,
         cumulative: 0,
       });
     }
@@ -112,6 +125,19 @@ export const AdminMemberTrendChart: React.FC = () => {
   // Derived Trend Metrics
   const totalAddedInPeriod = useMemo(() => {
     return trendData.reduce((acc, curr) => acc + curr.count, 0);
+  }, [trendData]);
+
+  /**
+   * Change between the last two buckets, or null when there is nothing to
+   * compare against — a fresh chapter has no previous period, and the badge
+   * used to state a hardcoded "+18.4%" regardless of the data.
+   */
+  const growthPercent = useMemo(() => {
+    if (trendData.length < 2) return null;
+    const latest = trendData[trendData.length - 1].count;
+    const previous = trendData[trendData.length - 2].count;
+    if (previous === 0) return null;
+    return ((latest - previous) / previous) * 100;
   }, [trendData]);
 
   const maxVal = useMemo(() => {
@@ -171,10 +197,23 @@ export const AdminMemberTrendChart: React.FC = () => {
             <div>
               <h4 className="text-base font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                 <span>Member Registration & Growth Trend</span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-[10px] font-extrabold flex items-center gap-1">
-                  <ArrowUpRight className="w-3 h-3" />
-                  +18.4%
-                </span>
+                {growthPercent !== null && (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold flex items-center gap-1 ${
+                      growthPercent >= 0
+                        ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300'
+                        : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300'
+                    }`}
+                  >
+                    {growthPercent >= 0 ? (
+                      <ArrowUpRight className="w-3 h-3" />
+                    ) : (
+                      <ArrowDownRight className="w-3 h-3" />
+                    )}
+                    {growthPercent >= 0 ? '+' : ''}
+                    {growthPercent.toFixed(1)}%
+                  </span>
+                )}
               </h4>
               <p className="text-xs text-slate-500 dark:text-zinc-400">
                 Monthly onboarding velocity, active member acquisition, and retention

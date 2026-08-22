@@ -610,6 +610,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ['/api/social-work', 'socialWorks', (rows) => setSocialWorks(rows as SocialWork[])],
       ['/api/public-info', 'publicInfos', (rows) => setPublicInfos(rows as PublicInfo[])],
       ['/api/announcements', 'announcements', (rows) => setAnnouncements(rows as Announcement[])],
+      // fetchMembers() exists and is exported for on-demand refreshes, but
+      // nothing ever called it on load, so the directory was empty too.
+      ['/api/members', 'members', (rows) => setMembers(rows as Member[])],
     ];
 
     await Promise.all(

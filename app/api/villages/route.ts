@@ -2,11 +2,32 @@ import { validateRequestBody, villageCreateSchema } from '@/src/lib/validations'
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore, logAuditAction } from '@/src/lib/serverStore';
 import { requireAuth } from '@/src/lib/jwtAuth';
+import { getDb } from '@/src/db';
+import * as schema from '@/src/db/schema';
+import { asc, eq } from 'drizzle-orm';
 
 export async function GET() {
   try {
-    const store = loadStore();
-    return NextResponse.json({ success: true, villages: store.villages || [] });
+    // Read from the database, not the JSON store. The store carried a legacy
+    // row with a slug-style id ("vil_rasoolpur") while every member, event and
+    // grievance references the numeric village id — so lookups like
+    // villages.find(v => v.id === member.villageId) never matched, and the
+    // members table showed "Main Unit" for everyone.
+    const db = getDb();
+    if (!db) {
+      return NextResponse.json({ success: true, villages: [] });
+    }
+
+    const rows = await db.select().from(schema.villages).orderBy(asc(schema.villages.id));
+
+    return NextResponse.json({
+      success: true,
+      villages: rows.map((v) => ({
+        ...v,
+        id: String(v.id),
+        gramPanchayatId: v.gramPanchayatId ? String(v.gramPanchayatId) : undefined,
+      })),
+    });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Error fetching villages' }, { status: 500 });
   }
@@ -47,33 +68,46 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Village name in English and Hindi is required.' }, { status: 400 });
     }
 
-    const store = loadStore();
-    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const newVillage = {
-      id: `vil_${Date.now()}`,
-      slug: slug || `vil-${Date.now()}`,
-      name: name.trim(),
-      nameHindi: nameHindi.trim(),
-      gramPanchayatName: gramPanchayatName ? gramPanchayatName.trim() : '',
-      gramPanchayatNameHindi: gramPanchayatNameHindi ? gramPanchayatNameHindi.trim() : '',
-      districtName: districtName ? districtName.trim() : 'Hardoi',
-      districtNameHindi: districtNameHindi ? districtNameHindi.trim() : 'हरदोई',
-      stateName: stateName ? stateName.trim() : 'Uttar Pradesh',
-      stateNameHindi: stateNameHindi ? stateNameHindi.trim() : 'उत्तर प्रदेश',
-      blockName: blockName ? blockName.trim() : 'Hardoi',
-      blockNameHindi: blockNameHindi ? blockNameHindi.trim() : 'हरदोई',
-      pincode: pincode ? pincode.trim() : '241125',
-      postOffice: postOffice ? postOffice.trim() : 'Bahera',
-      orgName: orgName ? orgName.trim() : `Gramodaya Youth Manch ${name}`,
-      orgNameHindi: orgNameHindi ? orgNameHindi.trim() : `ग्रामोदय यूथ मंच ${nameHindi}`,
-      sloganHindi: sloganHindi ? sloganHindi.trim() : 'सशक्त युवा, समर्थ ग्राम',
-      taglineHindi: taglineHindi ? taglineHindi.trim() : 'एक कदम समग्र ग्राम विकास की ओर',
-      isActive: true,
-    };
+    const db = getDb();
+    if (!db) {
+      return NextResponse.json({ error: 'Database connection unavailable.' }, { status: 500 });
+    }
 
-    if (!store.villages) store.villages = [];
-    store.villages.push(newVillage);
-    saveStore(store);
+    // Slugs are unique in the schema, so a repeated village name would fail the
+    // insert on a constraint rather than telling the admin what happened.
+    const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const slug = baseSlug || `village-${Date.now()}`;
+    const [clash] = await db
+      .select({ id: schema.villages.id })
+      .from(schema.villages)
+      .where(eq(schema.villages.slug, slug))
+      .limit(1);
+    if (clash) {
+      return NextResponse.json(
+        { error: `A village with the slug "${slug}" already exists.` },
+        { status: 409 }
+      );
+    }
+
+    const [inserted] = await db
+      .insert(schema.villages)
+      .values({
+        slug,
+        name: name.trim(),
+        nameHindi: nameHindi.trim(),
+        blockName: blockName ? blockName.trim() : null,
+        blockNameHindi: blockNameHindi ? blockNameHindi.trim() : null,
+        pincode: pincode ? pincode.trim() : null,
+        postOffice: postOffice ? postOffice.trim() : null,
+        orgName: orgName ? orgName.trim() : `Gramodaya Youth Manch ${name}`,
+        orgNameHindi: orgNameHindi ? orgNameHindi.trim() : `ग्रामोदय यूथ मंच ${nameHindi}`,
+        sloganHindi: sloganHindi ? sloganHindi.trim() : 'सशक्त युवा, समर्थ ग्राम',
+        taglineHindi: taglineHindi ? taglineHindi.trim() : 'एक कदम समग्र ग्राम विकास की ओर',
+        isActive: true,
+      })
+      .returning();
+
+    const newVillage = { ...inserted, id: String(inserted.id) };
 
     logAuditAction(
       `Added New Village: ${newVillage.nameHindi} (${newVillage.name})`,
