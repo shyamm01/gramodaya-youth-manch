@@ -13,6 +13,7 @@ export { EldersSection } from './EldersSection';
 export { LiveChatSection } from './LiveChatSection';
 export { EducationSection } from './EducationSection';
 export { EducationCategorySection } from './EducationCategorySection';
+export { EducationResourceSection } from './EducationResourceSection';
 export { EmploymentSection } from './EmploymentSection';
 export { EmploymentCategorySection } from './EmploymentCategorySection';
 export { VisionMissionSection } from './VisionMissionSection';

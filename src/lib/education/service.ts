@@ -523,13 +523,17 @@ export async function countResources(filters: ResourceFilters = {}) {
 
 export async function getResource(
   idOrSlug: string,
-  opts: EducationScopeOptions & { includeLinks?: boolean } = {}
+  opts: EducationScopeOptions & { includeLinks?: boolean; categoryId?: number } = {}
 ) {
   const db = getEducationDb();
   const conditions = [
     isNumericId(idOrSlug)
       ? eq(schema.educationResources.id, Number(idOrSlug))
       : eq(schema.educationResources.slug, idOrSlug),
+    // Slugs are unique per category, so /education/<category>/<resource> must
+    // pin the lookup to that category — two categories may each hold a row
+    // slugged "diksha", and only one of them belongs on that URL.
+    opts.categoryId ? eq(schema.educationResources.categoryId, opts.categoryId) : undefined,
     statusCondition(schema.educationResources.status, opts.status),
   ].filter(Boolean) as SQL[];
 
@@ -537,8 +541,8 @@ export async function getResource(
     .select()
     .from(schema.educationResources)
     .where(and(...conditions))
-    // Resource slugs are unique per category, so a slug lookup can be
-    // ambiguous across categories — resolve it deterministically.
+    // An unscoped slug lookup can still match more than one row — resolve it
+    // deterministically rather than depending on the scan order.
     .orderBy(asc(schema.educationResources.id))
     .limit(1);
 
@@ -606,11 +610,17 @@ function resourceContentPatch(values: Record<string, any>) {
     'eligibility',
     'benefits',
     'howToApply',
+    'eligibilityHindi',
+    'benefitsHindi',
+    'howToApplyHindi',
     'provider',
+    'providerHindi',
     'externalUrl',
     'photoUrl',
     'contactName',
     'contactMobile',
+    'ctaLabel',
+    'ctaLabelHindi',
   ];
   for (const field of textFields) {
     if (values[field] !== undefined) {
@@ -620,7 +630,7 @@ function resourceContentPatch(values: Record<string, any>) {
   for (const field of ['scope', 'type', 'status']) {
     if (values[field] !== undefined) patch[field] = values[field];
   }
-  for (const field of ['documentsRequired', 'tags', 'metadata']) {
+  for (const field of ['documentsRequired', 'documentsRequiredHindi', 'tags', 'metadata']) {
     if (values[field] !== undefined) patch[field] = values[field];
   }
   if (values.displayOrder !== undefined) patch.displayOrder = values.displayOrder;

@@ -383,14 +383,22 @@ export interface EducationResource {
   benefits?: string;
   howToApply?: string;
   documentsRequired?: string[];
+  eligibilityHindi?: string;
+  benefitsHindi?: string;
+  howToApplyHindi?: string;
+  documentsRequiredHindi?: string[];
   tags?: string[];
   provider?: string;
+  providerHindi?: string;
   externalUrl?: string;
   photoUrl?: string;
   contactName?: string;
   contactMobile?: string;
   startDate?: string;
   endDate?: string;
+  /** Label for the card's action button; empty falls back to "Learn more". */
+  ctaLabel?: string;
+  ctaLabelHindi?: string;
   displayOrder: number;
   metadata?: Record<string, any>;
   links?: EducationResourceLink[];

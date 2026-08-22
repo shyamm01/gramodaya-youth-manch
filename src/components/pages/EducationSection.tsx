@@ -17,6 +17,7 @@ import { DynamicIcon } from "../common";
 import {
   categoryName,
   fetchEducationTree,
+  resourceCtaLabel,
   resourceDescription,
   resourceTitle,
 } from "@/src/lib/education/client";
@@ -158,9 +159,12 @@ export const EducationSection: React.FC = () => {
                           <DynamicIcon name={item.icon} className="size-5 text-white" />
                         </div>
 
-                        <h3 className="min-w-0 text-xs sm:text-sm font-bold text-[#2C3327] dark:text-white line-clamp-2">
+                        <Link
+                          href={`/education/${category.slug}/${item.slug}`}
+                          className="min-w-0 text-xs sm:text-sm font-bold text-[#2C3327] dark:text-white line-clamp-2 hover:text-emerald-700 dark:hover:text-emerald-400 transition"
+                        >
                           {resourceTitle(t, lang, item)}
-                        </h3>
+                        </Link>
                       </div>
 
                       <p className="text-[11px] sm:text-xs text-[#8C8675] dark:text-slate-400 leading-relaxed line-clamp-2">
@@ -168,7 +172,7 @@ export const EducationSection: React.FC = () => {
                       </p>
 
                       <Link
-                        href={`/education/${category.slug}`}
+                        href={`/education/${category.slug}/${item.slug}`}
                         className="w-full mt-auto"
                       >
                         <Button
@@ -176,7 +180,7 @@ export const EducationSection: React.FC = () => {
                           size="sm"
                           className="w-full rounded-xl font-bold text-[11px] cursor-pointer"
                         >
-                          <span>{t("common.learnMore")}</span>
+                          <span>{resourceCtaLabel(t, lang, item)}</span>
                           <ArrowRight className="w-3.5 h-3.5 ml-1" />
                         </Button>
                       </Link>

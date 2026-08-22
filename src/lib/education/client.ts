@@ -80,6 +80,37 @@ export function fetchEducationCategory(slug: string): Promise<EducationCategory 
   });
 }
 
+/**
+ * GET /api/education/categories/[slug]/resources/[resourceSlug] — one scheme
+ * plus the category around it, which is what /education/<cat>/<res> renders.
+ *
+ * Returns null when either half of the URL does not resolve, so the page can
+ * show "not found" instead of an error the visitor cannot act on.
+ */
+export function fetchEducationResource(
+  categorySlug: string,
+  resourceSlug: string
+): Promise<{ category: EducationCategory; resource: EducationResource } | null> {
+  return dedupe(`resource:${categorySlug}/${resourceSlug}`, async () => {
+    const res = await fetch(
+      `/api/education/categories/${encodeURIComponent(categorySlug)}/resources/${encodeURIComponent(
+        resourceSlug
+      )}`,
+      { credentials: 'include' }
+    );
+    if (res.status === 404) return null;
+    if (!res.ok) throw await readError(res, 'Education resource request failed');
+    const data = await res.json();
+    if (!data.success || !data.resource || !data.category) {
+      throw new Error(data.error || 'Malformed resource response');
+    }
+    return {
+      category: data.category as EducationCategory,
+      resource: data.resource as EducationResource,
+    };
+  });
+}
+
 /** POST /api/education/enquiries — public, no login required. */
 export async function submitEducationEnquiry(
   payload: EnquiryPayload
@@ -137,9 +168,48 @@ export const categoryOverview = (t: Translate, lang: string, c: EducationCategor
 export const resourceTitle = (t: Translate, lang: string, r: EducationResource) =>
   localizeEducationText(t, lang, { key: r.titleKey, text: r.title, textHindi: r.titleHindi });
 
+/**
+ * Label for the card's action button.
+ *
+ * Stored per resource so an admin can say "Apply now" on a scheme with an open
+ * window and "Check eligibility" on one that needs a test first. A row that
+ * leaves it blank — which is every row until someone sets it — falls back to
+ * the UI's own translated "Learn more", so the button is never empty and never
+ * stuck in the wrong language.
+ */
+export const resourceCtaLabel = (t: Translate, lang: string, r: EducationResource) =>
+  localizeEducationText(t, lang, { text: r.ctaLabel, textHindi: r.ctaLabelHindi }) ||
+  t('education.card.cta');
+
 export const resourceDescription = (t: Translate, lang: string, r: EducationResource) =>
   localizeEducationText(t, lang, {
     key: r.descriptionKey,
     text: r.description,
     textHindi: r.descriptionHindi,
   });
+
+/**
+ * The long-form detail fields, resolved for the active language.
+ *
+ * These carry no i18n key — they are database content rather than shipped
+ * strings — so they read the Hindi column when it exists and fall back to the
+ * English one, which is what an admin-written row will have.
+ */
+export const resourceEligibility = (t: Translate, lang: string, r: EducationResource) =>
+  localizeEducationText(t, lang, { text: r.eligibility, textHindi: r.eligibilityHindi });
+
+export const resourceBenefits = (t: Translate, lang: string, r: EducationResource) =>
+  localizeEducationText(t, lang, { text: r.benefits, textHindi: r.benefitsHindi });
+
+export const resourceHowToApply = (t: Translate, lang: string, r: EducationResource) =>
+  localizeEducationText(t, lang, { text: r.howToApply, textHindi: r.howToApplyHindi });
+
+export const resourceProvider = (t: Translate, lang: string, r: EducationResource) =>
+  localizeEducationText(t, lang, { text: r.provider, textHindi: r.providerHindi });
+
+/** Document list for the active language, falling back item-for-item is not
+ *  possible — the two lists are independent, so the whole list switches. */
+export const resourceDocuments = (lang: string, r: EducationResource): string[] => {
+  const preferred = lang === 'en' ? r.documentsRequired : r.documentsRequiredHindi;
+  return preferred?.length ? preferred : r.documentsRequired || r.documentsRequiredHindi || [];
+};

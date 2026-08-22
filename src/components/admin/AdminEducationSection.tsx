@@ -169,9 +169,16 @@ interface ResourceFormState {
   benefits: string;
   howToApply: string;
   documentsRequired: string;
+  eligibilityHindi: string;
+  benefitsHindi: string;
+  howToApplyHindi: string;
+  documentsRequiredHindi: string;
+  providerHindi: string;
   tags: string;
   contactName: string;
   contactMobile: string;
+  ctaLabel: string;
+  ctaLabelHindi: string;
   startDate: string;
   endDate: string;
   displayOrder: string;
@@ -208,9 +215,16 @@ const emptyResourceForm = (categoryId = ''): ResourceFormState => ({
   benefits: '',
   howToApply: '',
   documentsRequired: '',
+  eligibilityHindi: '',
+  benefitsHindi: '',
+  howToApplyHindi: '',
+  documentsRequiredHindi: '',
+  providerHindi: '',
   tags: '',
   contactName: '',
   contactMobile: '',
+  ctaLabel: '',
+  ctaLabelHindi: '',
   startDate: '',
   endDate: '',
   displayOrder: '0',
@@ -397,9 +411,16 @@ export const AdminEducationSection: React.FC = () => {
       benefits: resource.benefits || '',
       howToApply: resource.howToApply || '',
       documentsRequired: (resource.documentsRequired || []).join(', '),
+      eligibilityHindi: resource.eligibilityHindi || '',
+      benefitsHindi: resource.benefitsHindi || '',
+      howToApplyHindi: resource.howToApplyHindi || '',
+      documentsRequiredHindi: (resource.documentsRequiredHindi || []).join(', '),
+      providerHindi: resource.providerHindi || '',
       tags: (resource.tags || []).join(', '),
       contactName: resource.contactName || '',
       contactMobile: resource.contactMobile || '',
+      ctaLabel: resource.ctaLabel || '',
+      ctaLabelHindi: resource.ctaLabelHindi || '',
       startDate: resource.startDate || '',
       endDate: resource.endDate || '',
       displayOrder: String(resource.displayOrder ?? 0),
@@ -436,9 +457,18 @@ export const AdminEducationSection: React.FC = () => {
       benefits: resourceForm.benefits.trim() || undefined,
       howToApply: resourceForm.howToApply.trim() || undefined,
       documentsRequired: splitList(resourceForm.documentsRequired),
+      eligibilityHindi: resourceForm.eligibilityHindi.trim() || undefined,
+      benefitsHindi: resourceForm.benefitsHindi.trim() || undefined,
+      howToApplyHindi: resourceForm.howToApplyHindi.trim() || undefined,
+      documentsRequiredHindi: splitList(resourceForm.documentsRequiredHindi),
+      providerHindi: resourceForm.providerHindi.trim() || undefined,
       tags: splitList(resourceForm.tags),
       contactName: resourceForm.contactName.trim() || undefined,
       contactMobile: resourceForm.contactMobile.trim(),
+      // Sent even when blank: an empty value is how an admin puts the button
+      // back to the default "Learn more" label.
+      ctaLabel: resourceForm.ctaLabel.trim(),
+      ctaLabelHindi: resourceForm.ctaLabelHindi.trim(),
       startDate: resourceForm.startDate,
       endDate: resourceForm.endDate,
       displayOrder: Number(resourceForm.displayOrder) || 0,
@@ -1178,7 +1208,43 @@ export const AdminEducationSection: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className={labelClass}>Eligibility (Hindi)</label>
+                <textarea
+                  rows={2}
+                  value={resourceForm.eligibilityHindi}
+                  onChange={(e) =>
+                    setResourceForm({ ...resourceForm, eligibilityHindi: e.target.value })
+                  }
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Benefits (Hindi)</label>
+                <textarea
+                  rows={2}
+                  value={resourceForm.benefitsHindi}
+                  onChange={(e) =>
+                    setResourceForm({ ...resourceForm, benefitsHindi: e.target.value })
+                  }
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className={labelClass}>How to apply (Hindi)</label>
+                <textarea
+                  rows={2}
+                  value={resourceForm.howToApplyHindi}
+                  onChange={(e) =>
+                    setResourceForm({ ...resourceForm, howToApplyHindi: e.target.value })
+                  }
+                  className={inputClass}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className={labelClass}>Documents required (comma separated)</label>
                 <input
@@ -1188,6 +1254,17 @@ export const AdminEducationSection: React.FC = () => {
                   }
                   className={inputClass}
                   placeholder="Aadhaar, Bank passbook, Marksheet"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Documents required (Hindi)</label>
+                <input
+                  value={resourceForm.documentsRequiredHindi}
+                  onChange={(e) =>
+                    setResourceForm({ ...resourceForm, documentsRequiredHindi: e.target.value })
+                  }
+                  className={inputClass}
+                  placeholder="आधार, बैंक पासबुक, अंकतालिका"
                 />
               </div>
               <div>
@@ -1212,6 +1289,15 @@ export const AdminEducationSection: React.FC = () => {
                 />
               </div>
               <div>
+                <label className={labelClass}>Provider (Hindi)</label>
+                <input
+                  value={resourceForm.providerHindi}
+                  onChange={(e) => setResourceForm({ ...resourceForm, providerHindi: e.target.value })}
+                  className={inputClass}
+                  placeholder="शिक्षा मंत्रालय"
+                />
+              </div>
+              <div>
                 <label className={labelClass}>Official URL</label>
                 <input
                   value={resourceForm.externalUrl}
@@ -1228,6 +1314,33 @@ export const AdminEducationSection: React.FC = () => {
                   className={`${inputClass} font-mono`}
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>Button label</label>
+                <input
+                  value={resourceForm.ctaLabel}
+                  onChange={(e) => setResourceForm({ ...resourceForm, ctaLabel: e.target.value })}
+                  className={inputClass}
+                  maxLength={40}
+                  placeholder="Learn more"
+                />
+              </div>
+              <div>
+                <label className={labelClass}>Button label (Hindi)</label>
+                <input
+                  value={resourceForm.ctaLabelHindi}
+                  onChange={(e) => setResourceForm({ ...resourceForm, ctaLabelHindi: e.target.value })}
+                  className={inputClass}
+                  maxLength={40}
+                  placeholder="अधिक जानें"
+                />
+              </div>
+              <p className="sm:col-span-2 text-[10px] text-slate-500 dark:text-zinc-400 -mt-1">
+                Shown on the scheme card on the public pages. Leave both blank to keep the default
+                &ldquo;Learn more&rdquo;, which already translates itself.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

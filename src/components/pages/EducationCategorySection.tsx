@@ -21,6 +21,7 @@ import {
   Gift,
   ListChecks,
   CalendarClock,
+  MessageCircleQuestion,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useApp } from '../../context/AppContext';
@@ -31,7 +32,12 @@ import {
   categoryName,
   categoryOverview,
   fetchEducationCategory,
+  resourceBenefits,
+  resourceCtaLabel,
   resourceDescription,
+  resourceDocuments,
+  resourceEligibility,
+  resourceHowToApply,
   resourceTitle,
 } from '@/src/lib/education/client';
 import type { EducationCategory, EducationResource } from '@/src/types';
@@ -56,10 +62,14 @@ const DetailRow: React.FC<{
 
 const SchemeCard: React.FC<{
   item: EducationResource;
+  categorySlug: string;
   onAsk: (item: EducationResource) => void;
-}> = ({ item, onAsk }) => {
+}> = ({ item, categorySlug, onAsk }) => {
   const { t, lang } = useApp();
-  const documents = item.documentsRequired || [];
+  const documents = resourceDocuments(lang, item);
+  const eligibility = resourceEligibility(t, lang, item);
+  const benefits = resourceBenefits(t, lang, item);
+  const howToApply = resourceHowToApply(t, lang, item);
   const links = item.links || [];
 
   return (
@@ -69,31 +79,34 @@ const SchemeCard: React.FC<{
           <DynamicIcon name={item.icon} className="size-5 text-white" />
         </div>
 
-        <h3 className="min-w-0 text-xs sm:text-sm font-bold text-[#2C3327] dark:text-white line-clamp-2">
+        <Link
+          href={`/education/${categorySlug}/${item.slug}`}
+          className="min-w-0 text-xs sm:text-sm font-bold text-[#2C3327] dark:text-white line-clamp-2 hover:text-emerald-700 dark:hover:text-emerald-400 transition"
+        >
           {resourceTitle(t, lang, item)}
-        </h3>
+        </Link>
       </div>
 
       <p className="text-[11px] sm:text-xs text-[#8C8675] dark:text-slate-400 leading-relaxed">
         {resourceDescription(t, lang, item)}
       </p>
 
-      {(item.eligibility || item.benefits || item.howToApply || documents.length > 0) && (
+      {(eligibility || benefits || howToApply || documents.length > 0) && (
         <div className="flex flex-col gap-2 pt-2 border-t border-[#EFEBE2] dark:border-slate-800/80">
           <DetailRow
             icon={<FileCheck2 className="w-3.5 h-3.5" />}
             label={t('education.detail.eligibility')}
-            value={item.eligibility}
+            value={eligibility}
           />
           <DetailRow
             icon={<Gift className="w-3.5 h-3.5" />}
             label={t('education.detail.benefits')}
-            value={item.benefits}
+            value={benefits}
           />
           <DetailRow
             icon={<ListChecks className="w-3.5 h-3.5" />}
             label={t('education.detail.howToApply')}
-            value={item.howToApply}
+            value={howToApply}
           />
           <DetailRow
             icon={<FileCheck2 className="w-3.5 h-3.5" />}
@@ -138,15 +151,28 @@ const SchemeCard: React.FC<{
         </div>
       )}
 
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => onAsk(item)}
-        className="w-full mt-auto rounded-xl font-bold text-[11px] cursor-pointer"
-      >
-        <span>{t('common.learnMore')}</span>
-        <ArrowRight className="w-3.5 h-3.5 ml-1" />
-      </Button>
+      <div className="mt-auto flex items-center gap-1.5">
+        <Link href={`/education/${categorySlug}/${item.slug}`} className="flex-1 min-w-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full rounded-xl font-bold text-[11px] cursor-pointer"
+          >
+            <span>{resourceCtaLabel(t, lang, item)}</span>
+            <ArrowRight className="w-3.5 h-3.5 ml-1" />
+          </Button>
+        </Link>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onAsk(item)}
+          title={t('education.enquiry.title')}
+          aria-label={t('education.enquiry.title')}
+          className="shrink-0 rounded-xl px-2 cursor-pointer"
+        >
+          <MessageCircleQuestion className="w-3.5 h-3.5" />
+        </Button>
+      </div>
     </Card>
   );
 };
@@ -154,9 +180,10 @@ const SchemeCard: React.FC<{
 const SchemeGroup: React.FC<{
   title: string;
   items: EducationResource[];
+  categorySlug: string;
   emptyLabel?: string;
   onAsk: (item: EducationResource) => void;
-}> = ({ title, items, emptyLabel, onAsk }) => (
+}> = ({ title, items, categorySlug, emptyLabel, onAsk }) => (
   <section className="w-full flex flex-col gap-3">
     <h2 className="text-sm sm:text-base font-black text-[#2C3327] dark:text-white px-1">
       {title}
@@ -169,7 +196,7 @@ const SchemeGroup: React.FC<{
     ) : (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {items.map((item) => (
-          <SchemeCard key={item.id} item={item} onAsk={onAsk} />
+          <SchemeCard key={item.id} item={item} categorySlug={categorySlug} onAsk={onAsk} />
         ))}
       </div>
     )}
@@ -313,12 +340,14 @@ export const EducationCategorySection: React.FC<{ slug: string }> = ({ slug }) =
         <SchemeGroup
           title={t('common.gramodayaSchemes')}
           items={gramodayaItems}
+          categorySlug={category.slug}
           emptyLabel={t('common.noGramodayaSchemes')}
           onAsk={setEnquiryFor}
         />
         <SchemeGroup
           title={t('common.governmentSchemes')}
           items={governmentItems}
+          categorySlug={category.slug}
           onAsk={setEnquiryFor}
         />
       </div>

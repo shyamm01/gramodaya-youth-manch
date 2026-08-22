@@ -602,14 +602,28 @@ export const educationResources = pgTable(
     benefits: text('benefits'),
     howToApply: text('how_to_apply'),
     documentsRequired: jsonb('documents_required').$type<string[]>(),
+    // Hindi twins for the long-form fields. The village site defaults to Hindi,
+    // so detail text that exists only in English would be the wrong language for
+    // most of its readers; null falls back to the English column.
+    eligibilityHindi: text('eligibility_hindi'),
+    benefitsHindi: text('benefits_hindi'),
+    howToApplyHindi: text('how_to_apply_hindi'),
+    documentsRequiredHindi: jsonb('documents_required_hindi').$type<string[]>(),
     tags: jsonb('tags').$type<string[]>(),
     provider: text('provider'),
+    providerHindi: text('provider_hindi'),
     externalUrl: text('external_url'),
     photoUrl: text('photo_url'),
     contactName: text('contact_name'),
     contactMobile: text('contact_mobile'),
     startDate: date('start_date'),
     endDate: date('end_date'),
+    // Label on the card's action button. Null means the UI keeps its own
+    // translated default ("Learn more"), so a row that says nothing about it
+    // reads correctly in both languages; set it per row to say something more
+    // specific ("Apply now", "Check eligibility").
+    ctaLabel: text('cta_label'),
+    ctaLabelHindi: text('cta_label_hindi'),
     displayOrder: integer('display_order').notNull().default(0),
     metadata: jsonb('metadata').$type<Record<string, any>>(),
     createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
