@@ -594,8 +594,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [authSession.token, currentMemberMobile]
   );
 
+  /**
+   * Pulls the content collections the admin panel renders from context.
+   *
+   * Each endpoint returns { success, <key>: [...] }. A failure on one must not
+   * take the others down with it — a village with no gallery is not a reason to
+   * leave the events list empty — so each result is applied independently.
+   */
+  const loadCollections = useCallback(async () => {
+    const sources: Array<[string, string, (rows: any[]) => void]> = [
+      ['/api/events', 'events', (rows) => setEvents(rows as EventItem[])],
+      ['/api/gallery', 'gallery', (rows) => setGallery(rows as GalleryItem[])],
+      ['/api/elders', 'elders', (rows) => setElders(rows as Elder[])],
+      ['/api/complaints', 'complaints', (rows) => setComplaints(rows as Complaint[])],
+      ['/api/social-work', 'socialWorks', (rows) => setSocialWorks(rows as SocialWork[])],
+      ['/api/public-info', 'publicInfos', (rows) => setPublicInfos(rows as PublicInfo[])],
+      ['/api/announcements', 'announcements', (rows) => setAnnouncements(rows as Announcement[])],
+    ];
+
+    await Promise.all(
+      sources.map(async ([url, key, apply]) => {
+        try {
+          const res = await authenticatedFetch(url, { credentials: 'include' });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data?.success && Array.isArray(data[key])) apply(data[key]);
+        } catch (e) {
+          console.warn(`Failed to load ${url}:`, e instanceof Error ? e.message : e);
+        }
+      })
+    );
+  }, [authenticatedFetch]);
+
   const refreshData = async (force = false, retryCount = 0) => {
     const now = Date.now();
+    // The throttle protects the bootstrap path from refetching on every render.
+    // Mutations pass force = true: a create the user just made has to appear
+    // now, not once a two-minute window happens to close.
     if (!force && lastDataFetchTimeRef.current > 0 && now - lastDataFetchTimeRef.current < 120000) {
       return;
     }
@@ -607,6 +642,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const [authData, villagesList] = await Promise.all([
         fetchAuthMeOnce(),
         fetchVillagesOnce(),
+        // Content collections. Until now refreshData fetched only the session
+        // and the village list, so events, gallery, elders, complaints, social
+        // works and public infos stayed at their initial [] for the lifetime of
+        // the app — every admin section rendered its empty state no matter what
+        // the database held. The public pages never showed it because they each
+        // fetch their own data directly.
+        loadCollections(),
       ]);
 
       if (authData?.user) {
@@ -725,7 +767,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || 'Failed to save config.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Network error.' };
@@ -744,7 +786,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       const data = await res.json();
-      await refreshData();
+      await refreshData(true);
       return data;
     } catch (e) {
       return { success: false, error: 'Connection test failed.' };
@@ -764,7 +806,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || 'Failed to disconnect.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Network error.' };
@@ -784,7 +826,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || 'Import failed.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true, message: data.message };
     } catch (e) {
       return { success: false, error: 'Network error during import.' };
@@ -796,7 +838,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const res = await authenticatedFetch('/api/data/reset', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || 'Reset failed.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true, message: data.message };
     } catch (e) {
       return { success: false, error: 'Network error during reset.' };
@@ -889,7 +931,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           email: data.admin.email || emailOrMobile,
         });
       }
-      await refreshData();
+      await refreshData(true);
       return { success: true, admin: data.admin };
     } catch (e) {
       return { success: false, error: 'सर्वर कनेक्शन त्रुटि।' };
@@ -970,7 +1012,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           member: data.member,
         };
       }
-      await refreshData();
+      await refreshData(true);
       return { success: true, member: data.member };
     } catch (e) {
       return { success: false, error: 'सर्वर से कनेक्ट करने में त्रुटि हुई।' };
@@ -988,7 +1030,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'active' }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1012,7 +1054,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!res.ok) {
         return { success: false, error: data.error || 'Failed to update member.' };
       }
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e.message || 'Server error.' };
@@ -1026,7 +1068,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     try {
       await authenticatedFetch(`/api/members/${id}`, { method: 'DELETE' });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1053,7 +1095,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (selectedIdCardMember && selectedIdCardMember.id === targetId) {
         setSelectedIdCardMember({ ...selectedIdCardMember, photoUrl });
       }
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1075,7 +1117,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const result = await res.json();
       if (!res.ok) return { success: false, error: result.error };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Failed to submit complaint.' };
@@ -1093,7 +1135,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1115,7 +1157,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           userMobile: currentMemberMobile,
         }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1137,7 +1179,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to edit complaint.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1162,7 +1204,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const result = await res.json().catch(() => ({}));
         return { success: false, error: result.error || 'Failed to submit social work.' };
       }
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1180,7 +1222,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1202,7 +1244,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           userMobile: currentMemberMobile,
         }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1224,7 +1266,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to edit social work.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1249,7 +1291,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const result = await res.json().catch(() => ({}));
         return { success: false, error: result.error || 'Failed to submit info.' };
       }
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1267,7 +1309,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1289,7 +1331,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           userMobile: currentMemberMobile,
         }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1311,7 +1353,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to edit public info.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1334,7 +1376,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to publish announcement.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1357,7 +1399,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to update announcement.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e.message || 'Server error.' };
@@ -1371,7 +1413,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     try {
       await authenticatedFetch(`/api/announcements/${id}`, { method: 'DELETE' });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1389,7 +1431,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify(data),
       });
       if (!res.ok) return { success: false, error: 'Failed to create event.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1407,7 +1449,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify(updates),
       });
       if (!res.ok) return { success: false, error: 'Failed to update event.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1428,7 +1470,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify({ status }),
       });
       if (!res.ok) return { success: false, error: 'Failed to update status.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1442,7 +1484,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     try {
       await authenticatedFetch(`/api/events/${id}`, { method: 'DELETE' });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1464,7 +1506,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to upload image.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1482,7 +1524,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'published' }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1499,7 +1541,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caption }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1512,7 +1554,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     try {
       await authenticatedFetch(`/api/gallery/${id}`, { method: 'DELETE' });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1530,7 +1572,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify(data),
       });
       if (!res.ok) return { success: false, error: 'Failed to add elder.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1548,7 +1590,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify(data),
       });
       if (!res.ok) return { success: false, error: 'Failed to update elder.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1562,7 +1604,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     try {
       await authenticatedFetch(`/api/elders/${id}`, { method: 'DELETE' });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1620,7 +1662,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const result = await res.json();
       if (!res.ok) return { success: false, error: result.error };
-      await refreshData();
+      await refreshData(true);
       return { success: true, village: result.village };
     } catch (e) {
       return { success: false, error: 'Failed to add village.' };
@@ -1643,7 +1685,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const result = await res.json();
       if (!res.ok) return { success: false, error: result.error };
-      await refreshData();
+      await refreshData(true);
       return { success: true, village: result.village };
     } catch (e) {
       return { success: false, error: 'Failed to update village.' };
@@ -1664,7 +1706,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to delete village.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error deleting village.' };
@@ -1689,7 +1731,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const result = await res.json();
       if (!res.ok) return { success: false, error: result.error };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Failed to update profile.' };
@@ -1714,7 +1756,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const result = await res.json();
       if (!res.ok) return { success: false, error: result.error };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Failed to change member role.' };

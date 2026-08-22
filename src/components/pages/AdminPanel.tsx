@@ -758,7 +758,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleComplaintSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!compTitle || !compDesc || !compLocation || !compReporterName || !compReporterMobile) return;
+    if (!compTitle || !compDesc || !compLocation || !compReporterName || !compReporterMobile) {
+      flash('error', 'Every field except the photo is required.');
+      return;
+    }
     setCompMsg('Filing grievance...');
     const result = await submitComplaint({
       title: compTitle,
@@ -786,7 +789,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleSocialWorkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!socialTitle || !socialDesc || !socialDate || !socialLocation || !socialSubmitterName) return;
+    if (!socialTitle || !socialDesc || !socialDate || !socialLocation || !socialSubmitterName) {
+      flash('error', 'Title, description, date, location and submitter are all required.');
+      return;
+    }
     setSocialMsg('Recording initiative...');
     const result = await submitSocialWork({
       title: socialTitle,
@@ -815,7 +821,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleAnnouncementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!annTitle || !annDesc) return;
+    if (!annTitle || !annDesc) {
+      flash('error', 'A title and content are both required.');
+      return;
+    }
     setAnnMsg('Publishing announcement...');
     try {
       await publishAnnouncement(annTitle, annDesc);
@@ -831,7 +840,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleEventSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!eventTitle || !eventDate || !eventLocation) return;
+    if (!eventTitle || !eventDate || !eventLocation) {
+      flash('error', 'Title, date and venue are all required.');
+      return;
+    }
     setEventMsg('Scheduling event...');
     try {
       await createEvent({
@@ -858,7 +870,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleGallerySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!galleryCaption || !galleryUrl) return;
+    if (!galleryCaption || !galleryUrl) {
+      flash('error', 'A caption and an uploaded photo are both required.');
+      return;
+    }
     setGalleryMsg('Uploading media...');
     try {
       await uploadGalleryPhoto(galleryCaption, galleryUrl, 'published');
@@ -874,7 +889,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleElderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!elderName || !elderMobile || !elderLocation) return;
+    if (!elderName || !elderMobile || !elderLocation) {
+      flash('error', 'Name, mobile and location are all required.');
+      return;
+    }
     setElderMsg('Adding senior citizen record...');
     try {
       await addElder({
@@ -899,7 +917,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleVillageSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!villageName || !villageNameHindi || !villageContactMobile) return;
+    if (!villageName || !villageNameHindi || !villageContactMobile) {
+      flash('error', 'Name, Hindi name and contact mobile are all required.');
+      return;
+    }
     setVillageMsg('Registering village branch...');
     try {
       await addVillage({
