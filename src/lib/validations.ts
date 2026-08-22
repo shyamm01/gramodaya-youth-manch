@@ -60,15 +60,27 @@ export const memberCreateSchema = z.object({
  */
 export const complaintCreateSchema = z.object({
   title: z.string().min(3, 'Title must be at least 3 characters').max(200),
+  titleHindi: z.string().max(200).optional(),
   category: z.string().min(2, 'Category is required').default('Other'),
+  categoryId: z.union([z.string(), z.number()]).optional(),
   description: z.string().min(5, 'Description must be at least 5 characters'),
+  descriptionHindi: z.string().optional(),
   location: z.string().min(2, 'Location is required').default('Rasoolpur'),
+  locationHindi: z.string().optional(),
+  ward: z.string().max(100).optional(),
+  wardHindi: z.string().max(100).optional(),
   reporterName: z.string().min(2, 'Reporter name is required'),
   reporterMobile: mobileSchema,
+  priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
   villageId: z.union([z.string(), z.number()]).optional(),
   photoUrl: z.string().optional(),
   videoUrl: z.string().optional(),
-  isDemo: z.boolean().optional().default(false),
+  attachments: z.array(z.object({
+    type: z.enum(['photo', 'video', 'document']).default('photo'),
+    url: z.string().min(1),
+    caption: z.string().max(200).optional(),
+  })).max(10).optional(),
+  isActive: z.boolean().optional().default(true),
   adminName: z.string().optional(),
   adminMobile: z.string().optional(),
 });

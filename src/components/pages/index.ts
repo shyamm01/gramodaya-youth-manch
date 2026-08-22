@@ -18,4 +18,5 @@ export { EmploymentSection } from './EmploymentSection';
 export { EmploymentCategorySection } from './EmploymentCategorySection';
 export { VisionMissionSection } from './VisionMissionSection';
 export { VisionMissionCategorySection } from './VisionMissionCategorySection';
+export { GrievanceDetailPage } from './GrievanceDetailPage';
 export { AdminPanel } from './AdminPanel';

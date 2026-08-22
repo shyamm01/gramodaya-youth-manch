@@ -252,7 +252,7 @@ export async function syncAllDatastoreToSupabase(): Promise<{ success: boolean; 
         status: c.status,
         photo_url: c.photoUrl || null,
         video_url: c.videoUrl || null,
-        is_demo: c.isDemo || false,
+        is_active: c.isActive !== undefined ? c.isActive : true,
         resolved_at: c.resolvedAt || null,
         created_at: c.createdAt,
       }));

@@ -246,21 +246,75 @@ export type ComplaintCategory =
 
 export type ComplaintStatus = 'NEW' | 'ACTION IN PROGRESS' | 'RESOLVED';
 
+export type ComplaintPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export type ComplaintAttachmentType = 'photo' | 'video' | 'document';
+
+export interface ComplaintCategoryItem {
+  id: string;
+  slug: string;
+  name: string;
+  nameHindi: string;
+  icon: string;
+  displayOrder: number;
+  isActive: boolean;
+}
+
+export interface ComplaintAttachment {
+  id: string;
+  complaintId: string;
+  type: ComplaintAttachmentType;
+  url: string;
+  caption?: string;
+  createdAt: string;
+}
+
+export interface ComplaintStatusHistoryEntry {
+  id: string;
+  complaintId: string;
+  fromStatus?: string | null;
+  toStatus: string;
+  changedBy?: string | null;
+  note?: string | null;
+  createdAt: string;
+}
+
 export interface Complaint {
   id: string;
   villageId?: string;
+  villageName?: string;
+  villageNameHindi?: string;
+  village?: {
+    id: string;
+    name: string;
+    nameHindi: string;
+    slug?: string;
+  } | null;
+  categoryId?: string;
   title: string;
+  titleHindi?: string;
   category: ComplaintCategory;
   description: string;
+  descriptionHindi?: string;
   location: string;
+  locationHindi?: string;
+  ward?: string;
+  wardHindi?: string;
   reporterName: string;
   reporterMobile: string;
   status: ComplaintStatus;
+  priority: ComplaintPriority;
+  /** @deprecated Use attachments array */
   photoUrl?: string;
+  /** @deprecated Use attachments array */
   videoUrl?: string;
-  isDemo?: boolean;
+  attachments?: ComplaintAttachment[];
+  statusHistory?: ComplaintStatusHistoryEntry[];
+  categoryRef?: ComplaintCategoryItem;
+  isActive?: boolean;
   createdAt: string;
   resolvedAt?: string;
+  updatedAt?: string;
 }
 
 export interface SocialWork {

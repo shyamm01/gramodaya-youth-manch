@@ -1104,7 +1104,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // Complaint Handlers
+  // Complaint Handlers (optimistic updates)
   const submitComplaint = async (data: Omit<Complaint, 'id' | 'createdAt' | 'status'>) => {
     if (!isApprovedMember) {
       return {
@@ -1113,10 +1113,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
     try {
+      // Auto-inject villageId from session if not provided
+      const payload = {
+        ...data,
+        villageId: data.villageId || authSession.activeVillageId || authSession.adminVillageId,
+      };
       const res = await authenticatedFetch('/api/complaints', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
       const result = await res.json();
       if (!res.ok) return { success: false, error: result.error };
@@ -1132,14 +1137,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Unauthorized attempt to update complaint status.');
       return;
     }
+
+    // Optimistic update: update local state immediately
+    const prevComplaints = [...complaints];
+    const idx = complaints.findIndex((c) => c.id === id);
+    if (idx !== -1) {
+      const updated = { ...complaints[idx], status };
+      if (status === 'RESOLVED') updated.resolvedAt = new Date().toISOString();
+      complaints[idx] = updated;
+    }
+
     try {
-      await authenticatedFetch(`/api/complaints/${id}/status`, {
+      const res = await authenticatedFetch(`/api/complaints/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status,
+          adminName: authSession.adminName,
+          adminMobile: authSession.adminMobile,
+        }),
       });
+      if (!res.ok) {
+        // Rollback on failure
+        if (idx !== -1) complaints[idx] = prevComplaints[idx];
+      }
       await refreshData(true);
     } catch (e) {
+      // Rollback on error
+      if (idx !== -1) complaints[idx] = prevComplaints[idx];
       console.error(e);
     }
   };

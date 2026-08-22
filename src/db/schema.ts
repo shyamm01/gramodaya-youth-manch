@@ -56,6 +56,19 @@ export const complaintStatusEnum = pgEnum('complaint_status', [
   'RESOLVED',
 ]);
 
+export const complaintPriorityEnum = pgEnum('complaint_priority', [
+  'low',
+  'medium',
+  'high',
+  'urgent',
+]);
+
+export const complaintAttachmentTypeEnum = pgEnum('complaint_attachment_type', [
+  'photo',
+  'video',
+  'document',
+]);
+
 export const socialWorkStatusEnum = pgEnum('social_work_status', [
   'pending',
   'approved',
@@ -341,6 +354,26 @@ export const userVillageRoles = pgTable(
 /**
  * 4.1 COMPLAINTS TABLE (ग्राम स्तर की समस्याएं)
  */
+/**
+ * 4.0.1 COMPLAINT CATEGORIES LOOKUP TABLE (शिकायत श्रेणियां)
+ */
+export const complaintCategories = pgTable(
+  'complaint_categories',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    slug: text('slug').notNull().unique(),
+    name: text('name').notNull(),
+    nameHindi: text('name_hindi').notNull(),
+    icon: text('icon').notNull().default('📌'),
+    displayOrder: integer('display_order').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('idx_complaint_categories_slug').on(table.slug),
+  ]
+);
+
 export const complaints = pgTable(
   'complaints',
   {
@@ -348,16 +381,27 @@ export const complaints = pgTable(
     villageId: bigint('village_id', { mode: 'number' })
       .references(() => villages.id, { onDelete: 'cascade' }),
     userId: uuid('user_id').references(() => profiles.id, { onDelete: 'set null' }),
+    categoryId: bigint('category_id', { mode: 'number' })
+      .references(() => complaintCategories.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
+    titleHindi: text('title_hindi'),
+    /** @deprecated Use categoryId FK instead. Kept for backward compat. */
     category: complaintCategoryEnum('category').notNull().default('Other'),
     description: text('description').notNull(),
+    descriptionHindi: text('description_hindi'),
     location: text('location').notNull(),
+    locationHindi: text('location_hindi'),
+    ward: text('ward'),
+    wardHindi: text('ward_hindi'),
     reporterName: text('reporter_name').notNull(),
     reporterMobile: text('reporter_mobile').notNull(),
     status: complaintStatusEnum('status').notNull().default('NEW'),
+    priority: complaintPriorityEnum('priority').notNull().default('medium'),
+    /** @deprecated Use complaint_attachments table instead. */
     photoUrl: text('photo_url'),
+    /** @deprecated Use complaint_attachments table instead. */
     videoUrl: text('video_url'),
-    isDemo: boolean('is_demo').default(false),
+    isActive: boolean('is_active').notNull().default(true),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -367,7 +411,54 @@ export const complaints = pgTable(
     index('idx_complaints_user_id').on(table.userId),
     index('idx_complaints_status').on(table.status),
     index('idx_complaints_category').on(table.category),
+    index('idx_complaints_category_id').on(table.categoryId),
     index('idx_complaints_created_at').on(table.createdAt),
+    index('idx_complaints_priority').on(table.priority),
+    index('idx_complaints_is_active').on(table.isActive),
+    index('idx_complaints_village_status').on(table.villageId, table.status),
+  ]
+);
+
+/**
+ * 4.0.2 COMPLAINT ATTACHMENTS (शिकायत संलग्नक)
+ */
+export const complaintAttachments = pgTable(
+  'complaint_attachments',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    complaintId: bigint('complaint_id', { mode: 'number' })
+      .notNull()
+      .references(() => complaints.id, { onDelete: 'cascade' }),
+    type: complaintAttachmentTypeEnum('type').notNull().default('photo'),
+    url: text('url').notNull(),
+    caption: text('caption'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_complaint_attachments_complaint_id').on(table.complaintId),
+  ]
+);
+
+/**
+ * 4.0.3 COMPLAINT STATUS HISTORY (शिकायत स्थिति इतिहास)
+ */
+export const complaintStatusHistory = pgTable(
+  'complaint_status_history',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    complaintId: bigint('complaint_id', { mode: 'number' })
+      .notNull()
+      .references(() => complaints.id, { onDelete: 'cascade' }),
+    fromStatus: text('from_status'),
+    toStatus: text('to_status').notNull(),
+    changedBy: uuid('changed_by')
+      .references(() => profiles.id, { onDelete: 'set null' }),
+    note: text('note'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_complaint_status_history_complaint_id').on(table.complaintId),
+    index('idx_complaint_status_history_created_at').on(table.createdAt),
   ]
 );
 
@@ -883,13 +974,41 @@ export const userVillageRolesRelations = relations(userVillageRoles, ({ one }) =
   }),
 }));
 
-export const complaintsRelations = relations(complaints, ({ one }) => ({
+export const complaintCategoriesRelations = relations(complaintCategories, ({ many }) => ({
+  complaints: many(complaints),
+}));
+
+export const complaintsRelations = relations(complaints, ({ one, many }) => ({
   village: one(villages, {
     fields: [complaints.villageId],
     references: [villages.id],
   }),
   user: one(profiles, {
     fields: [complaints.userId],
+    references: [profiles.id],
+  }),
+  categoryRef: one(complaintCategories, {
+    fields: [complaints.categoryId],
+    references: [complaintCategories.id],
+  }),
+  attachments: many(complaintAttachments),
+  statusHistory: many(complaintStatusHistory),
+}));
+
+export const complaintAttachmentsRelations = relations(complaintAttachments, ({ one }) => ({
+  complaint: one(complaints, {
+    fields: [complaintAttachments.complaintId],
+    references: [complaints.id],
+  }),
+}));
+
+export const complaintStatusHistoryRelations = relations(complaintStatusHistory, ({ one }) => ({
+  complaint: one(complaints, {
+    fields: [complaintStatusHistory.complaintId],
+    references: [complaints.id],
+  }),
+  changedByUser: one(profiles, {
+    fields: [complaintStatusHistory.changedBy],
     references: [profiles.id],
   }),
 }));
@@ -1068,6 +1187,15 @@ export type NewUserVillageRoleModel = typeof userVillageRoles.$inferInsert;
 
 export type ComplaintModel = typeof complaints.$inferSelect;
 export type NewComplaintModel = typeof complaints.$inferInsert;
+
+export type ComplaintCategoryModel = typeof complaintCategories.$inferSelect;
+export type NewComplaintCategoryModel = typeof complaintCategories.$inferInsert;
+
+export type ComplaintAttachmentModel = typeof complaintAttachments.$inferSelect;
+export type NewComplaintAttachmentModel = typeof complaintAttachments.$inferInsert;
+
+export type ComplaintStatusHistoryModel = typeof complaintStatusHistory.$inferSelect;
+export type NewComplaintStatusHistoryModel = typeof complaintStatusHistory.$inferInsert;
 
 export type SocialWorkModel = typeof socialWorks.$inferSelect;
 export type NewSocialWorkModel = typeof socialWorks.$inferInsert;

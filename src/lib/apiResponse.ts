@@ -129,7 +129,7 @@ export function formatComplaint(c: any) {
     status: c.status,
     photoUrl: c.photoUrl || '',
     videoUrl: c.videoUrl || '',
-    isDemo: c.isDemo || false,
+    isActive: c.isActive !== undefined ? Boolean(c.isActive) : true,
     resolvedAt: c.resolvedAt ? new Date(c.resolvedAt).toISOString() : undefined,
     createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : undefined,
   };

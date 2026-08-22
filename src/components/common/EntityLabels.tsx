@@ -70,33 +70,38 @@ const Icon = ({ as: As, size }: { as: LucideIcon; size: Size }) => (
 interface StatusBadgeProps {
   status: ComplaintStatus;
   size?: Size;
+  lang?: string;
 }
 
-const COMPLAINT_STATUS_MAP: Record<ComplaintStatus, { label: string; classes: string; icon: LucideIcon }> = {
+const COMPLAINT_STATUS_MAP: Record<ComplaintStatus, { labelHi: string; labelEn: string; classes: string; icon: LucideIcon }> = {
   NEW: {
-    label: 'नवीन',
+    labelHi: 'नवीन',
+    labelEn: 'New',
     classes: 'bg-blue-50 dark:bg-blue-950/40 text-blue-800 dark:text-blue-200 border-blue-200 dark:border-blue-800',
     icon: AlertCircle,
   },
   'ACTION IN PROGRESS': {
-    label: 'प्रक्रियाधीन',
+    labelHi: 'प्रक्रियाधीन',
+    labelEn: 'In Progress',
     classes: 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 border-amber-200 dark:border-amber-800',
     icon: Clock,
   },
   RESOLVED: {
-    label: 'निस्तारित',
+    labelHi: 'निस्तारित',
+    labelEn: 'Resolved',
     classes: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-200 border-emerald-200 dark:border-emerald-800',
     icon: CheckCircle2,
   },
 };
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'sm' }) => {
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'sm', lang = 'hi' }) => {
   const cfg = COMPLAINT_STATUS_MAP[status];
   if (!cfg) return null;
+  const label = lang === 'en' ? cfg.labelEn : cfg.labelHi;
   return (
     <span className={`inline-flex items-center font-bold rounded-full border ${sizeClasses[size]} ${cfg.classes}`}>
       <Icon as={cfg.icon} size={size} />
-      {cfg.label}
+      {label}
     </span>
   );
 };

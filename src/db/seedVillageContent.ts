@@ -112,9 +112,7 @@ export async function seedVillageContent() {
       reporterName: seed.reporterName,
       reporterMobile: seed.reporterMobile,
       status: seed.status,
-      // Marks these as demonstration rows, so a chapter can tell the seeded
-      // grievances apart from ones residents actually filed.
-      isDemo: true,
+      isActive: true,
       resolvedAt: seed.status === 'RESOLVED' ? new Date() : null,
     };
 
