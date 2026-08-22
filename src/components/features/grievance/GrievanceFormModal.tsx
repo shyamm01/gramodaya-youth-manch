@@ -53,7 +53,6 @@ export const GrievanceFormModal: React.FC<GrievanceFormModalProps> = ({
   const [location, setLocation] = useState(defaultLocation);
   const [ward, setWard] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
-  const [videoUrl, setVideoUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState('');
   const [showSecondaryFields, setShowSecondaryFields] = useState(false);
@@ -76,7 +75,6 @@ export const GrievanceFormModal: React.FC<GrievanceFormModalProps> = ({
     setDescription('');
     setDescriptionHindi('');
     setPhotoUrl('');
-    setVideoUrl('');
     setMsg('');
     setPriority('medium');
     setWard('');
@@ -123,7 +121,6 @@ export const GrievanceFormModal: React.FC<GrievanceFormModalProps> = ({
       reporterName: currentUserName || (isHindi ? 'पंजीकृत सदस्य' : 'Registered Member'),
       reporterMobile: currentUserMobile || 'Hidden',
       photoUrl: photoUrl || undefined,
-      videoUrl: videoUrl || undefined,
     });
 
     setSubmitting(false);
@@ -400,36 +397,17 @@ export const GrievanceFormModal: React.FC<GrievanceFormModalProps> = ({
           )}
         </div>
 
-        {/* 5. Photo & Media Attachments */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-          <div>
-            <ImageUploader
-              value={photoUrl}
-              onChange={setPhotoUrl}
-              onRemove={() => setPhotoUrl('')}
-              bucket="images"
-              folder="grievances"
-              label={lang === 'en' ? 'Photo Evidence (Optional)' : 'फ़ोटो प्रमाण (ऐच्छिक)'}
-              hint={lang === 'en' ? 'Upload evidence photo (JPG/PNG)' : 'समस्या की फोटो अपलोड करें'}
-            />
-          </div>
-          <div className="flex flex-col justify-between">
-            <div>
-              <label className="block text-xs font-bold text-slate-800 dark:text-slate-200 mb-1.5">
-                {lang === 'en' ? 'Video Evidence Link (Optional)' : 'वीडियो लिंक (वैकल्पिक)'}
-              </label>
-              <Input
-                type="url"
-                value={videoUrl}
-                onChange={(e) => setVideoUrl(e.target.value)}
-                placeholder="https://youtu.be/... or Drive link"
-                className="rounded-xl text-xs bg-white dark:bg-[#111726] border-slate-200 dark:border-slate-800"
-              />
-              <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                {lang === 'en' ? 'Attach YouTube or cloud video link of the affected spot' : 'प्रभावित स्थल का वीडियो लिंक यहां जोड़ें'}
-              </p>
-            </div>
-          </div>
+        {/* 5. Photo Evidence Attachment */}
+        <div className="pt-1">
+          <ImageUploader
+            value={photoUrl}
+            onChange={setPhotoUrl}
+            onRemove={() => setPhotoUrl('')}
+            bucket="images"
+            folder="grievances"
+            label={isHindi ? 'फ़ोटो प्रमाण (ऐच्छिक)' : 'Photo Evidence (Optional)'}
+            hint={isHindi ? 'समस्या की फोटो अपलोड करें (JPG/PNG)' : 'Upload evidence photo (JPG/PNG)'}
+          />
         </div>
 
         {/* Status / Error / Success message */}
