@@ -31,26 +31,33 @@ export const EducationSection: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (signal?: AbortSignal) => {
+  const load = useCallback(async (isStale?: () => boolean) => {
     setLoading(true);
     setError(null);
     try {
-      setCategories(await fetchEducationTree(signal));
+      const result = await fetchEducationTree();
+      if (isStale?.()) return;
+      setCategories(result);
     } catch (err: any) {
-      if (err?.name === "AbortError") return;
+      if (isStale?.()) return;
       setError(err?.message || t("education.loadError"));
     } finally {
-      setLoading(false);
+      if (!isStale?.()) setLoading(false);
     }
     // t is stable enough for this purpose; re-running on language change would
     // refetch identical rows (the text itself is translated at render time).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The response is ignored rather than aborted on cleanup: aborting made
+  // StrictMode's second mount issue a second request, so the network panel
+  // showed a cancelled fetch beside the real one.
   useEffect(() => {
-    const controller = new AbortController();
-    load(controller.signal);
-    return () => controller.abort();
+    let stale = false;
+    load(() => stale);
+    return () => {
+      stale = true;
+    };
   }, [load]);
 
   return (

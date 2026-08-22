@@ -65,6 +65,64 @@ const labelClass =
 const cardClass =
   'bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl shadow-xs';
 
+const shimmerClass = 'bg-slate-100 dark:bg-[#1c1c20] rounded-lg animate-pulse';
+
+/**
+ * Placeholder that matches the shape of whichever view is loading, so the
+ * layout does not jump once the real rows arrive: cards for categories and
+ * enquiries, a table for resources.
+ */
+const SectionSkeleton: React.FC<{ view: SectionView }> = ({ view }) => {
+  if (view === 'resources') {
+    return (
+      <div className={`${cardClass} overflow-hidden`}>
+        <div className="bg-slate-50 dark:bg-[#18181c] px-4 py-3 flex items-center gap-4">
+          {['w-24', 'w-20', 'w-16', 'w-14'].map((w) => (
+            <div key={w} className={`${shimmerClass} h-2.5 ${w}`} />
+          ))}
+        </div>
+        <div className="divide-y divide-slate-100 dark:divide-[#1e1f24]">
+          {[0, 1, 2, 3, 4].map((row) => (
+            <div key={row} className="px-4 py-3.5 flex items-center gap-4">
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <div className={`${shimmerClass} h-3 w-2/5`} />
+                <div className={`${shimmerClass} h-2.5 w-3/5`} />
+              </div>
+              <div className={`${shimmerClass} h-2.5 w-20 hidden sm:block`} />
+              <div className={`${shimmerClass} h-5 w-20 rounded-full`} />
+              <div className={`${shimmerClass} h-7 w-24 rounded-xl`} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {[0, 1, 2, 3, 4, 5].map((card) => (
+        <div key={card} className={`${cardClass} p-5 space-y-3`}>
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1 space-y-1.5">
+              <div className={`${shimmerClass} h-3.5 w-1/2`} />
+              <div className={`${shimmerClass} h-2.5 w-2/3`} />
+            </div>
+            <div className={`${shimmerClass} h-5 w-16 rounded-full shrink-0`} />
+          </div>
+          <div className="space-y-1.5">
+            <div className={`${shimmerClass} h-2.5 w-full`} />
+            <div className={`${shimmerClass} h-2.5 w-4/5`} />
+          </div>
+          <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex items-center justify-between">
+            <div className={`${shimmerClass} h-2.5 w-24`} />
+            <div className={`${shimmerClass} h-4 w-4 rounded`} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const statusVariant = (status: string) => {
   if (status === 'published' || status === 'resolved') return 'success' as const;
   if (status === 'pending' || status === 'in_progress') return 'warning' as const;
@@ -617,9 +675,7 @@ export const AdminEducationSection: React.FC = () => {
       )}
 
       {loading ? (
-        <div className={`${cardClass} p-10 text-center text-xs text-slate-500 dark:text-zinc-400`}>
-          Loading education content…
-        </div>
+        <SectionSkeleton view={view} />
       ) : (
         <>
           {/* ── CATEGORIES ── */}

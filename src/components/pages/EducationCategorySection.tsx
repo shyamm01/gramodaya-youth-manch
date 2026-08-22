@@ -186,31 +186,36 @@ export const EducationCategorySection: React.FC<{ slug: string }> = ({ slug }) =
   const [enquiryFor, setEnquiryFor] = useState<EducationResource | null>(null);
 
   const load = useCallback(
-    async (signal?: AbortSignal) => {
+    async (isStale?: () => boolean) => {
       setLoading(true);
       setError(null);
       setNotFound(false);
       try {
-        const result = await fetchEducationCategory(slug, signal);
+        const result = await fetchEducationCategory(slug);
+        if (isStale?.()) return;
         if (result) {
           setCategory(result);
         } else {
           setNotFound(true);
         }
       } catch (err: any) {
-        if (err?.name === 'AbortError') return;
+        if (isStale?.()) return;
         setError(err?.message || 'Request failed');
       } finally {
-        setLoading(false);
+        if (!isStale?.()) setLoading(false);
       }
     },
     [slug]
   );
 
+  // A response for an old slug is ignored rather than aborted on cleanup:
+  // aborting made StrictMode's second mount issue a duplicate request.
   useEffect(() => {
-    const controller = new AbortController();
-    load(controller.signal);
-    return () => controller.abort();
+    let stale = false;
+    load(() => stale);
+    return () => {
+      stale = true;
+    };
   }, [load]);
 
   const backLink = (

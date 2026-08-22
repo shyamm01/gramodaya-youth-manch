@@ -27,31 +27,57 @@ async function readError(res: Response, fallback: string): Promise<Error> {
   return new Error(body?.error || `${fallback} (HTTP ${res.status})`);
 }
 
+/**
+ * Collapses identical GETs that overlap in time onto a single request.
+ *
+ * StrictMode runs every effect twice in development, so a component that loads
+ * on mount fires the same request twice — the first showed up in the network
+ * panel as a cancelled request next to the real one. Two components asking for
+ * the same data at once hit it too, in development and production alike.
+ *
+ * The entry is dropped as soon as the request settles, so this de-duplicates
+ * concurrent callers without ever serving stale data on a later visit.
+ */
+const inFlight = new Map<string, Promise<unknown>>();
+
+function dedupe<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const pending = inFlight.get(key) as Promise<T> | undefined;
+  if (pending) return pending;
+
+  const request = run().finally(() => {
+    inFlight.delete(key);
+  });
+  inFlight.set(key, request);
+  return request;
+}
+
 /** GET /api/education — every published category with its resources and links. */
-export async function fetchEducationTree(signal?: AbortSignal): Promise<EducationCategory[]> {
-  const res = await fetch('/api/education', { credentials: 'include', signal });
-  if (!res.ok) throw await readError(res, 'Education request failed');
-  const data = await res.json();
-  if (!data.success || !Array.isArray(data.categories)) {
-    throw new Error(data.error || 'Malformed education response');
-  }
-  return data.categories as EducationCategory[];
+export function fetchEducationTree(): Promise<EducationCategory[]> {
+  return dedupe('tree', async () => {
+    const res = await fetch('/api/education', { credentials: 'include' });
+    if (!res.ok) throw await readError(res, 'Education request failed');
+    const data = await res.json();
+    if (!data.success || !Array.isArray(data.categories)) {
+      throw new Error(data.error || 'Malformed education response');
+    }
+    return data.categories as EducationCategory[];
+  });
 }
 
 /** GET /api/education/categories/[slug] — one category with its resources. */
-export async function fetchEducationCategory(
-  slug: string,
-  signal?: AbortSignal
-): Promise<EducationCategory | null> {
-  const res = await fetch(`/api/education/categories/${encodeURIComponent(slug)}`, {
-    credentials: 'include',
-    signal,
+export function fetchEducationCategory(slug: string): Promise<EducationCategory | null> {
+  return dedupe(`category:${slug}`, async () => {
+    const res = await fetch(`/api/education/categories/${encodeURIComponent(slug)}`, {
+      credentials: 'include',
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) throw await readError(res, 'Education category request failed');
+    const data = await res.json();
+    if (!data.success || !data.category) {
+      throw new Error(data.error || 'Malformed category response');
+    }
+    return data.category as EducationCategory;
   });
-  if (res.status === 404) return null;
-  if (!res.ok) throw await readError(res, 'Education category request failed');
-  const data = await res.json();
-  if (!data.success || !data.category) throw new Error(data.error || 'Malformed category response');
-  return data.category as EducationCategory;
 }
 
 /** POST /api/education/enquiries — public, no login required. */
