@@ -59,6 +59,8 @@ export const memberCreateSchema = z.object({
  * 2. COMPLAINT / GRIEVANCE SCHEMA
  */
 export const complaintCreateSchema = z.object({
+  userId: z.union([z.string(), z.number()]).optional(),
+  memberId: z.union([z.string(), z.number()]).optional(),
   title: z.string().min(3, 'Title must be at least 3 characters').max(200),
   titleHindi: z.string().max(200).optional(),
   category: z.string().min(2, 'Category is required').default('Other'),
@@ -69,8 +71,8 @@ export const complaintCreateSchema = z.object({
   locationHindi: z.string().optional(),
   ward: z.string().max(100).optional(),
   wardHindi: z.string().max(100).optional(),
-  reporterName: z.string().min(2, 'Reporter name is required'),
-  reporterMobile: mobileSchema,
+  reporterName: z.string().optional(),
+  reporterMobile: z.string().optional(),
   priority: z.enum(['low', 'medium', 'high', 'urgent']).default('medium'),
   villageId: z.union([z.string(), z.number()]).optional(),
   photoUrl: z.string().optional(),

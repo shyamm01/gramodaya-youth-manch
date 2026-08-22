@@ -123,7 +123,7 @@ interface AppContextType {
   updateMember: (id: string, updates: Partial<Member>) => Promise<{ success: boolean; error?: string }>;
   deleteMember: (id: string) => Promise<void>;
   uploadPhoto: (targetType: 'admin' | 'member', targetId: string, photoUrl: string) => Promise<void>;
-  submitComplaint: (data: Omit<Complaint, 'id' | 'createdAt' | 'status'>) => Promise<{ success: boolean; error?: string }>;
+  submitComplaint: (data: Omit<Complaint, 'id' | 'createdAt' | 'status'> & { userId?: string }) => Promise<{ success: boolean; error?: string }>;
   updateComplaintStatus: (id: string, status: ComplaintStatus) => Promise<void>;
   deleteComplaint: (id: string) => Promise<void>;
   submitSocialWork: (data: Omit<SocialWork, 'id' | 'createdAt' | 'status'>) => Promise<{ success: boolean; error?: string }>;
@@ -1105,7 +1105,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Complaint Handlers (optimistic updates)
-  const submitComplaint = async (data: Omit<Complaint, 'id' | 'createdAt' | 'status'>) => {
+  const submitComplaint = async (data: Omit<Complaint, 'id' | 'createdAt' | 'status'> & { userId?: string }) => {
     if (!isApprovedMember) {
       return {
         success: false,
@@ -1113,9 +1113,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
     try {
-      // Auto-inject villageId from session if not provided
+      const currentUserId = authSession.currentMemberId || authSession.currentMember?.id || authSession.adminId || authSession.supabaseUserId;
+      const currentUserName = authSession.currentMemberName || authSession.adminName || authSession.currentMember?.name;
+      const currentUserMobile = authSession.currentMemberMobile || authSession.adminMobile || authSession.currentMember?.mobile;
+
+      // Auto-inject userId, reporter details, and villageId from session if not provided
       const payload = {
         ...data,
+        userId: data.userId || currentUserId,
+        reporterName: data.reporterName || currentUserName || 'Village Resident',
+        reporterMobile: data.reporterMobile || currentUserMobile || 'Hidden',
         villageId: data.villageId || authSession.activeVillageId || authSession.adminVillageId,
       };
       const res = await authenticatedFetch('/api/complaints', {

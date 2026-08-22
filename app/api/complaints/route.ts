@@ -166,6 +166,8 @@ export async function POST(req: Request) {
       return validation.response;
     }
     const {
+      userId,
+      memberId,
       title,
       titleHindi,
       category,
@@ -194,22 +196,37 @@ export async function POST(req: Request) {
     }
 
     let resolvedVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : undefined;
-    let resolvedUserId: string | undefined = undefined;
+    let resolvedUserId: string | undefined = (userId || memberId) ? String(userId || memberId) : undefined;
+    let resolvedReporterName = reporterName?.trim();
+    let resolvedReporterMobile = reporterMobile?.trim();
     let resolvedCategoryId: number | undefined = categoryId ? Number(categoryId) : undefined;
 
-    // Resolve user from mobile (using indexed column, not regex)
-    if (reporterMobile) {
-      const cleanMob = reporterMobile.replace(/\D/g, "").slice(-10);
+    // If userId provided, fetch profile details if reporter info missing
+    if (resolvedUserId) {
+      const userProfile = await db.query.profiles.findFirst({
+        where: (p, { eq: eqOp }) => eqOp(p.id, resolvedUserId!),
+      });
+      if (userProfile) {
+        if (!resolvedReporterName) resolvedReporterName = userProfile.fullName;
+        if (!resolvedReporterMobile) resolvedReporterMobile = userProfile.mobile || undefined;
+        if (!resolvedVillageId && userProfile.villageId) resolvedVillageId = userProfile.villageId;
+      }
+    } else if (resolvedReporterMobile) {
+      const cleanMob = resolvedReporterMobile.replace(/\D/g, "").slice(-10);
       const matchedMember = await db.query.profiles.findFirst({
         where: (m, { like }) => like(m.mobile, `%${cleanMob}`),
       });
       if (matchedMember) {
         resolvedUserId = matchedMember.id;
+        if (!resolvedReporterName) resolvedReporterName = matchedMember.fullName;
         if (!resolvedVillageId && matchedMember.villageId) {
           resolvedVillageId = matchedMember.villageId;
         }
       }
     }
+
+    if (!resolvedReporterName) resolvedReporterName = "Village Resident";
+    if (!resolvedReporterMobile) resolvedReporterMobile = "Hidden";
 
     // Resolve categoryId from category name if not provided
     if (!resolvedCategoryId && category) {
@@ -237,8 +254,8 @@ export async function POST(req: Request) {
         locationHindi: locationHindi?.trim() || null,
         ward: ward?.trim() || null,
         wardHindi: wardHindi?.trim() || null,
-        reporterName: reporterName.trim(),
-        reporterMobile: reporterMobile.trim(),
+        reporterName: resolvedReporterName,
+        reporterMobile: resolvedReporterMobile,
         priority: (priority as any) || "medium",
         photoUrl: cdnPhotoUrl || photoUrl || null,
         videoUrl: videoUrl || null,

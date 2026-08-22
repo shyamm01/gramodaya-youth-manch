@@ -297,8 +297,9 @@ export const ProblemsSection: React.FC = () => {
         defaultVillageId={selectedVillageFilter !== 'ALL' ? selectedVillageFilter : (activeVillageId || '1')}
         villages={villages}
         defaultLocation={lang === 'en' ? (villageSettings.name || '') : (villageSettings.nameHindi || '')}
-        defaultReporterName={authSession.currentMemberName || ''}
-        defaultReporterMobile={currentMemberMobile || ''}
+        currentUserId={authSession.currentMemberId || authSession.currentMember?.id || authSession.adminId || authSession.supabaseUserId}
+        currentUserName={authSession.currentMemberName || authSession.adminName || authSession.currentMember?.name || ''}
+        currentUserMobile={currentMemberMobile || authSession.adminMobile || ''}
       />
 
       {/* Grievance Detail View Modal */}
