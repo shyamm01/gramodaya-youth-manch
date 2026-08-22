@@ -11,7 +11,7 @@
 import React, { useEffect, useState } from 'react';
 import { Send, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { Dialog, Button } from '../ui';
+import { Modal, Button } from '../ui';
 import { submitEducationEnquiry } from '@/src/lib/education/client';
 
 interface EducationEnquiryModalProps {
@@ -93,7 +93,7 @@ export const EducationEnquiryModal: React.FC<EducationEnquiryModalProps> = ({
     'block text-[10px] font-bold uppercase tracking-wider text-[#8C8675] dark:text-slate-400 mb-1.5';
 
   return (
-    <Dialog
+    <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={t('education.enquiry.title')}
@@ -176,6 +176,6 @@ export const EducationEnquiryModal: React.FC<EducationEnquiryModalProps> = ({
           </div>
         </form>
       )}
-    </Dialog>
+    </Modal>
   );
 };

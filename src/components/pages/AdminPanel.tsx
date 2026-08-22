@@ -49,10 +49,58 @@ import {
   MapPin,
 } from 'lucide-react';
 import { Badge } from '../ui/badge';
-import { DatePicker } from '../ui/DatePicker';
+import { Button } from '../ui/button';
+import { Dialog } from '../ui/dialog';
+import { DatePicker } from '../inputs/DatePicker';
+import { ImageUploader } from '../inputs/ImageUploader';
 import { AddressFormFields, AddressData } from '../common/AddressFormFields';
-import { Member, Complaint, SocialWork, EventItem, GalleryItem, Elder, Village, Announcement } from '../../types';
+import {
+  Member,
+  Complaint,
+  ComplaintCategory,
+  SocialWork,
+  EventItem,
+  GalleryItem,
+  Elder,
+  Village,
+  Announcement,
+  EventStatus,
+} from '../../types';
 import { MemberPermissionsModal } from '../modals/MemberPermissionsModal';
+import {
+  ConfirmDialog,
+  EditorDialog,
+  EmptyState,
+  FilterBar,
+  NoticeBanner,
+  SearchInput,
+  SectionHeader,
+  SectionShell,
+  adminCardClass,
+  adminInputClass,
+  adminLabelClass,
+  useSectionNotice,
+  type ConfirmTarget,
+} from '../admin/section-ui';
+
+/** Mirrors the EventStatus union in src/types.ts. */
+const EVENT_STATUSES: EventStatus[] = ['DRAFT', 'PENDING', 'PUBLISHED', 'COMPLETED', 'CANCELLED'];
+
+/** Mirrors the ComplaintCategory union in src/types.ts. */
+const COMPLAINT_CATEGORIES: ComplaintCategory[] = [
+  'Water',
+  'Road',
+  'Electricity',
+  'Cleanliness',
+  'Environment',
+  'Education',
+  'Health',
+  'Sanitation',
+  'Animal-related',
+  'Social Issue',
+  'Government Service',
+  'Other',
+];
 
 
 interface AdminPanelProps {
@@ -304,6 +352,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [villageOrgName, setVillageOrgName] = useState('');
   const [villageOrgNameHindi, setVillageOrgNameHindi] = useState('');
   const [villageMsg, setVillageMsg] = useState('');
+
+  // Every destructive action in this panel routes through one dialog rather
+  // than deleting on the first click. The action itself is carried as a
+  // closure, so a new delete needs no new state and no new branch here.
+  const [confirmTarget, setConfirmTarget] = useState<ConfirmTarget | null>(null);
+
+  // Each section's create form is a modal opened from its header button, the
+  // way the education module does it, rather than a form card pinned above the
+  // list taking up room whether or not anyone is adding anything.
+  const [isComplaintFormOpen, setIsComplaintFormOpen] = useState(false);
+  const [isSocialFormOpen, setIsSocialFormOpen] = useState(false);
+  const [isAnnFormOpen, setIsAnnFormOpen] = useState(false);
+  const [isEventFormOpen, setIsEventFormOpen] = useState(false);
+  const [isGalleryFormOpen, setIsGalleryFormOpen] = useState(false);
+  const [isElderFormOpen, setIsElderFormOpen] = useState(false);
+  const [isVillageFormOpen, setIsVillageFormOpen] = useState(false);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const { notice, flash } = useSectionNotice();
+
+  // Grievance Form (admins file on behalf of residents who walk in or phone)
+  // Photos for the forms that carry one. Each is uploaded and cropped before
+  // it ever reaches the form state — what is held here is the final CDN URL.
+  const [compPhotoUrl, setCompPhotoUrl] = useState('');
+  const [socialPhotoUrl, setSocialPhotoUrl] = useState('');
+  const [eventPhotoUrl, setEventPhotoUrl] = useState('');
+  const [elderPhotoUrl, setElderPhotoUrl] = useState('');
+
+  const [compTitle, setCompTitle] = useState('');
+  const [compCategory, setCompCategory] = useState<ComplaintCategory>('Water');
+  const [compDesc, setCompDesc] = useState('');
+  const [compLocation, setCompLocation] = useState('');
+  const [compReporterName, setCompReporterName] = useState('');
+  const [compReporterMobile, setCompReporterMobile] = useState('');
+  const [compMsg, setCompMsg] = useState('');
+
+  // Social Initiative Form
+  const [socialTitle, setSocialTitle] = useState('');
+  const [socialDesc, setSocialDesc] = useState('');
+  const [socialDate, setSocialDate] = useState('');
+  const [socialLocation, setSocialLocation] = useState('');
+  const [socialSubmitterName, setSocialSubmitterName] = useState('');
+  const [socialSubmitterMobile, setSocialSubmitterMobile] = useState('');
+  const [socialMsg, setSocialMsg] = useState('');
 
   // Settings Form
   const [orgName, setOrgName] = useState(villageSettings.orgName || '');
@@ -644,16 +735,95 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  /**
+   * Queues a destructive action behind the confirm dialog.
+   *
+   * The context's delete functions return nothing and report authorization
+   * failures to the console, so the dialog closes on completion either way —
+   * what it guarantees is that the click was deliberate, not that the row went.
+   */
+  const askToDelete = (title: string, label: string, run: () => void | Promise<unknown>) =>
+    setConfirmTarget({ title, label, run });
+
+  const runConfirmedAction = async () => {
+    if (!confirmTarget) return;
+    setConfirmBusy(true);
+    try {
+      await confirmTarget.run();
+    } finally {
+      setConfirmBusy(false);
+      setConfirmTarget(null);
+    }
+  };
+
+  const handleComplaintSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!compTitle || !compDesc || !compLocation || !compReporterName || !compReporterMobile) return;
+    setCompMsg('Filing grievance...');
+    const result = await submitComplaint({
+      title: compTitle,
+      category: compCategory,
+      description: compDesc,
+      location: compLocation,
+      reporterName: compReporterName,
+      reporterMobile: compReporterMobile,
+      photoUrl: compPhotoUrl || undefined,
+    } as any);
+    if (!result?.success) {
+      setCompMsg(`❌ Error: ${result?.error || 'Failed to file grievance'}`);
+      return;
+    }
+    setCompMsg('');
+    setIsComplaintFormOpen(false);
+    flash('ok', 'Grievance filed.');
+    setCompTitle('');
+    setCompDesc('');
+    setCompLocation('');
+    setCompReporterName('');
+    setCompReporterMobile('');
+    setCompPhotoUrl('');
+  };
+
+  const handleSocialWorkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!socialTitle || !socialDesc || !socialDate || !socialLocation || !socialSubmitterName) return;
+    setSocialMsg('Recording initiative...');
+    const result = await submitSocialWork({
+      title: socialTitle,
+      description: socialDesc,
+      date: socialDate,
+      location: socialLocation,
+      submitterName: socialSubmitterName,
+      submitterMobile: socialSubmitterMobile,
+      photoUrl: socialPhotoUrl || undefined,
+    } as any);
+    if (!result?.success) {
+      setSocialMsg(`❌ Error: ${result?.error || 'Failed to record initiative'}`);
+      return;
+    }
+    setSocialMsg('');
+    setIsSocialFormOpen(false);
+    flash('ok', 'Initiative recorded.');
+    setSocialTitle('');
+    setSocialDesc('');
+    setSocialDate('');
+    setSocialLocation('');
+    setSocialSubmitterName('');
+    setSocialSubmitterMobile('');
+    setSocialPhotoUrl('');
+  };
+
   const handleAnnouncementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!annTitle || !annDesc) return;
     setAnnMsg('Publishing announcement...');
     try {
       await publishAnnouncement(annTitle, annDesc);
-      setAnnMsg('✅ Announcement published successfully!');
+      setAnnMsg('');
       setAnnTitle('');
       setAnnDesc('');
-      setTimeout(() => setAnnMsg(''), 2000);
+      setIsAnnFormOpen(false);
+      flash('ok', 'Announcement published.');
     } catch (err: any) {
       setAnnMsg(`❌ Error: ${err?.message || 'Failed'}`);
     }
@@ -670,14 +840,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         date: eventDate,
         time: eventTime,
         location: eventLocation,
+        photoUrl: eventPhotoUrl || undefined,
         status: 'PUBLISHED',
       });
-      setEventMsg('✅ Event scheduled successfully!');
+      setEventMsg('');
+      setIsEventFormOpen(false);
+      flash('ok', 'Event scheduled.');
       setEventTitle('');
       setEventDesc('');
       setEventDate('');
       setEventLocation('');
-      setTimeout(() => setEventMsg(''), 2000);
+      setEventPhotoUrl('');
     } catch (err: any) {
       setEventMsg(`❌ Error: ${err?.message || 'Failed'}`);
     }
@@ -689,10 +862,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setGalleryMsg('Uploading media...');
     try {
       await uploadGalleryPhoto(galleryCaption, galleryUrl, 'published');
-      setGalleryMsg('✅ Media item added successfully!');
+      setGalleryMsg('');
+      setIsGalleryFormOpen(false);
+      flash('ok', 'Media item added.');
       setGalleryCaption('');
       setGalleryUrl('');
-      setTimeout(() => setGalleryMsg(''), 2000);
     } catch (err: any) {
       setGalleryMsg(`❌ Error: ${err?.message || 'Failed'}`);
     }
@@ -708,13 +882,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         mobile: elderMobile,
         location: elderLocation,
         details: elderDetails,
+        photoUrl: elderPhotoUrl || undefined,
       });
-      setElderMsg('✅ Senior citizen recorded successfully!');
+      setElderMsg('');
+      setIsElderFormOpen(false);
+      flash('ok', 'Elder record saved.');
       setElderName('');
       setElderMobile('');
+      setElderPhotoUrl('');
       setElderLocation('');
       setElderDetails('');
-      setTimeout(() => setElderMsg(''), 2000);
     } catch (err: any) {
       setElderMsg(`❌ Error: ${err?.message || 'Failed'}`);
     }
@@ -734,13 +911,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         contactMobile: villageContactMobile,
         isActive: true,
       });
-      setVillageMsg('✅ Village unit registered successfully!');
+      setVillageMsg('');
+      setIsVillageFormOpen(false);
+      flash('ok', 'Village unit registered.');
       setVillageName('');
       setVillageNameHindi('');
       setVillageContactMobile('');
       setVillageOrgName('');
       setVillageOrgNameHindi('');
-      setTimeout(() => setVillageMsg(''), 2000);
     } catch (err: any) {
       setVillageMsg(`❌ Error: ${err?.message || 'Failed'}`);
     }
@@ -773,6 +951,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setActiveTab={handleTabChange}
       onTriggerQuickCreateAction={handleTriggerQuickAction}
     >
+      {/* One notice line for the whole panel — the result of the last action,
+          reported where the eye already is rather than inside a form that has
+          since been dismissed. */}
+      {notice && (
+        <div className="mb-6">
+          <NoticeBanner notice={notice} />
+        </div>
+      )}
+
       {/* ─────────────────────────────────────────────────────────────
           TAB 1: EXECUTIVE DASHBOARD OVERVIEW
       ───────────────────────────────────────────────────────────── */}
@@ -788,7 +975,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <AdminActivityChart />
 
           {/* Pending Triage Queue Table */}
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-6 space-y-4 shadow-xs transition-colors">
+          <div className={`${adminCardClass} p-6 space-y-4 transition-colors`}>
             <div className="flex items-center justify-between">
               <div>
                 <h4 className="text-base font-bold text-slate-900 dark:text-white tracking-tight">
@@ -843,7 +1030,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           Resolve
                         </button>
                         <button
-                          onClick={() => deleteComplaint(comp.id)}
+                          onClick={() =>
+                            askToDelete('Delete grievance?', comp.title, () => deleteComplaint(comp.id))
+                          }
                           className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
                           title="Delete"
                         >
@@ -895,29 +1084,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ───────────────────────────────────────────────────────────── */}
       {activeTab === 'members' && (
         <div className="space-y-6 animate-fade-in">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                Members Directory & Access Control
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
-                {members.length} registered members total | {stats.pendingMembers} pending verification
-              </p>
-            </div>
-            <button
-              onClick={() => setIsAddMemberOpen(true)}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-extrabold text-xs rounded-xl flex items-center gap-2 shadow cursor-pointer self-start sm:self-auto"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add New Member</span>
-            </button>
-          </div>
+          <SectionHeader
+            icon={Users}
+            title="Members Directory & Access Control"
+            description={`${members.length} registered members total · ${stats.pendingMembers} pending verification`}
+            onRefresh={refreshData}
+          >
+            <Button size="sm" onClick={() => setIsAddMemberOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              New Member
+            </Button>
+          </SectionHeader>
 
           {/* Members Growth Trend Chart */}
           <AdminMemberTrendChart />
 
           {/* Search & Filters with State/Village & Date Selector */}
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-4 flex flex-col md:flex-row gap-3">
+          <div className={`${adminCardClass} p-4 flex flex-col md:flex-row gap-3`}>
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 dark:text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -925,7 +1108,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 placeholder="Search by member name or mobile..."
                 value={memberSearch}
                 onChange={(e) => setMemberSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500"
+                className={`${adminInputClass} pl-10`}
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -985,7 +1168,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           {/* Members Table */}
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl overflow-hidden shadow-xs">
+          <div className={`${adminCardClass} overflow-hidden`}>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 dark:bg-[#16161a] text-slate-500 dark:text-zinc-400 font-bold uppercase tracking-wider border-b border-slate-200 dark:border-[#222328]">
@@ -1000,6 +1183,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-[#1e1f24] text-slate-700 dark:text-zinc-300">
+                  {filteredMembersList.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-10 text-center text-xs text-slate-500 dark:text-zinc-400">
+                        No members match these filters.
+                      </td>
+                    </tr>
+                  )}
                   {filteredMembersList.map((mem) => {
                     const memVillage = villages.find((v) => v.id === mem.villageId);
                     return (
@@ -1071,7 +1261,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
-                            onClick={() => deleteMember(mem.id)}
+                            onClick={() =>
+                              askToDelete('Remove member?', mem.name, () => deleteMember(mem.id))
+                            }
                             className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
                             title="Delete"
                           >
@@ -1093,17 +1285,110 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ───────────────────────────────────────────────────────────── */}
       {activeTab === 'problems' && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              Grievance Triage & Resolution
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Manage status and record resolution steps for submitted civic complaints
-            </p>
-          </div>
+          <SectionHeader
+            icon={AlertTriangle}
+            title="Grievance Triage & Resolution"
+            description="Manage status and record resolution steps for submitted civic complaints."
+            onRefresh={refreshData}
+          >
+            <Button size="sm" onClick={() => setIsComplaintFormOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              File Grievance
+            </Button>
+          </SectionHeader>
+
+          <EditorDialog
+            isOpen={isComplaintFormOpen}
+            onClose={() => setIsComplaintFormOpen(false)}
+            title="File a grievance"
+            description="Filed on behalf of a resident who walks in or phones."
+          >
+            <div className="space-y-4">
+            {compMsg && (
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-xl">
+                {compMsg}
+              </div>
+            )}
+            <form onSubmit={handleComplaintSubmit} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  required
+                  placeholder="Grievance title"
+                  value={compTitle}
+                  onChange={(e) => setCompTitle(e.target.value)}
+                  className={adminInputClass}
+                />
+                <select
+                  value={compCategory}
+                  onChange={(e) => setCompCategory(e.target.value as ComplaintCategory)}
+                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  {COMPLAINT_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <textarea
+                required
+                rows={3}
+                placeholder="What is the problem?"
+                value={compDesc}
+                onChange={(e) => setCompDesc(e.target.value)}
+                className={adminInputClass}
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  type="text"
+                  required
+                  placeholder="Location in the village"
+                  value={compLocation}
+                  onChange={(e) => setCompLocation(e.target.value)}
+                  className={adminInputClass}
+                />
+                <input
+                  type="text"
+                  required
+                  placeholder="Reported by"
+                  value={compReporterName}
+                  onChange={(e) => setCompReporterName(e.target.value)}
+                  className={adminInputClass}
+                />
+                <input
+                  type="tel"
+                  required
+                  placeholder="Reporter mobile"
+                  value={compReporterMobile}
+                  onChange={(e) => setCompReporterMobile(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+              <ImageUploader
+                value={compPhotoUrl}
+                onChange={setCompPhotoUrl}
+                onRemove={() => setCompPhotoUrl('')}
+                bucket="images"
+                folder="complaints"
+                label="Photo of the problem"
+                aspectRatio="video"
+                hint="Optional — drag an image here or click to choose; crop before it uploads"
+              />
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsComplaintFormOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm">
+                  File Grievance
+                </Button>
+              </div>
+            </form>
+            </div>
+          </EditorDialog>
 
           {/* Search & Filter with Date Selector */}
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-4 flex flex-col md:flex-row gap-3">
+          <div className={`${adminCardClass} p-4 flex flex-col md:flex-row gap-3`}>
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 dark:text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -1111,9 +1396,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 placeholder="Search by title, description or reporter..."
                 value={problemSearch}
                 onChange={(e) => setProblemSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500"
+                className={`${adminInputClass} pl-10`}
               />
             </div>
+
             <div className="flex flex-wrap items-center gap-2">
               <select
                 value={problemStatusFilter}
@@ -1150,10 +1436,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           {/* Grievances List */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredProblemsList.length === 0 && (
+              <EmptyState message="No grievances match these filters." className="" />
+            )}
             {filteredProblemsList.map((prob) => (
               <div
                 key={prob.id}
-                className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-4 shadow-xs"
+                className={`${adminCardClass} p-5 space-y-4`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -1205,7 +1494,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => deleteComplaint(prob.id)}
+                      onClick={() =>
+                        askToDelete('Delete grievance?', prob.title, () => deleteComplaint(prob.id))
+                      }
                       className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
                       title="Delete"
                     >
@@ -1224,17 +1515,105 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ───────────────────────────────────────────────────────────── */}
       {activeTab === 'social-work' && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              Social Initiatives & Development Works
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Review, approve, and showcase verified community initiatives
-            </p>
-          </div>
+          <SectionHeader
+            icon={HeartHandshake}
+            title="Social Initiatives & Development Works"
+            description="Review, approve, and showcase verified community initiatives."
+            onRefresh={refreshData}
+          >
+            <Button size="sm" onClick={() => setIsSocialFormOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              New Initiative
+            </Button>
+          </SectionHeader>
+
+          <EditorDialog
+            isOpen={isSocialFormOpen}
+            onClose={() => setIsSocialFormOpen(false)}
+            title="Record an initiative"
+            description="Appears on the public social work page once approved."
+          >
+            <div className="space-y-4">
+            {socialMsg && (
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-xl">
+                {socialMsg}
+              </div>
+            )}
+            <form onSubmit={handleSocialWorkSubmit} className="space-y-3">
+              <input
+                type="text"
+                required
+                placeholder="Initiative title"
+                value={socialTitle}
+                onChange={(e) => setSocialTitle(e.target.value)}
+                className={adminInputClass}
+              />
+              <textarea
+                required
+                rows={3}
+                placeholder="What was done, and by whom?"
+                value={socialDesc}
+                onChange={(e) => setSocialDesc(e.target.value)}
+                className={adminInputClass}
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <DatePicker
+                  value={socialDate}
+                  onChange={(d) => setSocialDate(d)}
+                  placeholder="Date of the initiative"
+                  lang="en"
+                  className="py-2 text-xs"
+                />
+                <input
+                  type="text"
+                  required
+                  placeholder="Location"
+                  value={socialLocation}
+                  onChange={(e) => setSocialLocation(e.target.value)}
+                  className={adminInputClass}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input
+                  type="text"
+                  required
+                  placeholder="Submitted by"
+                  value={socialSubmitterName}
+                  onChange={(e) => setSocialSubmitterName(e.target.value)}
+                  className={adminInputClass}
+                />
+                <input
+                  type="tel"
+                  placeholder="Submitter mobile (optional)"
+                  value={socialSubmitterMobile}
+                  onChange={(e) => setSocialSubmitterMobile(e.target.value)}
+                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500 font-mono"
+                />
+              </div>
+              <ImageUploader
+                value={socialPhotoUrl}
+                onChange={setSocialPhotoUrl}
+                onRemove={() => setSocialPhotoUrl('')}
+                bucket="images"
+                folder="social-work"
+                label="Photo of the initiative"
+                aspectRatio="video"
+                hint="Optional — drag an image here or click to choose; crop before it uploads"
+              />
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsSocialFormOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm">
+                  Record Initiative
+                </Button>
+              </div>
+            </form>
+            </div>
+          </EditorDialog>
 
           {/* Search & Filter Bar */}
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-4 flex flex-col md:flex-row gap-3">
+          <div className={`${adminCardClass} p-4 flex flex-col md:flex-row gap-3`}>
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 dark:text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -1242,9 +1621,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 placeholder="Search initiatives by title or submitter..."
                 value={socialSearch}
                 onChange={(e) => setSocialSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500"
+                className={`${adminInputClass} pl-10`}
               />
             </div>
+
             <div className="flex flex-wrap items-center gap-2">
               <select
                 value={socialStatusFilter}
@@ -1280,10 +1660,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredSocialList.length === 0 && (
+              <EmptyState message="No initiatives match these filters." className="md:col-span-2" />
+            )}
             {filteredSocialList.map((soc) => (
               <div
                 key={soc.id}
-                className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-4 shadow-xs"
+                className={`${adminCardClass} p-5 space-y-4`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
@@ -1334,7 +1717,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => deleteSocialWork(soc.id)}
+                      onClick={() =>
+                        askToDelete('Delete initiative?', soc.title, () => deleteSocialWork(soc.id))
+                      }
                       className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
                       title="Delete"
                     >
@@ -1353,20 +1738,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ───────────────────────────────────────────────────────────── */}
       {activeTab === 'announcements' && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              Public Notices & Announcements
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Broadcast administrative updates, government schemes, and emergency notices
-            </p>
-          </div>
+          <SectionHeader
+            icon={Volume2}
+            title="Public Notices & Announcements"
+            description="Broadcast administrative updates, government schemes, and emergency notices."
+            onRefresh={refreshData}
+          >
+            <Button size="sm" onClick={() => setIsAnnFormOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              New Announcement
+            </Button>
+          </SectionHeader>
 
-          {/* Form */}
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-4 shadow-xs">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              + Publish New Announcement
-            </h4>
+          <EditorDialog
+            isOpen={isAnnFormOpen}
+            onClose={() => setIsAnnFormOpen(false)}
+            title="Publish an announcement"
+            description="Goes out on the public notices page."
+          >
+            <div className="space-y-4">
             {annMsg && (
               <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-xl">
                 {annMsg}
@@ -1379,7 +1769,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 placeholder="Announcement Title"
                 value={annTitle}
                 onChange={(e) => setAnnTitle(e.target.value)}
-                className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500"
+                className={adminInputClass}
               />
               <textarea
                 required
@@ -1387,23 +1777,34 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 placeholder="Announcement Content / Details"
                 value={annDesc}
                 onChange={(e) => setAnnDesc(e.target.value)}
-                className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500"
+                className={adminInputClass}
               />
-              <button
-                type="submit"
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-extrabold text-xs rounded-xl shadow cursor-pointer"
-              >
-                Publish Announcement
-              </button>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsAnnFormOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm">
+                  Publish Announcement
+                </Button>
+              </div>
             </form>
-          </div>
+            </div>
+          </EditorDialog>
 
           {/* List */}
           <div className="space-y-3">
+            {publicInfos.length === 0 && (
+              <EmptyState message="No announcements published yet." className="" />
+            )}
             {publicInfos.map((info) => (
               <div
                 key={info.id}
-                className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-4 flex items-start justify-between gap-4 shadow-xs"
+                className={`${adminCardClass} p-4 flex items-start justify-between gap-4`}
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
@@ -1432,7 +1833,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => deleteAnnouncement(info.id)}
+                    onClick={() =>
+                      askToDelete('Delete announcement?', info.name || 'this notice', () =>
+                        deleteAnnouncement(info.id)
+                      )
+                    }
                     className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
                     title="Delete"
                   >
@@ -1450,20 +1855,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ───────────────────────────────────────────────────────────── */}
       {activeTab === 'events' && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              Events & Community Calendar
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Schedule and manage upcoming meetings, cleanliness drives, and village activities
-            </p>
-          </div>
+          <SectionHeader
+            icon={Calendar}
+            title="Events & Community Calendar"
+            description="Schedule and manage upcoming meetings, cleanliness drives, and village activities."
+            onRefresh={refreshData}
+          >
+            <Button size="sm" onClick={() => setIsEventFormOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              New Event
+            </Button>
+          </SectionHeader>
 
-          {/* Form with DatePicker */}
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-4 shadow-xs">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              + Schedule New Event
-            </h4>
+          <EditorDialog
+            isOpen={isEventFormOpen}
+            onClose={() => setIsEventFormOpen(false)}
+            title="Schedule an event"
+            description="Appears on the public events calendar."
+          >
+            <div className="space-y-4">
             {eventMsg && (
               <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-xl">
                 {eventMsg}
@@ -1477,7 +1887,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   placeholder="Event Title"
                   value={eventTitle}
                   onChange={(e) => setEventTitle(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                  className={adminInputClass}
                 />
                 <div className="w-full">
                   <DatePicker
@@ -1495,7 +1905,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   placeholder="Location / Venue"
                   value={eventLocation}
                   onChange={(e) => setEventLocation(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                  className={adminInputClass}
                 />
               </div>
               <input
@@ -1503,19 +1913,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 placeholder="Description / Agenda"
                 value={eventDesc}
                 onChange={(e) => setEventDesc(e.target.value)}
-                className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                className={adminInputClass}
               />
-              <button
-                type="submit"
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-extrabold text-xs rounded-xl shadow cursor-pointer"
-              >
-                Schedule Event
-              </button>
+              <ImageUploader
+                value={eventPhotoUrl}
+                onChange={setEventPhotoUrl}
+                onRemove={() => setEventPhotoUrl('')}
+                bucket="images"
+                folder="events"
+                label="Event photo"
+                aspectRatio="video"
+                hint="Optional — drag an image here or click to choose; crop before it uploads"
+              />
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsEventFormOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm">
+                  Schedule Event
+                </Button>
+              </div>
             </form>
-          </div>
+            </div>
+          </EditorDialog>
 
           {/* Search & Filter Bar */}
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-4 flex flex-col md:flex-row gap-3">
+          <div className={`${adminCardClass} p-4 flex flex-col md:flex-row gap-3`}>
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-slate-400 dark:text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -1523,7 +1946,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 placeholder="Search events by title or venue..."
                 value={eventSearch}
                 onChange={(e) => setEventSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500"
+                className={`${adminInputClass} pl-10`}
               />
             </div>
             <div className="w-44 relative">
@@ -1548,10 +1971,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           {/* List */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredEventsList.length === 0 && (
+              <EmptyState message="No events match these filters." className="md:col-span-2" />
+            )}
             {filteredEventsList.map((ev) => (
               <div
                 key={ev.id}
-                className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-3 shadow-xs"
+                className={`${adminCardClass} p-5 space-y-3`}
               >
                 <div className="flex items-start justify-between">
                   <div>
@@ -1576,7 +2002,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => deleteEvent(ev.id)}
+                      onClick={() =>
+                        askToDelete('Delete event?', ev.title, () => deleteEvent(ev.id))
+                      }
                       className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
                       title="Delete"
                     >
@@ -1585,9 +2013,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </div>
                 </div>
                 <p className="text-xs text-slate-600 dark:text-zinc-300">{ev.description}</p>
-                <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex items-center justify-between text-[11px] text-slate-400 dark:text-zinc-500 font-mono">
+                <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400 dark:text-zinc-500 font-mono">
                   <span>📅 {ev.date}</span>
                   <span>📍 {ev.location}</span>
+                  <select
+                    value={ev.status || 'PUBLISHED'}
+                    onChange={(e) => updateEventStatus(ev.id, e.target.value as EventStatus)}
+                    className="px-2 py-1 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-lg text-[10px] font-bold text-slate-900 dark:text-white outline-none cursor-pointer"
+                    title="Event status"
+                  >
+                    {EVENT_STATUSES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             ))}
@@ -1600,20 +2040,25 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ───────────────────────────────────────────────────────────── */}
       {activeTab === 'villages' && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              Village Units & Multi-Tenant Management
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Manage village chapters, local unit assignments, and local administrators
-            </p>
-          </div>
+          <SectionHeader
+            icon={Globe}
+            title="Village Units & Multi-Tenant Management"
+            description="Manage village chapters, local unit assignments, and local administrators."
+            onRefresh={refreshData}
+          >
+            <Button size="sm" onClick={() => setIsVillageFormOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              New Village
+            </Button>
+          </SectionHeader>
 
-          {/* Form */}
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-4 shadow-xs">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              + Register New Village Unit
-            </h4>
+          <EditorDialog
+            isOpen={isVillageFormOpen}
+            onClose={() => setIsVillageFormOpen(false)}
+            title="Register a village unit"
+            description="Creates a new chapter of the Manch."
+          >
+            <div className="space-y-4">
             {villageMsg && (
               <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-xl">
                 {villageMsg}
@@ -1627,7 +2072,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   placeholder="Village Name (English, e.g. Jamua)"
                   value={villageName}
                   onChange={(e) => setVillageName(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                  className={adminInputClass}
                 />
                 <input
                   type="text"
@@ -1635,7 +2080,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   placeholder="Village Name (Hindi / Local, e.g. जमुआ)"
                   value={villageNameHindi}
                   onChange={(e) => setVillageNameHindi(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                  className={adminInputClass}
                 />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1652,24 +2097,30 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   placeholder="Organization Chapter Name (e.g. Jamua Youth Manch)"
                   value={villageOrgName}
                   onChange={(e) => setVillageOrgName(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                  className={adminInputClass}
                 />
               </div>
-              <button
-                type="submit"
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-extrabold text-xs rounded-xl shadow cursor-pointer"
-              >
-                Register Village Unit
-              </button>
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsVillageFormOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm">
+                  Register Village Unit
+                </Button>
+              </div>
             </form>
-          </div>
+            </div>
+          </EditorDialog>
 
           {/* List */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {villages.length === 0 && (
+              <EmptyState message="No village units yet." className="md:col-span-3" />
+            )}
             {villages.map((v) => (
               <div
                 key={v.id}
-                className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-3 shadow-xs"
+                className={`${adminCardClass} p-5 space-y-3`}
               >
                 <div className="flex items-center justify-between">
                   <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-[#1c1d22] flex items-center justify-center font-bold text-xs text-emerald-600 dark:text-emerald-400">
@@ -1692,7 +2143,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </button>
                     {villages.length > 1 && (
                       <button
-                        onClick={() => deleteVillage(v.id)}
+                        onClick={() =>
+                          askToDelete('Delete village?', v.name, () => deleteVillage(v.id))
+                        }
                         className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
                         title="Delete"
                       >
@@ -1723,59 +2176,81 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ───────────────────────────────────────────────────────────── */}
       {activeTab === 'gallery' && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              Media & Visual Gallery
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Manage visual documentation of village initiatives, meetings, and achievements
-            </p>
-          </div>
+          <SectionHeader
+            icon={ImageIcon}
+            title="Media & Visual Gallery"
+            description="Manage visual documentation of village initiatives, meetings, and achievements."
+            onRefresh={refreshData}
+          >
+            <Button size="sm" onClick={() => setIsGalleryFormOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              Add Media
+            </Button>
+          </SectionHeader>
 
-          {/* Form */}
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-4 shadow-xs">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              + Add Media Item
-            </h4>
+          <FilterBar>
+            <SearchInput
+              value={gallerySearch}
+              onChange={setGallerySearch}
+              placeholder="Search media by caption or uploader..."
+            />
+          </FilterBar>
+
+          <EditorDialog
+            isOpen={isGalleryFormOpen}
+            onClose={() => setIsGalleryFormOpen(false)}
+            title="Add a media item"
+            description="Appears in the public gallery."
+          >
+            <div className="space-y-4">
             {galleryMsg && (
               <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-xl">
                 {galleryMsg}
               </div>
             )}
             <form onSubmit={handleGallerySubmit} className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input
-                  type="text"
-                  required
-                  placeholder="Caption / Description"
-                  value={galleryCaption}
-                  onChange={(e) => setGalleryCaption(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
-                />
-                <input
-                  type="url"
-                  required
-                  placeholder="Image URL (https://...)"
-                  value={galleryUrl}
-                  onChange={(e) => setGalleryUrl(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none font-mono"
-                />
+              <input
+                type="text"
+                required
+                placeholder="Caption / Description"
+                value={galleryCaption}
+                onChange={(e) => setGalleryCaption(e.target.value)}
+                className={adminInputClass}
+              />
+              {/* Was a box to paste a URL into, which meant the image had to be
+                  hosted somewhere else first. The uploader crops, compresses and
+                  stores it, and hands back the CDN URL the form submits. */}
+              <ImageUploader
+                value={galleryUrl}
+                onChange={setGalleryUrl}
+                onRemove={() => setGalleryUrl('')}
+                bucket="images"
+                folder="gallery"
+                label="Photo"
+                aspectRatio="video"
+                hint="Drag an image here or click to choose — crop before it uploads"
+              />
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsGalleryFormOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm">
+                  Add to Gallery
+                </Button>
               </div>
-              <button
-                type="submit"
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-extrabold text-xs rounded-xl shadow cursor-pointer"
-              >
-                Add to Gallery
-              </button>
             </form>
-          </div>
+            </div>
+          </EditorDialog>
 
           {/* List */}
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {gallery.map((item) => (
+            {filteredGalleryList.length === 0 && (
+              <EmptyState message="No media items match this search." className="col-span-2 sm:col-span-3 md:col-span-4" />
+            )}
+            {filteredGalleryList.map((item) => (
               <div
                 key={item.id}
-                className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl overflow-hidden shadow-xs group"
+                className={`${adminCardClass} overflow-hidden group`}
               >
                 <div className="h-32 bg-slate-100 dark:bg-[#18181c] relative overflow-hidden">
                   <img
@@ -1783,7 +2258,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     alt={item.caption || 'Gallery image'}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                   />
+                  {item.status === 'pending' && (
+                    <span className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-amber-500/90 text-white text-[10px] font-bold">
+                      Pending
+                    </span>
+                  )}
                   <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                    {item.status === 'pending' && (
+                      <button
+                        onClick={() => approveGalleryPhoto(item.id)}
+                        className="p-1.5 bg-black/70 hover:bg-emerald-600 text-white rounded-lg transition cursor-pointer"
+                        title="Approve and publish"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     <button
                       onClick={() => {
                         setEditingGallery(item);
@@ -1795,7 +2284,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => deleteGalleryItem(item.id)}
+                      onClick={() =>
+                        askToDelete('Delete media item?', item.caption || 'this image', () =>
+                          deleteGalleryItem(item.id)
+                        )
+                      }
                       className="p-1.5 bg-black/70 hover:bg-rose-600 text-white rounded-lg transition cursor-pointer"
                       title="Delete"
                     >
@@ -1822,20 +2315,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       ───────────────────────────────────────────────────────────── */}
       {activeTab === 'elders' && (
         <div className="space-y-6 animate-fade-in">
-          <div>
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-              Senior Citizens & Elder Honors
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-zinc-400">
-              Directory honoring respected senior villagers and their lifelong community contributions
-            </p>
-          </div>
+          <SectionHeader
+            icon={Award}
+            title="Senior Citizens & Elder Honors"
+            description="Directory honoring respected senior villagers and their lifelong community contributions."
+            onRefresh={refreshData}
+          >
+            <Button size="sm" onClick={() => setIsElderFormOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />
+              New Elder
+            </Button>
+          </SectionHeader>
 
-          {/* Form */}
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-4 shadow-xs">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              + Add Senior Citizen Record
-            </h4>
+          <FilterBar>
+            <SearchInput
+              value={elderSearch}
+              onChange={setElderSearch}
+              placeholder="Search elders by name, mobile or location..."
+            />
+          </FilterBar>
+
+          <EditorDialog
+            isOpen={isElderFormOpen}
+            onClose={() => setIsElderFormOpen(false)}
+            title="Honour an elder"
+            description="Appears in the public elders directory."
+          >
+            <div className="space-y-4">
             {elderMsg && (
               <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-xl">
                 {elderMsg}
@@ -1849,7 +2355,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   placeholder="Full Name"
                   value={elderName}
                   onChange={(e) => setElderName(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                  className={adminInputClass}
                 />
                 <input
                   type="tel"
@@ -1865,7 +2371,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   placeholder="Location / Hamlet"
                   value={elderLocation}
                   onChange={(e) => setElderLocation(e.target.value)}
-                  className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                  className={adminInputClass}
                 />
               </div>
               <input
@@ -1873,23 +2379,39 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 placeholder="Contributions / Field of Service"
                 value={elderDetails}
                 onChange={(e) => setElderDetails(e.target.value)}
-                className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                className={adminInputClass}
               />
-              <button
-                type="submit"
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black font-extrabold text-xs rounded-xl shadow cursor-pointer"
-              >
-                Save Record
-              </button>
+              <ImageUploader
+                value={elderPhotoUrl}
+                onChange={setElderPhotoUrl}
+                onRemove={() => setElderPhotoUrl('')}
+                bucket="images"
+                folder="elders"
+                label="Photograph"
+                aspectRatio="square"
+                hint="Optional — the crop step keeps the face centred"
+              />
+              <div className="flex items-center justify-end gap-2 pt-1">
+                <Button type="button" variant="outline" size="sm" onClick={() => setIsElderFormOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm">
+                  Save Record
+                </Button>
+              </div>
             </form>
-          </div>
+            </div>
+          </EditorDialog>
 
           {/* List */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {elders.map((el) => (
+            {filteredEldersList.length === 0 && (
+              <EmptyState message="No elders match this search." className="md:col-span-2" />
+            )}
+            {filteredEldersList.map((el) => (
               <div
                 key={el.id}
-                className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-3 shadow-xs"
+                className={`${adminCardClass} p-5 space-y-3`}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
@@ -1915,7 +2437,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => deleteElder(el.id)}
+                      onClick={() =>
+                        askToDelete('Remove honoured elder?', el.name, () => deleteElder(el.id))
+                      }
                       className="p-1 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition cursor-pointer"
                       title="Delete"
                     >
@@ -1953,7 +2477,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </p>
           </div>
 
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-6 space-y-5 shadow-xs">
+          <div className={`${adminCardClass} p-6 space-y-5`}>
             <h4 className="text-sm font-bold text-slate-900 dark:text-white">
               Organization Profile
             </h4>
@@ -1972,7 +2496,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     type="text"
                     value={orgName}
                     onChange={(e) => setOrgName(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                    className={adminInputClass}
                   />
                 </div>
                 <div>
@@ -1983,7 +2507,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     type="text"
                     value={orgNameHindi}
                     onChange={(e) => setOrgNameHindi(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                    className={adminInputClass}
                   />
                 </div>
               </div>
@@ -1997,7 +2521,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     type="text"
                     value={tagline}
                     onChange={(e) => setTagline(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                    className={adminInputClass}
                   />
                 </div>
                 <div>
@@ -2008,7 +2532,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     type="text"
                     value={taglineHindi}
                     onChange={(e) => setTaglineHindi(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none"
+                    className={adminInputClass}
                   />
                 </div>
               </div>
@@ -2023,7 +2547,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
           {/* Supabase Storage Integration Card */}
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-6 space-y-4 shadow-xs">
+          <div className={`${adminCardClass} p-6 space-y-4`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">
@@ -3005,6 +3529,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         onSuccess={() => {
           refreshData();
         }}
+      />
+
+      {/* One confirmation for every destructive action in the panel. */}
+      <ConfirmDialog
+        target={confirmTarget}
+        busy={confirmBusy}
+        onCancel={() => setConfirmTarget(null)}
+        onConfirm={runConfirmedAction}
       />
     </AdminLayout>
   );

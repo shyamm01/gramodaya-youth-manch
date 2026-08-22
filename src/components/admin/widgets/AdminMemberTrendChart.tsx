@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/src/context/AppContext';
-import { DatePicker } from '../ui/DatePicker';
+import { DatePicker } from '../../inputs/DatePicker';
 import {
   TrendingUp,
   Users,

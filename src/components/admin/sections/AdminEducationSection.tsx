@@ -31,9 +31,15 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { apiClient } from '@/src/lib/apiClient';
-import { Dialog } from '../ui/dialog';
-import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
+import { Modal } from '../../ui/modal';
+import { Badge } from '../../ui/badge';
+import { Button } from '../../ui/button';
+import {
+  adminCardClass,
+  adminInputClass,
+  adminLabelClass,
+  SectionSkeleton,
+} from '../section-ui';
 import type {
   EducationCategory,
   EducationEnquiry,
@@ -58,70 +64,11 @@ const RESOURCE_TYPES = [
 ] as const;
 const LINK_TYPES = ['portal', 'pdf', 'video', 'form', 'contact', 'other'] as const;
 
-const inputClass =
-  'w-full px-3.5 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500 dark:focus:border-emerald-500 transition';
-const labelClass =
-  'block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400 mb-1.5';
-const cardClass =
-  'bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl shadow-xs';
-
-const shimmerClass = 'bg-slate-100 dark:bg-[#1c1c20] rounded-lg animate-pulse';
-
-/**
- * Placeholder that matches the shape of whichever view is loading, so the
- * layout does not jump once the real rows arrive: cards for categories and
- * enquiries, a table for resources.
- */
-const SectionSkeleton: React.FC<{ view: SectionView }> = ({ view }) => {
-  if (view === 'resources') {
-    return (
-      <div className={`${cardClass} overflow-hidden`}>
-        <div className="bg-slate-50 dark:bg-[#18181c] px-4 py-3 flex items-center gap-4">
-          {['w-24', 'w-20', 'w-16', 'w-14'].map((w) => (
-            <div key={w} className={`${shimmerClass} h-2.5 ${w}`} />
-          ))}
-        </div>
-        <div className="divide-y divide-slate-100 dark:divide-[#1e1f24]">
-          {[0, 1, 2, 3, 4].map((row) => (
-            <div key={row} className="px-4 py-3.5 flex items-center gap-4">
-              <div className="flex-1 min-w-0 space-y-1.5">
-                <div className={`${shimmerClass} h-3 w-2/5`} />
-                <div className={`${shimmerClass} h-2.5 w-3/5`} />
-              </div>
-              <div className={`${shimmerClass} h-2.5 w-20 hidden sm:block`} />
-              <div className={`${shimmerClass} h-5 w-20 rounded-full`} />
-              <div className={`${shimmerClass} h-7 w-24 rounded-xl`} />
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-      {[0, 1, 2, 3, 4, 5].map((card) => (
-        <div key={card} className={`${cardClass} p-5 space-y-3`}>
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <div className={`${shimmerClass} h-3.5 w-1/2`} />
-              <div className={`${shimmerClass} h-2.5 w-2/3`} />
-            </div>
-            <div className={`${shimmerClass} h-5 w-16 rounded-full shrink-0`} />
-          </div>
-          <div className="space-y-1.5">
-            <div className={`${shimmerClass} h-2.5 w-full`} />
-            <div className={`${shimmerClass} h-2.5 w-4/5`} />
-          </div>
-          <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex items-center justify-between">
-            <div className={`${shimmerClass} h-2.5 w-24`} />
-            <div className={`${shimmerClass} h-4 w-4 rounded`} />
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-};
+// The look comes from ./sectionUi, shared by every admin section; these
+// aliases keep the markup below unchanged.
+const inputClass = adminInputClass;
+const labelClass = adminLabelClass;
+const cardClass = adminCardClass;
 
 const statusVariant = (status: string) => {
   if (status === 'published' || status === 'resolved') return 'success' as const;
@@ -705,7 +652,7 @@ export const AdminEducationSection: React.FC = () => {
       )}
 
       {loading ? (
-        <SectionSkeleton view={view} />
+        <SectionSkeleton variant={view === 'resources' ? 'table' : 'cards'} />
       ) : (
         <>
           {/* ── CATEGORIES ── */}
@@ -955,7 +902,7 @@ export const AdminEducationSection: React.FC = () => {
       )}
 
       {/* ── CATEGORY EDITOR ── */}
-      <Dialog
+      <Modal
         isOpen={Boolean(categoryForm)}
         onClose={() => setCategoryForm(null)}
         title={categoryForm?.id ? 'Edit Category' : 'New Education Category'}
@@ -1080,10 +1027,10 @@ export const AdminEducationSection: React.FC = () => {
             </div>
           </div>
         )}
-      </Dialog>
+      </Modal>
 
       {/* ── RESOURCE EDITOR ── */}
-      <Dialog
+      <Modal
         isOpen={Boolean(resourceForm)}
         onClose={() => setResourceForm(null)}
         title={resourceForm?.id ? 'Edit Scheme' : 'New Scheme / Resource'}
@@ -1520,10 +1467,10 @@ export const AdminEducationSection: React.FC = () => {
             </div>
           </div>
         )}
-      </Dialog>
+      </Modal>
 
       {/* ── ENQUIRY DETAIL ── */}
-      <Dialog
+      <Modal
         isOpen={Boolean(activeEnquiry)}
         onClose={() => setActiveEnquiry(null)}
         title={activeEnquiry ? `Enquiry from ${activeEnquiry.name}` : ''}
@@ -1593,10 +1540,10 @@ export const AdminEducationSection: React.FC = () => {
             </div>
           </div>
         )}
-      </Dialog>
+      </Modal>
 
       {/* ── DELETE CONFIRMATION ── */}
-      <Dialog
+      <Modal
         isOpen={Boolean(confirmTarget)}
         onClose={() => setConfirmTarget(null)}
         title="Confirm delete"
@@ -1627,7 +1574,7 @@ export const AdminEducationSection: React.FC = () => {
             </div>
           </div>
         )}
-      </Dialog>
+      </Modal>
     </div>
   );
 };

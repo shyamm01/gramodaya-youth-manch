@@ -33,28 +33,32 @@ export async function PATCH(
         .where(eq(schema.complaints.id, numId));
     }
 
+    // The database is the source of truth. The JSON store is a leftover from
+    // before the Postgres migration and holds nothing for rows created since —
+    // updating it stays best-effort, but a row missing from it must not turn a
+    // successful database write into a 404, which is what used to happen.
     const store = loadStore();
     const complaint = store.complaints.find((c) => c.id === id);
+    if (complaint) {
+      complaint.status = status;
+      if (resolvedAtDate) {
+        complaint.resolvedAt = resolvedAtDate.toISOString();
+      }
+      saveStore(store);
+    }
 
-    if (!complaint) {
+    if (!db || isNaN(numId)) {
       return NextResponse.json({ error: 'शिकायत नहीं मिली।' }, { status: 404 });
     }
 
-    complaint.status = status;
-    if (resolvedAtDate) {
-      complaint.resolvedAt = resolvedAtDate.toISOString();
-    }
-
-    saveStore(store);
-
     logAuditAction(
-      `Updated Complaint Status to "${status}" (${complaint.title})`,
+      `Updated Complaint Status to "${status}"`,
       adminName || currentUser.name || 'Admin',
       adminMobile || currentUser.mobile || '',
-      complaint.title
+      complaint?.title || String(id)
     );
 
-    return NextResponse.json({ success: true, complaint });
+    return NextResponse.json({ success: true, complaint: complaint || { id, status } });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Error updating status' }, { status: 500 });
   }

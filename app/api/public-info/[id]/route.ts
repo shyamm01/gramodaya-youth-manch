@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { loadStore, saveStore, logAuditAction } from '@/src/lib/serverStore';
 import { requireAuth } from '@/src/lib/jwtAuth';
+import { getDb } from '@/src/db';
+import * as schema from '@/src/db/schema';
+import { eq } from 'drizzle-orm';
 
 export async function PUT(
   req: Request,
@@ -13,27 +16,52 @@ export async function PUT(
 
     const { id } = await params;
     const body = await req.json();
-    const store = loadStore();
 
-    const index = store.publicInfos.findIndex((i) => i.id === id);
-    if (index === -1) {
+    // Rewritten onto the database: this handler only ever touched the JSON
+    // store, which holds nothing for rows created since the Postgres migration,
+    // so the edit was a no-op that answered 404. The store is still updated
+    // where it happens to carry the row, but it no longer decides the outcome.
+    const db = getDb();
+    const numId = Number(id);
+    if (!db || isNaN(numId)) {
       return NextResponse.json({ error: 'Public info item not found' }, { status: 404 });
     }
 
-    const updated = {
-      ...store.publicInfos[index],
-      ...body,
-      id,
-    };
+    const patch: Record<string, unknown> = {};
+    for (const field of [
+      'title',
+      'description',
+      'category',
+      'submitterName',
+      'submitterMobile',
+      'status',
+    ]) {
+      if (body[field] !== undefined) patch[field] = body[field];
+    }
 
-    store.publicInfos[index] = updated;
-    saveStore(store);
+    const [row] = await db
+      .update(schema.publicInfos)
+      .set(patch)
+      .where(eq(schema.publicInfos.id, numId))
+      .returning();
+
+    if (!row) {
+      return NextResponse.json({ error: 'Public info item not found' }, { status: 404 });
+    }
+    const updated = { ...row, id: String(row.id) };
+
+    const store = loadStore();
+    const index = store.publicInfos.findIndex((i) => i.id === id);
+    if (index !== -1) {
+      store.publicInfos[index] = { ...store.publicInfos[index], ...body, id };
+      saveStore(store);
+    }
 
     logAuditAction(
-      `Updated Public Info (${updated.name || updated.information.slice(0, 20)})`,
+      `Updated Public Info (${updated.title})`,
       body.updaterName || currentUser.name || 'Admin',
       body.updaterMobile || currentUser.mobile || '',
-      updated.name || 'Public Info'
+      updated.title || 'Public Info'
     );
 
     return NextResponse.json({ success: true, publicInfo: updated });
@@ -62,20 +90,32 @@ export async function DELETE(
     const body = await req.json().catch(() => ({}));
     const { adminName, adminMobile } = body;
 
-    const store = loadStore();
-    const item = store.publicInfos.find((i) => i.id === id);
-    if (!item) {
+    const db = getDb();
+    const numId = Number(id);
+    if (!db || isNaN(numId)) {
       return NextResponse.json({ error: 'Public info item not found' }, { status: 404 });
     }
 
-    store.publicInfos = store.publicInfos.filter((i) => i.id !== id);
-    saveStore(store);
+    const [removed] = await db
+      .delete(schema.publicInfos)
+      .where(eq(schema.publicInfos.id, numId))
+      .returning();
+
+    if (!removed) {
+      return NextResponse.json({ error: 'Public info item not found' }, { status: 404 });
+    }
+
+    const store = loadStore();
+    if (store.publicInfos.some((i) => i.id === id)) {
+      store.publicInfos = store.publicInfos.filter((i) => i.id !== id);
+      saveStore(store);
+    }
 
     logAuditAction(
-      `Deleted Public Info (${item.name || item.information.slice(0, 20)})`,
+      `Deleted Public Info (${removed.title})`,
       adminName || currentUser.name || 'Admin',
       adminMobile || currentUser.mobile || '',
-      item.name || 'Public Info'
+      removed.title || 'Public Info'
     );
 
     return NextResponse.json({ success: true });

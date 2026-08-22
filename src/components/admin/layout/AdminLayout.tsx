@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminNavbar } from './AdminNavbar';
-import { AdminQuickCreateModal } from './AdminQuickCreateModal';
+import { AdminQuickCreateModal } from '../widgets/AdminQuickCreateModal';
 
 interface AdminLayoutProps {
   children: React.ReactNode;

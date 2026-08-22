@@ -7,7 +7,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useToast } from '@/src/context/ToastContext';
 import { useApp } from '@/src/context/AppContext';
 import { INDIAN_STATES, DEFAULT_PANCHAYATS } from '@/src/data/geoData';
-import { DatePicker } from '@/src/components/ui/DatePicker';
+import { DatePicker } from '@/src/components/inputs/DatePicker';
 import {
   UserPlus,
   Mail,

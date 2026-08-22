@@ -2,8 +2,8 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import { Upload, X, Loader2, CheckCircle2, AlertCircle, Zap, Crop } from 'lucide-react';
-import { Button } from './button';
-import { Badge } from './badge';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 import { ImageCropperModal } from './ImageCropperModal';
 import { optimizeImage, forceReduceImageSize, formatFileSize, STRICT_UNDER_100KB_LIMIT, OptimizedImageResult } from '@/src/lib/imageOptimizer';
 

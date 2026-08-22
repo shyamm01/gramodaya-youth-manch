@@ -22,7 +22,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { DigitalIdCard } from '../features/DigitalIdCard';
-import { DatePicker, Button, Input, ImageCropperModal } from '../ui';
+import { Button, Input } from '../ui';
+import { DatePicker, ImageCropperModal } from '../inputs';
 
 export const MyProfileModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const {

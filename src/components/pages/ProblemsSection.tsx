@@ -6,15 +6,8 @@ import { useApp } from '../../context/AppContext';
 import { ComplaintCategory, ComplaintStatus } from '../../types';
 import { AlertTriangle, Plus, MapPin, Phone, Trash2 } from 'lucide-react';
 import { StatusBadge } from '../common/EntityLabels';
-import {
-  Button,
-  Card,
-  Input,
-  Textarea,
-  Dialog,
-  Badge,
-  ImageUploader,
-} from '../ui';
+import { Button, Card, Input, Textarea, Modal, Badge } from '../ui';
+import { ImageUploader } from '../inputs';
 
 const CATEGORY_MAP: { id: ComplaintCategory; labelHindi: string; labelEnglish: string; icon: string }[] = [
   { id: 'Water', labelHindi: 'पानी', labelEnglish: 'Water', icon: '🚰' },
@@ -376,7 +369,7 @@ export const ProblemsSection: React.FC = () => {
       )}
 
       {/* New Complaint Modal */}
-      <Dialog
+      <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={t('problems.modalTitle')}
@@ -528,7 +521,7 @@ export const ProblemsSection: React.FC = () => {
             </Button>
           </div>
         </form>
-      </Dialog>
+      </Modal>
     </div>
   );
 };
