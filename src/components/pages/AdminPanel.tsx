@@ -151,6 +151,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     activeVillageId,
     setActiveVillageId,
     publicInfos,
+    announcements,
     villageSettings,
     stats,
     isSuperAdmin,
@@ -1819,10 +1820,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
           {/* List */}
           <div className="space-y-3">
-            {publicInfos.length === 0 && (
+            {announcements.length === 0 && (
               <EmptyState message="No announcements published yet." className="" />
             )}
-            {publicInfos.map((info) => (
+            {announcements.map((info) => (
               <div
                 key={info.id}
                 className={`${adminCardClass} p-4 flex items-start justify-between gap-4`}
@@ -1833,20 +1834,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       NOTICE
                     </Badge>
                     <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-mono">
-                      {info.createdAt?.split('T')[0] || 'N/A'}
+                      {info.date || info.createdAt?.split('T')[0] || 'N/A'}
                     </span>
                   </div>
-                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                    {info.name} ({info.mobile})
-                  </h4>
-                  <p className="text-xs text-slate-600 dark:text-zinc-400">{info.information}</p>
+                  <h4 className="text-sm font-bold text-slate-900 dark:text-white">{info.title}</h4>
+                  <p className="text-xs text-slate-600 dark:text-zinc-400">{info.content}</p>
+                  <p className="text-[10px] text-slate-400 dark:text-zinc-500">
+                    Published by {info.publishedBy}
+                  </p>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => {
                       setEditingAnnouncement(info as any);
-                      setEditAnnTitle(info.name || 'Notice');
-                      setEditAnnContent(info.information || '');
+                      setEditAnnTitle(info.title);
+                      setEditAnnContent(info.content);
                     }}
                     className="p-1.5 text-slate-400 hover:text-slate-900 dark:hover:text-white transition cursor-pointer"
                     title="Edit Announcement"
@@ -1855,7 +1857,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </button>
                   <button
                     onClick={() =>
-                      askToDelete('Delete announcement?', info.name || 'this notice', () =>
+                      askToDelete('Delete announcement?', info.title, () =>
                         deleteAnnouncement(info.id)
                       )
                     }
