@@ -35,6 +35,7 @@ import { GrievancePriorityBadge } from '../features/grievance/GrievancePriorityB
 import { getCategoryLabel } from '../features/grievance/GrievanceCategoryFilter';
 import { GrievanceEditModal } from '../features/grievance/GrievanceEditModal';
 import { GrievanceDeleteModal } from '../features/grievance/GrievanceDeleteModal';
+import { getGrievanceFallbackImage } from '@/src/lib/defaultImages';
 
 interface GrievanceDetailPageProps {
   id: string;
@@ -198,7 +199,8 @@ export const GrievanceDetailPage: React.FC<GrievanceDetailPageProps> = ({ id }) 
     : (complaint.villageNameHindi || complaint.village?.nameHindi || 'रसूलपुर');
 
   const locale = lang === 'en' ? 'en-IN' : 'hi-IN';
-  const primaryPhoto = complaint.attachments?.[0]?.url || complaint.photoUrl;
+  const fallbackImg = getGrievanceFallbackImage(complaint.category);
+  const primaryPhoto = complaint.attachments?.[0]?.url || complaint.photoUrl || fallbackImg;
 
   const isNew = complaint.status === 'NEW';
   const isInProgress = complaint.status === 'ACTION IN PROGRESS';
@@ -419,44 +421,56 @@ export const GrievanceDetailPage: React.FC<GrievanceDetailPageProps> = ({ id }) 
           </div>
 
           {/* Photo Gallery Showcase */}
-          {primaryPhoto && (
-            <div className="space-y-3">
-              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                {lang === 'en' ? 'Attached Photo / Evidence' : 'संलग्न फोटो / प्रमाण'}
-              </h3>
-              <div
-                className="relative rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 cursor-pointer group shadow-sm max-h-96"
-                onClick={() => setLightboxUrl(primaryPhoto)}
-              >
-                <img
-                  src={primaryPhoto}
-                  alt={complaint.title}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-102 max-h-96"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-4 text-white">
-                  <span className="text-xs font-bold flex items-center gap-1.5">
-                    <ImageIcon className="w-4 h-4" />
-                    {lang === 'en' ? 'Click to view full photo' : 'बड़ा फ़ोटो देखने के लिए क्लिक करें'}
-                  </span>
-                </div>
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              {lang === 'en' ? 'Attached Photo / Evidence' : 'संलग्न फोटो / प्रमाण'}
+            </h3>
+            <div
+              className="relative rounded-3xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 cursor-pointer group shadow-sm max-h-96"
+              onClick={() => setLightboxUrl(primaryPhoto)}
+            >
+              <img
+                src={primaryPhoto}
+                alt={complaint.title}
+                onError={(e) => {
+                  if (e.currentTarget.src !== fallbackImg) {
+                    e.currentTarget.src = fallbackImg;
+                  }
+                }}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-102 max-h-96"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-4 text-white">
+                <span className="text-xs font-bold flex items-center gap-1.5">
+                  <ImageIcon className="w-4 h-4" />
+                  {lang === 'en' ? 'Click to view full photo' : 'बड़ा फ़ोटो देखने के लिए क्लिक करें'}
+                </span>
               </div>
-
-              {/* Extra attachments if any */}
-              {complaint.attachments && complaint.attachments.length > 1 && (
-                <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin">
-                  {complaint.attachments.map((att, i) => (
-                    <button
-                      key={att.id || i}
-                      onClick={() => setLightboxUrl(att.url)}
-                      className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-slate-200 dark:border-slate-700 flex-shrink-0 hover:border-emerald-500 transition-all cursor-pointer"
-                    >
-                      <img src={att.url} alt="" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
-          )}
+
+            {/* Extra attachments if any */}
+            {complaint.attachments && complaint.attachments.length > 1 && (
+              <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-thin">
+                {complaint.attachments.map((att, i) => (
+                  <button
+                    key={att.id || i}
+                    onClick={() => setLightboxUrl(att.url)}
+                    className="w-20 h-20 rounded-2xl overflow-hidden border-2 border-slate-200 dark:border-slate-700 flex-shrink-0 hover:border-emerald-500 transition-all cursor-pointer"
+                  >
+                    <img
+                      src={att.url}
+                      alt=""
+                      onError={(e) => {
+                        if (e.currentTarget.src !== fallbackImg) {
+                          e.currentTarget.src = fallbackImg;
+                        }
+                      }}
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Detailed Description */}
           <div className="p-6 sm:p-8 bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs space-y-3">

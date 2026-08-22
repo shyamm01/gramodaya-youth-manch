@@ -14,6 +14,7 @@ import { GrievancePriorityBadge } from "./GrievancePriorityBadge";
 import { getCategoryLabel } from "./GrievanceCategoryFilter";
 import { Card, Badge } from "../../ui";
 import { Complaint, ComplaintPriority } from "../../../types";
+import { getGrievanceFallbackImage } from "../../../lib/defaultImages";
 
 /** Category accent colors for top indicator bar */
 const CATEGORY_ACCENT: Record<string, string> = {
@@ -32,7 +33,7 @@ const CATEGORY_ACCENT: Record<string, string> = {
 };
 
 interface GrievanceCardProps {
-  complaint: Complaint | any;
+  complaint: Complaint;
   isAdmin: boolean;
   isMemberOwner: boolean;
   lang: string;
@@ -82,6 +83,8 @@ export const GrievanceCard: React.FC<GrievanceCardProps> = ({
   const accentColor = CATEGORY_ACCENT[c.category] || "bg-emerald-500";
   const priority: ComplaintPriority = c.priority || "medium";
   const primaryPhoto = c.attachments?.[0]?.url || c.photoUrl;
+  const fallbackImg = getGrievanceFallbackImage(c.category);
+  const photo = primaryPhoto || fallbackImg;
 
   const displayTitle =
     lang === "hi" ? c.titleHindi || c.title : c.title || c.titleHindi;
@@ -151,27 +154,30 @@ export const GrievanceCard: React.FC<GrievanceCardProps> = ({
           {displayDesc}
         </p>
 
-        {/* Optional Thumbnail if photo is attached */}
-        {primaryPhoto && (
-          <div className="mb-3 h-28 sm:h-32 rounded-xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 relative">
-            <img
-              src={primaryPhoto}
-              alt={lang === "en" ? "Grievance preview" : "शिकायत फोटो"}
-              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-              <span className="text-[10px] text-white font-bold flex items-center gap-1">
-                <ImageIcon className="w-3 h-3" />
-                {lang === "en" ? "View Photo" : "फ़ोटो देखें"}
-              </span>
-            </div>
-            {(c.attachments?.length || 0) > 1 && (
-              <span className="absolute top-2 right-2 bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md backdrop-blur-xs">
-                +{c.attachments.length - 1}
-              </span>
-            )}
+        {/* Photo with Default Fallback */}
+        <div className="mb-3 h-28 sm:h-32 rounded-xl overflow-hidden border border-slate-200/80 dark:border-slate-800 bg-slate-100 dark:bg-slate-900 relative">
+          <img
+            src={photo}
+            alt={lang === "en" ? "Grievance preview" : "शिकायत फोटो"}
+            onError={(e) => {
+              if (e.currentTarget.src !== fallbackImg) {
+                e.currentTarget.src = fallbackImg;
+              }
+            }}
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+            <span className="text-[10px] text-white font-bold flex items-center gap-1">
+              <ImageIcon className="w-3 h-3" />
+              {lang === "en" ? "View Photo" : "फ़ोटो देखें"}
+            </span>
           </div>
-        )}
+          {(c.attachments?.length || 0) > 1 && (
+            <span className="absolute top-2 right-2 bg-black/60 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md backdrop-blur-xs">
+              +{c.attachments.length - 1}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Card Footer: Location, Time & CTA */}

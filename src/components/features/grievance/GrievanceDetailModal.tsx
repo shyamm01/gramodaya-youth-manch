@@ -21,6 +21,7 @@ import { Button, Badge } from '../../ui';
 import { StatusBadge } from '../../common/EntityLabels';
 import { GrievancePriorityBadge } from './GrievancePriorityBadge';
 import { getCategoryLabel } from './GrievanceCategoryFilter';
+import { getGrievanceFallbackImage } from '../../../lib/defaultImages';
 
 interface GrievanceDetailModalProps {
   isOpen: boolean;
@@ -32,7 +33,7 @@ interface GrievanceDetailModalProps {
   t: (key: string, opts?: any) => string;
   onEdit?: (complaint: Complaint) => void;
   onDelete?: (complaint: Complaint) => void;
-  onStatusChange?: (id: string, status: ComplaintStatus) => Promise<void>;
+  onStatusChange?: (id: string | number, status: ComplaintStatus) => Promise<void>;
 }
 
 export const GrievanceDetailModal: React.FC<GrievanceDetailModalProps> = ({
@@ -58,7 +59,8 @@ export const GrievanceDetailModal: React.FC<GrievanceDetailModalProps> = ({
 
   if (!isOpen || !c) return null;
 
-  const primaryPhoto = c.attachments?.[0]?.url || c.photoUrl;
+  const fallbackImg = getGrievanceFallbackImage(c?.category);
+  const primaryPhoto = c.attachments?.[0]?.url || c.photoUrl || fallbackImg;
   const locale = lang === 'en' ? 'en-IN' : 'hi-IN';
 
   const handleShare = async () => {
@@ -88,9 +90,9 @@ export const GrievanceDetailModal: React.FC<GrievanceDetailModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header Bar */}
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-[#131927]/60 backdrop-blur-sm">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800/80">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-lg bg-[#1E3A2F] dark:bg-emerald-950 text-amber-300 dark:text-emerald-300 font-mono border border-[#2D5545] dark:border-emerald-800 shadow-xs">
+            <span className="text-xs font-mono font-black px-2.5 py-1 rounded-lg bg-slate-900 dark:bg-black text-amber-300 dark:text-emerald-300 border border-slate-700 dark:border-slate-800">
               #{c.id}
             </span>
             <Badge variant="secondary" className="text-xs rounded-lg font-bold">
@@ -100,79 +102,83 @@ export const GrievanceDetailModal: React.FC<GrievanceDetailModalProps> = ({
             <StatusBadge status={c.status} size="sm" lang={lang} />
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={handleShare}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-              title={lang === 'en' ? 'Share link' : 'लिंक साझा करें'}
-            >
-              {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Share2 className="w-4 h-4" />}
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-              title={t('common.close')}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        {/* Modal Scrollable Body */}
-        <div className="p-4 sm:p-6 max-h-[calc(85vh-130px)] overflow-y-auto space-y-5 scrollbar-thin">
-          {/* Title */}
+        {/* Modal Body */}
+        <div className="p-4 sm:p-6 max-h-[75vh] overflow-y-auto space-y-6">
+          {/* Grievance Title */}
           <div>
-            <h2 className="text-lg sm:text-xl font-black text-[#2C3327] dark:text-white leading-snug tracking-tight">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 w-fit px-2.5 py-0.5 rounded-md mb-2">
+              <Building2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>{lang === 'en' ? (c.villageName || c.village?.name || 'Rasoolpur') : (c.villageNameHindi || c.village?.nameHindi || 'रसूलपुर')}</span>
+            </div>
+            <h3 className="text-xl sm:text-2xl font-black text-[#2C3327] dark:text-white leading-tight">
               {displayTitle}
-            </h2>
+            </h3>
           </div>
 
-          {/* Status Progress Stepper */}
-          <div className="p-4 rounded-2xl bg-[#F7F5F0] dark:bg-[#111726] border border-[#E0DCCF] dark:border-slate-800/80">
-            <p className="text-[11px] font-bold text-[#8C8675] dark:text-slate-400 uppercase tracking-wider mb-3">
-              {lang === 'en' ? 'Resolution Progress' : 'निस्तारण प्रगति स्थिति'}
-            </p>
+          {/* Stepper Timeline */}
+          <div className="p-4 rounded-2xl bg-[#FAF9F5] dark:bg-[#151C2C] border border-slate-200/80 dark:border-slate-800">
+            <h4 className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">
+              {lang === 'en' ? 'Resolution Stepper' : 'निस्तारण प्रक्रिया'}
+            </h4>
             <div className="grid grid-cols-3 gap-2 relative">
-              {/* Step 1: Registered */}
-              <div className="flex flex-col items-center text-center">
-                <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold text-xs shadow-md shadow-blue-500/20 mb-1.5">
+              <div className="absolute top-3.5 left-[15%] right-[15%] h-0.5 bg-slate-200 dark:bg-slate-700 -z-0">
+                <div
+                  className={`h-full bg-emerald-500 transition-all duration-300 ${
+                    isResolved ? 'w-full' : isInProgress ? 'w-1/2' : 'w-0'
+                  }`}
+                />
+              </div>
+
+              {/* Step 1 */}
+              <div className="flex flex-col items-center text-center relative z-10">
+                <div className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-[11px] mb-1.5 shadow-sm">
                   ✓
                 </div>
-                <span className="text-[11px] font-bold text-slate-900 dark:text-white">
-                  {lang === 'en' ? 'Submitted' : 'दर्ज'}
+                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                  {lang === 'en' ? 'Submitted' : 'दर्ज की गई'}
                 </span>
-                <span className="text-[9px] text-[#8C8675] dark:text-slate-400 font-mono mt-0.5">
+                <span className="text-[9px] text-slate-500 font-mono mt-0.5">
                   {c.createdAt ? new Date(c.createdAt).toLocaleDateString(locale, { day: 'numeric', month: 'short' }) : ''}
                 </span>
               </div>
 
-              {/* Step 2: In Progress */}
-              <div className="flex flex-col items-center text-center">
+              {/* Step 2 */}
+              <div className="flex flex-col items-center text-center relative z-10">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-1.5 transition-all ${
+                  className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[11px] mb-1.5 transition-all ${
                     isInProgress || isResolved
-                      ? 'bg-amber-500 text-white shadow-md shadow-amber-500/20'
-                      : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
+                      ? 'bg-emerald-500 text-white shadow-sm'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500'
                   }`}
                 >
-                  {isInProgress ? '⏳' : isResolved ? '✓' : '2'}
+                  {isResolved ? '✓' : '2'}
                 </div>
                 <span
                   className={`text-[11px] font-bold ${
-                    isInProgress || isResolved ? 'text-slate-900 dark:text-white' : 'text-slate-400 dark:text-slate-500'
+                    isInProgress || isResolved
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-slate-400 dark:text-slate-500'
                   }`}
                 >
                   {lang === 'en' ? 'In Progress' : 'प्रक्रियाधीन'}
                 </span>
               </div>
 
-              {/* Step 3: Resolved */}
-              <div className="flex flex-col items-center text-center">
+              {/* Step 3 */}
+              <div className="flex flex-col items-center text-center relative z-10">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs mb-1.5 transition-all ${
+                  className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-[11px] mb-1.5 transition-all ${
                     isResolved
-                      ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
-                      : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500'
+                      ? 'bg-emerald-500 text-white shadow-sm'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500'
                   }`}
                 >
                   {isResolved ? '✓' : '3'}
@@ -193,22 +199,25 @@ export const GrievanceDetailModal: React.FC<GrievanceDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Photo Attachment if present */}
-          {primaryPhoto && (
-            <div
-              className="rounded-2xl overflow-hidden border border-[#E0DCCF] dark:border-slate-800 bg-[#F7F5F0] dark:bg-slate-900 cursor-pointer group/img relative"
-              onClick={() => setLightboxOpen(true)}
-            >
-              <img
-                src={primaryPhoto}
-                alt={lang === 'en' ? 'Grievance Photo' : 'समस्या की फोटो'}
-                className="w-full max-h-72 object-cover transition-transform duration-300 group-hover/img:scale-[1.01]"
-              />
-              <div className="absolute bottom-2.5 right-2.5 bg-black/60 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg backdrop-blur-sm">
-                🔍 {lang === 'en' ? 'Click to zoom' : 'बड़ा करके देखें'}
-              </div>
+          {/* Photo Attachment */}
+          <div
+            className="rounded-2xl overflow-hidden border border-[#E0DCCF] dark:border-slate-800 bg-[#F7F5F0] dark:bg-slate-900 cursor-pointer group/img relative"
+            onClick={() => setLightboxOpen(true)}
+          >
+            <img
+              src={primaryPhoto}
+              alt={lang === 'en' ? 'Grievance Photo' : 'समस्या की फोटो'}
+              onError={(e) => {
+                if (e.currentTarget.src !== fallbackImg) {
+                  e.currentTarget.src = fallbackImg;
+                }
+              }}
+              className="w-full max-h-72 object-cover transition-transform duration-300 group-hover/img:scale-[1.01]"
+            />
+            <div className="absolute bottom-2.5 right-2.5 bg-black/60 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg backdrop-blur-sm">
+              🔍 {lang === 'en' ? 'Click to zoom' : 'बड़ा करके देखें'}
             </div>
-          )}
+          </div>
 
           {/* Description Section */}
           <div className="space-y-2">
