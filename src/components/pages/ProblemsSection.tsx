@@ -1,534 +1,341 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
-import { ComplaintCategory, ComplaintStatus } from '../../types';
-import { AlertTriangle, Plus, MapPin, Phone, Trash2 } from 'lucide-react';
-import { StatusBadge } from '../common/EntityLabels';
+import { Complaint, ComplaintStatus } from '../../types';
+import { AlertTriangle, Building2 } from 'lucide-react';
+import { Button } from '../ui';
 import {
-  Button,
-  Card,
-  Input,
-  Textarea,
-  Dialog,
-  Badge,
-  ImageUploader,
-} from '../ui';
-
-const CATEGORY_MAP: { id: ComplaintCategory; labelHindi: string; labelEnglish: string; icon: string }[] = [
-  { id: 'Water', labelHindi: 'पानी', labelEnglish: 'Water', icon: '🚰' },
-  { id: 'Road', labelHindi: 'सड़क', labelEnglish: 'Road', icon: '🛣️' },
-  { id: 'Electricity', labelHindi: 'बिजली', labelEnglish: 'Electricity', icon: '💡' },
-  { id: 'Cleanliness', labelHindi: 'स्वच्छता', labelEnglish: 'Cleanliness', icon: '🧹' },
-  { id: 'Environment', labelHindi: 'पर्यावरण', labelEnglish: 'Environment', icon: '🌳' },
-  { id: 'Education', labelHindi: 'शिक्षा', labelEnglish: 'Education', icon: '🏫' },
-  { id: 'Health', labelHindi: 'स्वास्थ्य', labelEnglish: 'Health', icon: '🏥' },
-  { id: 'Sanitation', labelHindi: 'शौचालय', labelEnglish: 'Sanitation', icon: '🚽' },
-  { id: 'Animal-related', labelHindi: 'पशु संबंधी मुद्दा', labelEnglish: 'Animal Issue', icon: '🐄' },
-  { id: 'Social Issue', labelHindi: 'सामाजिक मुद्दा', labelEnglish: 'Social Issue', icon: '👥' },
-  { id: 'Government Service', labelHindi: 'सरकारी सेवा', labelEnglish: 'Govt Service', icon: '🏛️' },
-  { id: 'Other', labelHindi: 'अन्य', labelEnglish: 'Other', icon: '📌' },
-];
+  GrievanceListHeader,
+  GrievanceCategoryFilter,
+  GrievanceCard,
+  GrievanceFormModal,
+  GrievanceDetailModal,
+  GrievanceEditModal,
+  GrievanceDeleteModal,
+  GrievanceEmptyState,
+} from '../features/grievance';
 
 export const ProblemsSection: React.FC = () => {
   const {
     complaints: contextComplaints,
+    villages,
+    activeVillageId,
     submitComplaint,
+    editComplaint,
+    deleteComplaint,
+    updateComplaintStatus,
     authSession,
     isApprovedMember,
     currentMemberMobile,
     canEditContent,
     canDeleteContent,
-    updateComplaintStatus,
-    deleteComplaint,
     t,
     lang,
     villageSettings,
   } = useApp();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
 
-  const [fetchedComplaints, setFetchedComplaints] = useState<any[] | null>(null);
+  const [fetchedComplaints, setFetchedComplaints] = useState<Complaint[] | any[] | null>(null);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [unapprovedAlert, setUnapprovedAlert] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string>('ALL');
+  const [selectedVillageFilter, setSelectedVillageFilter] = useState<string>('ALL');
 
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<ComplaintCategory>('Electricity');
-  const [description, setDescription] = useState('');
-  const [location, setLocation] = useState(lang === 'en' ? (villageSettings.name || 'Rasoolpur') : villageSettings.nameHindi);
-  const [reporterName, setReporterName] = useState('');
-  const [reporterMobile, setReporterMobile] = useState('');
-  const [photoUrl, setPhotoUrl] = useState('');
-  const [videoUrl, setVideoUrl] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [msg, setMsg] = useState('');
+  // Modals state
+  const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null);
+  const [editingComplaint, setEditingComplaint] = useState<Complaint | null>(null);
+  const [deletingComplaint, setDeletingComplaint] = useState<Complaint | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const inFlightComplaintsPromiseRef = React.useRef<Promise<any> | null>(null);
+  const inFlightRef = useRef<Promise<any> | null>(null);
 
-  // Dedicated API Fetch: GET /api/complaints (deduplicated)
-  const fetchComplaints = React.useCallback(async () => {
-    if (inFlightComplaintsPromiseRef.current) {
-      return inFlightComplaintsPromiseRef.current;
-    }
+  // Fetch from optimized API with counts
+  const fetchComplaints = useCallback(async () => {
+    if (inFlightRef.current) return inFlightRef.current;
     const promise = (async () => {
       try {
         setLoading(true);
-        const res = await fetch('/api/complaints', { credentials: 'include' });
+        const res = await fetch('/api/complaints?includeCounts=1&limit=100', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.complaints)) {
             setFetchedComplaints(data.complaints);
+            if (data.counts?.byCategory) {
+              setCategoryCounts(data.counts.byCategory);
+            }
           }
         }
       } catch (e) {
         console.warn('Failed to fetch /api/complaints:', e);
       } finally {
         setLoading(false);
-        inFlightComplaintsPromiseRef.current = null;
+        inFlightRef.current = null;
       }
     })();
-    inFlightComplaintsPromiseRef.current = promise;
+    inFlightRef.current = promise;
     return promise;
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetchComplaints();
   }, [fetchComplaints]);
 
-  const complaints = fetchedComplaints || contextComplaints;
+  const complaints: Complaint[] = (fetchedComplaints || contextComplaints) as Complaint[];
 
-  const filteredComplaints =
-    filterCategory === 'ALL'
-      ? complaints
-      : complaints.filter((c) => c.category === filterCategory);
+  // Auto-open detail modal if ?id= is in query params
+  useEffect(() => {
+    const idParam = searchParams?.get('id');
+    if (idParam && complaints.length > 0 && !selectedComplaint) {
+      const match = complaints.find((c) => String(c.id) === String(idParam));
+      if (match) {
+        setSelectedComplaint(match);
+      }
+    }
+  }, [searchParams, complaints, selectedComplaint]);
 
-  const resolvedCount = complaints.filter((c) => c.status === 'RESOLVED').length;
+  // Filter complaints by Category and Village
+  const filteredComplaints = complaints.filter((c) => {
+    const matchesCategory = filterCategory === 'ALL' || c.category === filterCategory;
+    const matchesVillage =
+      selectedVillageFilter === 'ALL' ||
+      String(c.villageId) === String(selectedVillageFilter) ||
+      (c.villageName && c.villageName.toLowerCase() === selectedVillageFilter.toLowerCase());
+    return matchesCategory && matchesVillage;
+  });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title || !description) return;
+  const resolvedCount = filteredComplaints.filter((c) => c.status === 'RESOLVED').length;
+  const newCount = filteredComplaints.filter((c) => c.status === 'NEW').length;
 
-    setSubmitting(true);
-    setMsg('');
-
-    const res = await submitComplaint({
-      title,
-      category,
-      description,
-      location,
-      reporterName: reporterName || (lang === 'en' ? 'Village Resident' : 'ग्रामवासी'),
-      reporterMobile: reporterMobile || 'Hidden',
-      photoUrl,
-      videoUrl,
-    });
-
-    setSubmitting(false);
-
-    if (res.success) {
-      setMsg(t('problems.successMsg'));
-      setTitle('');
-      setDescription('');
-      setPhotoUrl('');
-      setVideoUrl('');
-      fetchComplaints();
-      setTimeout(() => {
-        setIsModalOpen(false);
-        setMsg('');
-      }, 2000);
+  const handleRegisterNew = () => {
+    if (!authSession.isAdminLoggedIn && !authSession.isMemberLoggedIn) {
+      router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`);
+    } else if (!isApprovedMember) {
+      setUnapprovedAlert(true);
     } else {
-      setMsg(res.error || (lang === 'en' ? 'An error occurred. Please try again.' : 'त्रुटि हुई। कृपया पुनः प्रयास करें।'));
+      setIsModalOpen(true);
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          setPhotoUrl(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+  const handleSubmit = async (data: any) => {
+    const res = await submitComplaint(data);
+    if (res.success) {
+      await fetchComplaints();
     }
+    return res;
+  };
+
+  const handleSaveEdit = async (id: string, updates: Partial<Complaint>) => {
+    const res = await editComplaint(id, updates);
+    if (res.success) {
+      await fetchComplaints();
+      // Update the active detail modal view
+      setSelectedComplaint((prev) => (prev && prev.id === id ? { ...prev, ...updates } : prev));
+      setEditingComplaint(null);
+    }
+    return res;
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingComplaint) return;
+    setIsDeleting(true);
+    try {
+      await deleteComplaint(deletingComplaint.id);
+      await fetchComplaints();
+      if (selectedComplaint?.id === deletingComplaint.id) {
+        setSelectedComplaint(null);
+      }
+      setDeletingComplaint(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleStatusChange = async (id: string, status: ComplaintStatus) => {
+    await updateComplaintStatus(id, status);
+    await fetchComplaints();
+    setSelectedComplaint((prev) => (prev && prev.id === id ? { ...prev, status } : prev));
   };
 
   return (
     <div className="max-w-7xl mx-auto transition-colors duration-200">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black text-[#2C3327] dark:text-white tracking-tight flex items-center gap-2">
-            <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400" />
-            <span>{t('nav.problems')}</span>
-          </h1>
-          <p className="text-xs text-[#8C8675] dark:text-slate-400 mt-1 font-medium">
-            {t('problems.totalRegistered', { count: complaints.length })} |{' '}
-            <span className="font-bold text-emerald-600 dark:text-emerald-400">
-              {t('problems.resolvedCount', { count: resolvedCount })}
-            </span>
-          </p>
-        </div>
+      {/* Header with stats */}
+      <GrievanceListHeader
+        totalCount={filteredComplaints.length}
+        resolvedCount={resolvedCount}
+        newCount={newCount}
+        t={t}
+        lang={lang}
+        onRegisterNew={handleRegisterNew}
+      />
 
-        <Button
-          variant="amber"
-          size="default"
-          onClick={() => {
-            if (!authSession.isAdminLoggedIn && !authSession.isMemberLoggedIn) {
-              router.push(`/auth/login?next=${encodeURIComponent(pathname || '/')}`);
-            } else if (!isApprovedMember) {
-              setUnapprovedAlert(true);
-            } else {
-              setIsModalOpen(true);
-            }
-          }}
-          className="rounded-xl font-bold cursor-pointer"
-        >
-          <Plus className="w-4 h-4 mr-1" />
-          <span>{t('problems.registerNewBtn')}</span>
-        </Button>
-      </div>
-
-      {/* Pending Approval Notice Banner for Unapproved Member */}
+      {/* Pending Approval Notice Banner */}
       {authSession.isMemberLoggedIn && !isApprovedMember && (
         <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 rounded-2xl flex items-center justify-between gap-3 text-amber-900 dark:text-amber-300 text-xs shadow-2xs">
           <div className="flex items-center gap-2.5">
             <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-600" />
             <div>
-              <p className="font-bold">आपकी सदस्यता अभी सत्यापन/अनुमोदन के लिए लंबित है।</p>
+              <p className="font-bold">
+                {lang === 'en'
+                  ? 'Your membership is pending verification/approval.'
+                  : 'आपकी सदस्यता अभी सत्यापन/अनुमोदन के लिए लंबित है।'}
+              </p>
               <p className="text-[11px] text-amber-800 dark:text-amber-400 mt-0.5">
-                आप गांव की सभी शिकायतें, आंकड़े और जानकारी देख सकते हैं। एडमिन द्वारा अनुमोदन के बाद आप नई शिकायतें दर्ज कर सकेंगे।
+                {lang === 'en'
+                  ? 'You can view all grievances and stats. You will be able to file new grievances after admin approval.'
+                  : 'आप गांव की सभी शिकायतें, आंकड़े और जानकारी देख सकते हैं। एडमिन द्वारा अनुमोदन के बाद आप नई शिकायतें दर्ज कर सकेंगे।'}
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal alert popup if unapproved member tries to post */}
+      {/* Modal for unapproved members */}
       {unapprovedAlert && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl animate-scale-in">
+          <div className="bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl animate-in zoom-in-95 duration-300">
             <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center mx-auto mb-3 text-amber-600 dark:text-amber-400">
               <AlertTriangle className="w-6 h-6" />
             </div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white mb-2">
-              सदस्यता अनुमोदन लंबित (Pending Approval)
+              {lang === 'en' ? 'Pending Approval' : 'सदस्यता अनुमोदन लंबित'}
             </h3>
             <p className="text-xs text-slate-600 dark:text-slate-300 mb-6 leading-relaxed">
-              आपकी सदस्यता का सत्यापन अभी एडमिन द्वारा किया जा रहा है। आप सभी सार्वजनिक शिकायतें और डेटा देख सकते हैं। अनुमोदन के बाद आप नई शिकायतें दर्ज कर सकेंगे।
+              {lang === 'en'
+                ? 'Your membership is being verified by the admin. You can view all public grievances and data. You will be able to file new grievances after approval.'
+                : 'आपकी सदस्यता का सत्यापन अभी एडमिन द्वारा किया जा रहा है। आप सभी सार्वजनिक शिकायतें और डेटा देख सकते हैं। अनुमोदन के बाद आप नई शिकायतें दर्ज कर सकेंगे।'}
             </p>
             <Button
               variant="default"
               size="default"
               onClick={() => setUnapprovedAlert(false)}
-              className="w-full rounded-xl font-bold"
+              className="w-full rounded-xl font-bold cursor-pointer"
             >
-              समझ गया (Got It)
+              {lang === 'en' ? 'Got It' : 'समझ गया'}
             </Button>
           </div>
+        </div>
+      )}
+
+      {/* Village Filter Selector Bar (Village-Wise Scoping) */}
+      {villages && villages.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-3 scrollbar-none">
+          <span className="text-xs font-bold text-slate-600 dark:text-slate-400 flex items-center gap-1 flex-shrink-0 mr-1">
+            <Building2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            {lang === 'en' ? 'Village:' : 'ग्राम इकाई:'}
+          </span>
+          <button
+            onClick={() => setSelectedVillageFilter('ALL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+              selectedVillageFilter === 'ALL'
+                ? 'bg-emerald-900 dark:bg-emerald-800 text-white border-transparent shadow-xs'
+                : 'bg-white/70 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-300'
+            }`}
+          >
+            {lang === 'en' ? 'All Villages' : 'सभी गांव'}
+          </button>
+          {villages.map((v) => (
+            <button
+              key={v.id}
+              onClick={() => setSelectedVillageFilter(String(v.id))}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border whitespace-nowrap ${
+                selectedVillageFilter === String(v.id)
+                  ? 'bg-emerald-900 dark:bg-emerald-800 text-white border-transparent shadow-xs'
+                  : 'bg-white/70 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-emerald-300'
+              }`}
+            >
+              {lang === 'en' ? v.name : v.nameHindi}
+            </button>
+          ))}
         </div>
       )}
 
       {/* Category Filter */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-none">
-        <Button
-          size="xs"
-          variant={filterCategory === 'ALL' ? 'default' : 'outline'}
-          onClick={() => setFilterCategory('ALL')}
-          className="rounded-xl whitespace-nowrap cursor-pointer font-bold"
-        >
-          {t('common.all')} ({complaints.length})
-        </Button>
-        {CATEGORY_MAP.map((catObj) => {
-          const count = complaints.filter((c) => c.category === catObj.id).length;
-          const label = lang === 'en' ? catObj.labelEnglish : catObj.labelHindi;
-          return (
-            <Button
-              key={catObj.id}
-              size="xs"
-              variant={filterCategory === catObj.id ? 'default' : 'outline'}
-              onClick={() => setFilterCategory(catObj.id)}
-              className="rounded-xl whitespace-nowrap cursor-pointer font-bold"
-            >
-              {label} ({count})
-            </Button>
-          );
-        })}
-      </div>
+      <GrievanceCategoryFilter
+        activeCategory={filterCategory}
+        onCategoryChange={setFilterCategory}
+        categoryCounts={categoryCounts || undefined}
+        complaints={filteredComplaints}
+        lang={lang}
+        t={t}
+      />
 
-      {/* Complaints List */}
+      {/* Complaints Cards Grid */}
       {filteredComplaints.length === 0 ? (
-        <Card className="p-12 text-center text-[#8C8675] dark:text-slate-400 rounded-2xl border border-dashed border-[#E0DCCF] dark:border-slate-800">
-          <AlertTriangle className="w-10 h-10 text-[#8C8675] dark:text-slate-500 mx-auto mb-3 opacity-60" />
-          <p className="text-sm font-bold text-[#2C3327] dark:text-white">
-            {t('problems.noGrievanceFound')}
-          </p>
-        </Card>
+        <GrievanceEmptyState lang={lang} />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredComplaints.map((c) => {
-            const isDemo = c.isDemo || c.title.includes('DEMO');
-
-            return (
-              <Card
-                key={c.id}
-                className={`p-4 sm:p-5 flex flex-col justify-between hover:border-emerald-500/60 dark:hover:border-emerald-500/60 transition-all rounded-2xl ${
-                  isDemo ? 'border-amber-300 dark:border-amber-800/80 bg-amber-50/20 dark:bg-amber-950/20' : ''
-                }`}
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-[#1E3A2F] dark:bg-emerald-950 text-amber-300 dark:text-emerald-300 font-mono border border-[#2D5545] dark:border-emerald-800">
-                        {c.id}
-                      </span>
-                      <Badge variant="secondary" className="text-[10px] rounded-md font-semibold">
-                        {c.category}
-                      </Badge>
-                    </div>
-
-                    <StatusBadge status={c.status} size="xs" />
-                  </div>
-
-                  {/* Demo Tag */}
-                  {isDemo && (
-                    <div className="mb-2 p-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-xl flex items-center justify-between">
-                      <span className="text-[11px] font-black text-amber-800 dark:text-amber-300">DEMO EXAMPLE</span>
-                      {authSession.isAdminLoggedIn && (
-                        <Button
-                          size="xs"
-                          variant="destructive"
-                          onClick={() => deleteComplaint(c.id)}
-                          className="rounded-lg text-xs"
-                        >
-                          {t('common.cancel')}
-                        </Button>
-                      )}
-                    </div>
-                  )}
-
-                  <h3 className="font-extrabold text-[#2C3327] dark:text-white text-sm mb-1">{c.title}</h3>
-                  <p className="text-xs text-[#8C8675] dark:text-slate-400 line-clamp-3 mb-3 leading-relaxed">{c.description}</p>
-
-                  {/* Attached Image */}
-                  {c.photoUrl && (
-                    <div className="mb-3 h-36 rounded-xl overflow-hidden border border-[#E0DCCF] dark:border-slate-800 bg-[#F7F5F0] dark:bg-slate-900">
-                      <img src={c.photoUrl} alt="Complaint Attachment" className="w-full h-full object-cover" />
-                    </div>
-                  )}
-
-                  {/* Location & Reporter Info */}
-                  <div className="text-xs text-[#8C8675] dark:text-slate-400 space-y-1 pt-2.5 border-t border-[#E0DCCF] dark:border-slate-800">
-                    <p className="flex items-center gap-1 text-[#2C3327] dark:text-slate-200 font-semibold">
-                      <MapPin className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                      <span>{t('problems.locationLabel', { location: c.location })}</span>
-                    </p>
-                    <p className="flex items-center gap-1 text-[#8C8675] dark:text-slate-400">
-                      <Phone className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span>
-                        {t('problems.reportedByLabel', { name: c.reporterName })}
-                        {authSession.isAdminLoggedIn && c.reporterMobile ? ` (${c.reporterMobile})` : ''}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                {/* Controls for Admin or Content Owner Member */}
-                {(authSession.isAdminLoggedIn || canDeleteContent(c.reporterMobile, c.villageId)) && (
-                  <div className="mt-3 pt-3 border-t border-[#E0DCCF] dark:border-slate-800 flex items-center justify-between gap-2">
-                    {authSession.isAdminLoggedIn ? (
-                      <select
-                        value={c.status}
-                        onChange={(e) =>
-                          updateComplaintStatus(c.id, e.target.value as ComplaintStatus)
-                        }
-                        className="text-xs font-bold py-1 px-2 border border-[#E0DCCF] dark:border-slate-700 rounded-lg bg-[#F7F5F0] dark:bg-slate-800 text-[#2C3327] dark:text-white"
-                      >
-                        <option value="NEW">{t('common.new')} (New)</option>
-                        <option value="ACTION IN PROGRESS">{t('common.inProgress')} (In Progress)</option>
-                        <option value="RESOLVED">{t('common.resolved')} (Resolved)</option>
-                      </select>
-                    ) : (
-                      <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-bold">
-                        ✓ आपकी प्रविष्टि (Your Submission)
-                      </span>
-                    )}
-
-                    <Button
-                      size="xs"
-                      variant="destructive"
-                      onClick={() => deleteComplaint(c.id)}
-                      className="h-7 px-2.5 rounded-lg cursor-pointer flex items-center gap-1 text-[11px]"
-                      title="शिकायत हटाएं (Delete Complaint)"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>{authSession.isAdminLoggedIn ? '' : 'हटाएं'}</span>
-                    </Button>
-                  </div>
-                )}
-              </Card>
-            );
-          })}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          {filteredComplaints.map((c, idx) => (
+            <GrievanceCard
+              key={c.id}
+              complaint={c}
+              isAdmin={authSession.isAdminLoggedIn}
+              isMemberOwner={canEditContent(c.reporterMobile, c.villageId)}
+              lang={lang}
+              t={t}
+              onSelect={(selected) => router.push(`/problems/${selected.id}`)}
+              index={idx}
+            />
+          ))}
         </div>
       )}
 
-      {/* New Complaint Modal */}
-      <Dialog
+      {/* New Grievance Modal */}
+      <GrievanceFormModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={t('problems.modalTitle')}
-        description={t('problems.modalDesc')}
-      >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
-              {t('problems.reporterNameLabel')}
-            </label>
-            <Input
-              type="text"
-              required
-              value={reporterName}
-              onChange={(e) => setReporterName(e.target.value)}
-              placeholder={lang === 'en' ? 'e.g. Ramesh Kumar' : 'उदा. रमेश कुमार'}
-              className="rounded-xl"
-            />
-          </div>
+        onSubmit={handleSubmit}
+        t={t}
+        lang={lang}
+        defaultVillageId={selectedVillageFilter !== 'ALL' ? selectedVillageFilter : (activeVillageId || '1')}
+        villages={villages}
+        defaultLocation={lang === 'en' ? (villageSettings.name || '') : (villageSettings.nameHindi || '')}
+        currentUserId={authSession.currentMemberId || authSession.currentMember?.id || authSession.adminId || authSession.supabaseUserId}
+        currentUserName={authSession.currentMemberName || authSession.adminName || authSession.currentMember?.name || ''}
+        currentUserMobile={currentMemberMobile || authSession.adminMobile || ''}
+      />
 
-          <div>
-            <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
-              {t('problems.reporterMobileLabel')}
-            </label>
-            <Input
-              type="text"
-              value={reporterMobile}
-              onChange={(e) => setReporterMobile(e.target.value)}
-              placeholder={lang === 'en' ? 'e.g. 9876543210' : 'उदा. 9876543210'}
-              className="rounded-xl"
-            />
-          </div>
+      {/* Grievance Detail View Modal */}
+      <GrievanceDetailModal
+        isOpen={!!selectedComplaint}
+        onClose={() => setSelectedComplaint(null)}
+        complaint={selectedComplaint}
+        isAdmin={authSession.isAdminLoggedIn}
+        isAuthor={selectedComplaint ? canEditContent(selectedComplaint.reporterMobile, selectedComplaint.villageId) : false}
+        lang={lang}
+        t={t}
+        onEdit={(comp) => setEditingComplaint(comp)}
+        onDelete={(comp) => setDeletingComplaint(comp)}
+        onStatusChange={authSession.isAdminLoggedIn ? handleStatusChange : undefined}
+      />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
-                {t('problems.categoryLabel')}
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as ComplaintCategory)}
-                className="w-full h-10 px-3 rounded-xl border border-[#E0DCCF] dark:border-slate-700 bg-[#FDFBF7] dark:bg-[#0B0F17] text-xs text-[#2C3327] dark:text-slate-100 font-medium focus:ring-2 focus:ring-emerald-500"
-              >
-                {CATEGORY_MAP.map((catObj) => {
-                  const label = lang === 'en' ? catObj.labelEnglish : catObj.labelHindi;
-                  return (
-                    <option key={catObj.id} value={catObj.id}>
-                      {label}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
+      {/* Grievance Edit Modal */}
+      <GrievanceEditModal
+        isOpen={!!editingComplaint}
+        onClose={() => setEditingComplaint(null)}
+        complaint={editingComplaint}
+        villages={villages}
+        onSave={handleSaveEdit}
+        lang={lang}
+        t={t}
+      />
 
-            <div>
-              <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
-                {t('problems.locationInputLabel')}
-              </label>
-              <Input
-                type="text"
-                required
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder={lang === 'en' ? 'e.g. Main Square, Rasoolpur' : 'उदा. मुख्य चौराहा, रसूलपुर'}
-                className="rounded-xl"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
-              {t('problems.titleLabel')}
-            </label>
-            <Input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder={lang === 'en' ? 'e.g. Waterlogging on road or transformer issue' : 'उदा. सड़क पर जलभराव या ट्रांसफार्मर खराब'}
-              className="rounded-xl"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
-              {t('problems.descLabel')}
-            </label>
-            <Textarea
-              required
-              rows={3}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder={lang === 'en' ? 'Write detailed description of problem...' : 'समस्या का पूरा विवरण लिखें...'}
-              className="rounded-xl"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <ImageUploader
-                value={photoUrl}
-                onChange={setPhotoUrl}
-                onRemove={() => setPhotoUrl('')}
-                bucket="images"
-                folder="grievances"
-                label={t('problems.uploadPhotoLabel')}
-                hint="समस्या की फ़ोटो खींचें या चुनें"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#2C3327] dark:text-slate-200 mb-1">
-                वीडियो लिंक (वैकल्पिक)
-              </label>
-              <Input
-                type="text"
-                value={videoUrl}
-                onChange={(e) => setVideoUrl(e.target.value)}
-                placeholder="https://..."
-                className="rounded-xl"
-              />
-            </div>
-          </div>
-
-          {msg && (
-            <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-800 text-emerald-900 dark:text-emerald-200 text-xs font-bold rounded-xl whitespace-pre-line">
-              {msg}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-2 border-t border-[#E0DCCF] dark:border-slate-800">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsModalOpen(false)}
-              className="rounded-xl"
-            >
-              {t('common.cancel')}
-            </Button>
-            <Button
-              type="submit"
-              variant="amber"
-              size="sm"
-              disabled={submitting}
-              className="rounded-xl"
-            >
-              {submitting ? t('common.loading') : t('common.submit')}
-            </Button>
-          </div>
-        </form>
-      </Dialog>
+      {/* Grievance Delete Confirmation Modal */}
+      <GrievanceDeleteModal
+        isOpen={!!deletingComplaint}
+        onClose={() => setDeletingComplaint(null)}
+        onConfirm={handleConfirmDelete}
+        complaintTitle={deletingComplaint?.title || ''}
+        lang={lang}
+        isDeleting={isDeleting}
+      />
     </div>
   );
 };

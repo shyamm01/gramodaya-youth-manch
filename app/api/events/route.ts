@@ -7,6 +7,7 @@ import { logAuditAction } from "@/src/lib/authUtils";
 import { requireAuth } from "@/src/lib/jwtAuth";
 import { ensureSupabaseUrl } from "@/src/lib/supabaseStorage";
 import { getRequestLimit } from "@/src/lib/requestParams";
+import { resolveVillageRef } from '@/src/lib/villageContext';
 
 export async function GET(req: Request) {
   try {
@@ -70,7 +71,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Database connection unavailable." }, { status: 500 });
     }
 
-    const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
+    // Verified against the villages table: the old `: 1` default was a village
+    // that does not exist here, and the insert died on the foreign key.
+    const numericVillageId = await resolveVillageRef(villageId);
 
     // Enforce Supabase public CDN URL for event banner
     const finalPhotoUrl = await ensureSupabaseUrl(photoUrl, 'events', 'event');

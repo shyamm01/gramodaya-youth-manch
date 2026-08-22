@@ -8,6 +8,7 @@ import { StatusBadge } from '../../common';
 import { Complaint } from '../../../types';
 import { useApp } from '../../../context/AppContext';
 import { FEED_LIMIT, RAIL_CARD, FeedRail, RailSkeleton, EmptyFeed } from './FeedRail';
+import { getCategoryLabel } from '../grievance';
 
 interface HomeGrievanceBannerProps {
   /** Server-computed count (SQL count(), not derived from a truncated list). */
@@ -18,6 +19,52 @@ interface HomeGrievanceBannerProps {
   complaints?: Complaint[] | any[];
   complaintsLoading?: boolean;
 }
+
+const GrievanceRailItem: React.FC<{
+  complaint: any;
+  lang: string;
+  locale: string;
+  idx: number;
+}> = ({ complaint: c, lang, locale, idx }) => {
+  const displayTitle = lang === 'hi' ? (c.titleHindi || c.title) : (c.title || c.titleHindi);
+  const displayLocation = lang === 'hi' ? (c.locationHindi || c.location) : (c.location || c.locationHindi);
+
+  return (
+    <Link
+      href={`/problems/${c.id}`}
+      className={RAIL_CARD}
+      style={{ animationDelay: `${idx * 80}ms` }}
+    >
+      <div className="flex items-center justify-between gap-1.5 mb-1.5">
+        <StatusBadge status={c.status} size="xs" lang={lang} />
+        {c.createdAt && (
+          <span className="text-[9px] text-[#8C8675] dark:text-slate-500 font-mono flex-shrink-0">
+            {new Date(c.createdAt).toLocaleDateString(locale, {
+              day: 'numeric',
+              month: 'short',
+            })}
+          </span>
+        )}
+      </div>
+      <h4 className="text-xs font-bold text-[#2C3327] dark:text-white line-clamp-2 leading-snug">
+        {displayTitle}
+      </h4>
+      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+        {c.category && (
+          <Badge variant="secondary" className="text-[9px] rounded-md font-semibold">
+            {getCategoryLabel(c.category, lang)}
+          </Badge>
+        )}
+      </div>
+      {c.location && (
+        <span className="text-[10px] text-[#8C8675] dark:text-slate-400 flex items-center gap-0.5 mt-1.5">
+          <MapPin className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+          <span className="truncate">{displayLocation}</span>
+        </span>
+      )}
+    </Link>
+  );
+};
 
 export const HomeGrievanceBanner: React.FC<HomeGrievanceBannerProps> = ({
   newComplaintsCount,
@@ -105,34 +152,14 @@ export const HomeGrievanceBanner: React.FC<HomeGrievanceBannerProps> = ({
           <EmptyFeed icon={AlertTriangle} label={t('home.noGrievances')} />
         ) : (
           <FeedRail>
-            {complaints.slice(0, FEED_LIMIT).map((c: any) => (
-              <Link key={c.id} href="/problems" className={RAIL_CARD}>
-                <div className="flex items-center justify-between gap-1.5 mb-1.5">
-                  <StatusBadge status={c.status} size="xs" />
-                  {c.createdAt && (
-                    <span className="text-[9px] text-[#8C8675] dark:text-slate-500 font-mono flex-shrink-0">
-                      {new Date(c.createdAt).toLocaleDateString(locale, {
-                        day: 'numeric',
-                        month: 'short',
-                      })}
-                    </span>
-                  )}
-                </div>
-                <h4 className="text-xs font-bold text-[#2C3327] dark:text-white line-clamp-2 leading-snug">
-                  {c.title}
-                </h4>
-                {c.category && (
-                  <Badge variant="secondary" className="text-[9px] rounded-md font-semibold self-start mt-1.5">
-                    {c.category}
-                  </Badge>
-                )}
-                {c.location && (
-                  <span className="text-[10px] text-[#8C8675] dark:text-slate-400 flex items-center gap-0.5 mt-1.5">
-                    <MapPin className="w-2.5 h-2.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                    <span className="truncate">{c.location}</span>
-                  </span>
-                )}
-              </Link>
+            {complaints.slice(0, FEED_LIMIT).map((c: any, idx: number) => (
+              <GrievanceRailItem
+                key={c.id}
+                complaint={c}
+                lang={lang}
+                locale={locale}
+                idx={idx}
+              />
             ))}
           </FeedRail>
         )}

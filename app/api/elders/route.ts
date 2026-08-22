@@ -6,6 +6,7 @@ import { validateRequestBody, elderCreateSchema } from "@/src/lib/validations";
 import { logAuditAction } from "@/src/lib/authUtils";
 import { requireAuth } from "@/src/lib/jwtAuth";
 import { ensureSupabaseUrl } from "@/src/lib/supabaseStorage";
+import { resolveVillageRef } from '@/src/lib/villageContext';
 
 export async function GET() {
   try {
@@ -59,7 +60,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Database connection unavailable." }, { status: 500 });
     }
 
-    const numericVillageId = villageId && !isNaN(Number(villageId)) ? Number(villageId) : 1;
+    // Verified against the villages table: the old `: 1` default was a village
+    // that does not exist here, and the insert died on the foreign key.
+    const numericVillageId = await resolveVillageRef(villageId);
     const cdnPhotoUrl = await ensureSupabaseUrl(photoUrl, "elders", "elder");
 
     const [inserted] = await db
@@ -67,7 +70,10 @@ export async function POST(req: Request) {
       .values({
         villageId: numericVillageId,
         name: name.trim(),
-        age: age ? age.trim() : null,
+        // age is NOT NULL in the schema and the admin form does not collect it,
+        // so an omitted value must land as '' — the falsy check used to turn the
+        // route's own "" default into a null and fail the insert.
+        age: (age ?? '').trim(),
         role: role ? role.trim() : null,
         contribution: contribution ? contribution.trim() : null,
         photoUrl: cdnPhotoUrl || null,

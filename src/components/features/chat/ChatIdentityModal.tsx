@@ -3,7 +3,7 @@
 import React from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { Member } from '../../../types';
-import { Dialog } from '../../ui/dialog';
+import { Modal } from '../../ui/modal';
 import { Input } from '../../ui/input';
 import { Button } from '../../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
@@ -37,7 +37,7 @@ export const ChatIdentityModal: React.FC<ChatIdentityModalProps> = ({
   villageNameHindi,
 }) => {
   return (
-    <Dialog
+    <Modal
       isOpen={isOpen}
       onClose={onClose}
       maxWidth="md"
@@ -115,6 +115,6 @@ export const ChatIdentityModal: React.FC<ChatIdentityModalProps> = ({
           </div>
         </div>
       </div>
-    </Dialog>
+    </Modal>
   );
 };

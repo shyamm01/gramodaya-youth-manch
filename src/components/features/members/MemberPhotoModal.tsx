@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, Button, ImageUploader } from '../../ui';
+import { Modal, Button } from '../../ui';
+import { ImageUploader } from '../../inputs';
 import { Member } from '../../../types';
 import { useApp } from '../../../context/AppContext';
 
@@ -34,7 +35,7 @@ export const MemberPhotoModal: React.FC<MemberPhotoModalProps> = ({
   };
 
   return (
-    <Dialog
+    <Modal
       isOpen={Boolean(member)}
       onClose={onClose}
       title={t('members.photoModalTitle')}
@@ -73,6 +74,6 @@ export const MemberPhotoModal: React.FC<MemberPhotoModalProps> = ({
           </Button>
         </div>
       </div>
-    </Dialog>
+    </Modal>
   );
 };

@@ -16,11 +16,11 @@ import {
   Inbox,
   Filter,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
-import { Badge } from '../ui/badge';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../ui/card';
+import { Badge } from '../../ui/badge';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '../../ui/avatar';
 import { supabase } from '@/src/lib/supabase';
 import { sendRoomMessage, playChatChime } from '@/src/lib/supabaseChat';
 

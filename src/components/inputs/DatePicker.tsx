@@ -30,6 +30,10 @@ const MONTHS_HI = [
 const DAYS_EN = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const DAYS_HI = ['रवि', 'सोम', 'मंगल', 'बुध', 'गुरु', 'शुक्र', 'शनि'];
 
+/** Panel width (sm:w-76 = 19rem) plus the gap kept from the viewport edge. */
+const PANEL_WIDTH_PX = 304;
+const VIEWPORT_MARGIN_PX = 12;
+
 export const DatePicker: React.FC<DatePickerProps> = ({
   value = '',
   onChange,
@@ -48,6 +52,11 @@ export const DatePicker: React.FC<DatePickerProps> = ({
 
   const [isOpen, setIsOpen] = useState(false);
   const [actualPlacement, setActualPlacement] = useState<'top' | 'bottom'>('bottom');
+  // The panel is ~19rem wide and was pinned to the trigger's left edge, so a
+  // trigger sitting near the right of the viewport — a filter bar, for one —
+  // pushed the year selector and the next-month arrow off screen. Flip to
+  // right-alignment when there is not enough room to open leftwards.
+  const [actualAlign, setActualAlign] = useState<'left' | 'right'>('left');
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Parse initial selected date or default to current date
@@ -90,6 +99,11 @@ export const DatePicker: React.FC<DatePickerProps> = ({
           setActualPlacement('bottom');
         }
       }
+
+      const rect = containerRef.current.getBoundingClientRect();
+      const overflowsRight = rect.left + PANEL_WIDTH_PX > window.innerWidth - VIEWPORT_MARGIN_PX;
+      const hasRoomLeftwards = rect.right - PANEL_WIDTH_PX > VIEWPORT_MARGIN_PX;
+      setActualAlign(overflowsRight && hasRoomLeftwards ? 'right' : 'left');
     }
   }, [isOpen, placement]);
 
@@ -233,7 +247,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
       {isOpen && (
         <div
           className={cn(
-            'absolute left-0 z-[100] w-72 sm:w-76 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 shadow-2xl animate-in fade-in zoom-in-95 duration-150',
+            'absolute z-[100] w-72 sm:w-76 max-w-[calc(100vw-1.5rem)] rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 shadow-2xl animate-in fade-in zoom-in-95 duration-150',
+            actualAlign === 'right' ? 'right-0' : 'left-0',
             actualPlacement === 'top'
               ? 'bottom-full mb-1.5'
               : 'top-full mt-1.5'

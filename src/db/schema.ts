@@ -8,6 +8,8 @@ import {
   date,
   uuid,
   index,
+  integer,
+  jsonb,
   pgEnum,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
@@ -54,6 +56,19 @@ export const complaintStatusEnum = pgEnum('complaint_status', [
   'RESOLVED',
 ]);
 
+export const complaintPriorityEnum = pgEnum('complaint_priority', [
+  'low',
+  'medium',
+  'high',
+  'urgent',
+]);
+
+export const complaintAttachmentTypeEnum = pgEnum('complaint_attachment_type', [
+  'photo',
+  'video',
+  'document',
+]);
+
 export const socialWorkStatusEnum = pgEnum('social_work_status', [
   'pending',
   'approved',
@@ -77,6 +92,48 @@ export const publicInfoStatusEnum = pgEnum('public_info_status', [
   'pending',
   'approved',
   'rejected',
+]);
+
+/**
+ * Education module enums. Kept deliberately generic so new kinds of education
+ * content can be added without a schema change beyond a new enum value.
+ */
+export const educationScopeEnum = pgEnum('education_scope', [
+  'gramodaya', // the Manch's own programme
+  'government', // central / state government scheme
+]);
+
+export const educationStatusEnum = pgEnum('education_status', [
+  'draft',
+  'pending',
+  'published',
+  'archived',
+]);
+
+export const educationResourceTypeEnum = pgEnum('education_resource_type', [
+  'scheme',
+  'scholarship',
+  'course',
+  'institution',
+  'guidance',
+  'resource',
+  'other',
+]);
+
+export const educationLinkTypeEnum = pgEnum('education_link_type', [
+  'portal',
+  'pdf',
+  'video',
+  'form',
+  'contact',
+  'other',
+]);
+
+export const educationEnquiryStatusEnum = pgEnum('education_enquiry_status', [
+  'new',
+  'in_progress',
+  'resolved',
+  'closed',
 ]);
 
 // ==============================================================================
@@ -297,6 +354,26 @@ export const userVillageRoles = pgTable(
 /**
  * 4.1 COMPLAINTS TABLE (ग्राम स्तर की समस्याएं)
  */
+/**
+ * 4.0.1 COMPLAINT CATEGORIES LOOKUP TABLE (शिकायत श्रेणियां)
+ */
+export const complaintCategories = pgTable(
+  'complaint_categories',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    slug: text('slug').notNull().unique(),
+    name: text('name').notNull(),
+    nameHindi: text('name_hindi').notNull(),
+    icon: text('icon').notNull().default('📌'),
+    displayOrder: integer('display_order').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('idx_complaint_categories_slug').on(table.slug),
+  ]
+);
+
 export const complaints = pgTable(
   'complaints',
   {
@@ -304,16 +381,27 @@ export const complaints = pgTable(
     villageId: bigint('village_id', { mode: 'number' })
       .references(() => villages.id, { onDelete: 'cascade' }),
     userId: uuid('user_id').references(() => profiles.id, { onDelete: 'set null' }),
+    categoryId: bigint('category_id', { mode: 'number' })
+      .references(() => complaintCategories.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
+    titleHindi: text('title_hindi'),
+    /** @deprecated Use categoryId FK instead. Kept for backward compat. */
     category: complaintCategoryEnum('category').notNull().default('Other'),
     description: text('description').notNull(),
+    descriptionHindi: text('description_hindi'),
     location: text('location').notNull(),
+    locationHindi: text('location_hindi'),
+    ward: text('ward'),
+    wardHindi: text('ward_hindi'),
     reporterName: text('reporter_name').notNull(),
     reporterMobile: text('reporter_mobile').notNull(),
     status: complaintStatusEnum('status').notNull().default('NEW'),
+    priority: complaintPriorityEnum('priority').notNull().default('medium'),
+    /** @deprecated Use complaint_attachments table instead. */
     photoUrl: text('photo_url'),
+    /** @deprecated Use complaint_attachments table instead. */
     videoUrl: text('video_url'),
-    isDemo: boolean('is_demo').default(false),
+    isActive: boolean('is_active').notNull().default(true),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -323,7 +411,54 @@ export const complaints = pgTable(
     index('idx_complaints_user_id').on(table.userId),
     index('idx_complaints_status').on(table.status),
     index('idx_complaints_category').on(table.category),
+    index('idx_complaints_category_id').on(table.categoryId),
     index('idx_complaints_created_at').on(table.createdAt),
+    index('idx_complaints_priority').on(table.priority),
+    index('idx_complaints_is_active').on(table.isActive),
+    index('idx_complaints_village_status').on(table.villageId, table.status),
+  ]
+);
+
+/**
+ * 4.0.2 COMPLAINT ATTACHMENTS (शिकायत संलग्नक)
+ */
+export const complaintAttachments = pgTable(
+  'complaint_attachments',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    complaintId: bigint('complaint_id', { mode: 'number' })
+      .notNull()
+      .references(() => complaints.id, { onDelete: 'cascade' }),
+    type: complaintAttachmentTypeEnum('type').notNull().default('photo'),
+    url: text('url').notNull(),
+    caption: text('caption'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_complaint_attachments_complaint_id').on(table.complaintId),
+  ]
+);
+
+/**
+ * 4.0.3 COMPLAINT STATUS HISTORY (शिकायत स्थिति इतिहास)
+ */
+export const complaintStatusHistory = pgTable(
+  'complaint_status_history',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    complaintId: bigint('complaint_id', { mode: 'number' })
+      .notNull()
+      .references(() => complaints.id, { onDelete: 'cascade' }),
+    fromStatus: text('from_status'),
+    toStatus: text('to_status').notNull(),
+    changedBy: uuid('changed_by')
+      .references(() => profiles.id, { onDelete: 'set null' }),
+    note: text('note'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_complaint_status_history_complaint_id').on(table.complaintId),
+    index('idx_complaint_status_history_created_at').on(table.createdAt),
   ]
 );
 
@@ -475,6 +610,186 @@ export const publicInfos = pgTable(
   (table) => [
     index('idx_public_infos_village_id').on(table.villageId),
     index('idx_public_infos_status').on(table.status),
+  ]
+);
+
+/**
+ * 4.8 EDUCATION MODULE (शिक्षा)
+ *
+ * Structure mirrors what the education pages render, but as data:
+ *   education_categories  →  education_resources  →  education_resource_links
+ * plus education_enquiries for citizens asking for help with a scheme.
+ *
+ * Extensibility notes:
+ *  - villageId is nullable: NULL rows are platform-wide content shared by every
+ *    village chapter, a non-NULL row belongs to that one village only.
+ *  - The *Key columns hold i18n keys (e.g. "education.nsp.title") so the seeded
+ *    content keeps using the existing locale files, while admin-created rows
+ *    simply store literal title/description text instead.
+ *  - metadata (jsonb) absorbs new per-item fields without a migration.
+ */
+export const educationCategories = pgTable(
+  'education_categories',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    villageId: bigint('village_id', { mode: 'number' })
+      .references(() => villages.id, { onDelete: 'cascade' }),
+    slug: text('slug').notNull(),
+    name: text('name').notNull(),
+    nameHindi: text('name_hindi'),
+    nameKey: text('name_key'),
+    overview: text('overview'),
+    overviewHindi: text('overview_hindi'),
+    overviewKey: text('overview_key'),
+    icon: text('icon').notNull().default('GraduationCap'),
+    displayOrder: integer('display_order').notNull().default(0),
+    status: educationStatusEnum('status').notNull().default('published'),
+    metadata: jsonb('metadata').$type<Record<string, any>>(),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('idx_education_categories_village_slug').on(table.villageId, table.slug),
+    // Postgres treats NULLs as distinct in a unique index, so platform-wide
+    // categories (village_id IS NULL) need their own partial unique index.
+    uniqueIndex('idx_education_categories_global_slug')
+      .on(table.slug)
+      .where(sql`village_id IS NULL`),
+    index('idx_education_categories_village_id').on(table.villageId),
+    index('idx_education_categories_status').on(table.status),
+    index('idx_education_categories_display_order').on(table.displayOrder),
+  ]
+);
+
+/**
+ * 4.8.2 EDUCATION RESOURCES (योजनाएं, छात्रवृत्ति, मार्गदर्शन)
+ * One card on an education category page — a scheme, scholarship, course,
+ * institution or guidance item.
+ */
+export const educationResources = pgTable(
+  'education_resources',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    categoryId: bigint('category_id', { mode: 'number' })
+      .notNull()
+      .references(() => educationCategories.id, { onDelete: 'cascade' }),
+    villageId: bigint('village_id', { mode: 'number' })
+      .references(() => villages.id, { onDelete: 'cascade' }),
+    slug: text('slug').notNull(),
+    title: text('title').notNull(),
+    titleHindi: text('title_hindi'),
+    titleKey: text('title_key'),
+    description: text('description'),
+    descriptionHindi: text('description_hindi'),
+    descriptionKey: text('description_key'),
+    icon: text('icon').notNull().default('BookOpen'),
+    scope: educationScopeEnum('scope').notNull().default('government'),
+    type: educationResourceTypeEnum('type').notNull().default('scheme'),
+    status: educationStatusEnum('status').notNull().default('published'),
+    // Long-form detail fields — all optional, so a minimal card
+    // (title + description) is still a valid record.
+    eligibility: text('eligibility'),
+    benefits: text('benefits'),
+    howToApply: text('how_to_apply'),
+    documentsRequired: jsonb('documents_required').$type<string[]>(),
+    // Hindi twins for the long-form fields. The village site defaults to Hindi,
+    // so detail text that exists only in English would be the wrong language for
+    // most of its readers; null falls back to the English column.
+    eligibilityHindi: text('eligibility_hindi'),
+    benefitsHindi: text('benefits_hindi'),
+    howToApplyHindi: text('how_to_apply_hindi'),
+    documentsRequiredHindi: jsonb('documents_required_hindi').$type<string[]>(),
+    tags: jsonb('tags').$type<string[]>(),
+    provider: text('provider'),
+    providerHindi: text('provider_hindi'),
+    externalUrl: text('external_url'),
+    photoUrl: text('photo_url'),
+    contactName: text('contact_name'),
+    contactMobile: text('contact_mobile'),
+    startDate: date('start_date'),
+    endDate: date('end_date'),
+    // Label on the card's action button. Null means the UI keeps its own
+    // translated default ("Learn more"), so a row that says nothing about it
+    // reads correctly in both languages; set it per row to say something more
+    // specific ("Apply now", "Check eligibility").
+    ctaLabel: text('cta_label'),
+    ctaLabelHindi: text('cta_label_hindi'),
+    displayOrder: integer('display_order').notNull().default(0),
+    metadata: jsonb('metadata').$type<Record<string, any>>(),
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('idx_education_resources_category_slug').on(table.categoryId, table.slug),
+    index('idx_education_resources_category_id').on(table.categoryId),
+    index('idx_education_resources_village_id').on(table.villageId),
+    index('idx_education_resources_status').on(table.status),
+    index('idx_education_resources_scope').on(table.scope),
+    index('idx_education_resources_type').on(table.type),
+    index('idx_education_resources_display_order').on(table.displayOrder),
+  ]
+);
+
+/**
+ * 4.8.3 EDUCATION RESOURCE LINKS
+ * Apply-here portals, PDFs, videos and forms attached to a resource.
+ */
+export const educationResourceLinks = pgTable(
+  'education_resource_links',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    resourceId: bigint('resource_id', { mode: 'number' })
+      .notNull()
+      .references(() => educationResources.id, { onDelete: 'cascade' }),
+    label: text('label').notNull(),
+    labelHindi: text('label_hindi'),
+    url: text('url').notNull(),
+    type: educationLinkTypeEnum('type').notNull().default('portal'),
+    displayOrder: integer('display_order').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_education_resource_links_resource_id').on(table.resourceId),
+    index('idx_education_resource_links_display_order').on(table.displayOrder),
+  ]
+);
+
+/**
+ * 4.8.4 EDUCATION ENQUIRIES (शिक्षा सहायता अनुरोध)
+ * A student/parent asking for help with a scheme — the "Learn more" CTA that
+ * currently points at the helpline.
+ */
+export const educationEnquiries = pgTable(
+  'education_enquiries',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    villageId: bigint('village_id', { mode: 'number' })
+      .references(() => villages.id, { onDelete: 'cascade' }),
+    resourceId: bigint('resource_id', { mode: 'number' })
+      .references(() => educationResources.id, { onDelete: 'set null' }),
+    categoryId: bigint('category_id', { mode: 'number' })
+      .references(() => educationCategories.id, { onDelete: 'set null' }),
+    userId: uuid('user_id').references(() => profiles.id, { onDelete: 'set null' }),
+    name: text('name').notNull(),
+    mobile: text('mobile').notNull(),
+    email: text('email'),
+    studentClass: text('student_class'),
+    message: text('message').notNull(),
+    status: educationEnquiryStatusEnum('status').notNull().default('new'),
+    assignedTo: uuid('assigned_to').references(() => profiles.id, { onDelete: 'set null' }),
+    response: text('response'),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('idx_education_enquiries_village_id').on(table.villageId),
+    index('idx_education_enquiries_resource_id').on(table.resourceId),
+    index('idx_education_enquiries_status').on(table.status),
+    index('idx_education_enquiries_mobile').on(table.mobile),
+    index('idx_education_enquiries_created_at').on(table.createdAt),
   ]
 );
 
@@ -659,13 +974,41 @@ export const userVillageRolesRelations = relations(userVillageRoles, ({ one }) =
   }),
 }));
 
-export const complaintsRelations = relations(complaints, ({ one }) => ({
+export const complaintCategoriesRelations = relations(complaintCategories, ({ many }) => ({
+  complaints: many(complaints),
+}));
+
+export const complaintsRelations = relations(complaints, ({ one, many }) => ({
   village: one(villages, {
     fields: [complaints.villageId],
     references: [villages.id],
   }),
   user: one(profiles, {
     fields: [complaints.userId],
+    references: [profiles.id],
+  }),
+  categoryRef: one(complaintCategories, {
+    fields: [complaints.categoryId],
+    references: [complaintCategories.id],
+  }),
+  attachments: many(complaintAttachments),
+  statusHistory: many(complaintStatusHistory),
+}));
+
+export const complaintAttachmentsRelations = relations(complaintAttachments, ({ one }) => ({
+  complaint: one(complaints, {
+    fields: [complaintAttachments.complaintId],
+    references: [complaints.id],
+  }),
+}));
+
+export const complaintStatusHistoryRelations = relations(complaintStatusHistory, ({ one }) => ({
+  complaint: one(complaints, {
+    fields: [complaintStatusHistory.complaintId],
+    references: [complaints.id],
+  }),
+  changedByUser: one(profiles, {
+    fields: [complaintStatusHistory.changedBy],
     references: [profiles.id],
   }),
 }));
@@ -713,6 +1056,66 @@ export const publicInfosRelations = relations(publicInfos, ({ one }) => ({
   village: one(villages, {
     fields: [publicInfos.villageId],
     references: [villages.id],
+  }),
+}));
+
+export const educationCategoriesRelations = relations(educationCategories, ({ one, many }) => ({
+  village: one(villages, {
+    fields: [educationCategories.villageId],
+    references: [villages.id],
+  }),
+  createdByProfile: one(profiles, {
+    fields: [educationCategories.createdBy],
+    references: [profiles.id],
+  }),
+  resources: many(educationResources),
+  enquiries: many(educationEnquiries),
+}));
+
+export const educationResourcesRelations = relations(educationResources, ({ one, many }) => ({
+  category: one(educationCategories, {
+    fields: [educationResources.categoryId],
+    references: [educationCategories.id],
+  }),
+  village: one(villages, {
+    fields: [educationResources.villageId],
+    references: [villages.id],
+  }),
+  createdByProfile: one(profiles, {
+    fields: [educationResources.createdBy],
+    references: [profiles.id],
+  }),
+  links: many(educationResourceLinks),
+  enquiries: many(educationEnquiries),
+}));
+
+export const educationResourceLinksRelations = relations(educationResourceLinks, ({ one }) => ({
+  resource: one(educationResources, {
+    fields: [educationResourceLinks.resourceId],
+    references: [educationResources.id],
+  }),
+}));
+
+export const educationEnquiriesRelations = relations(educationEnquiries, ({ one }) => ({
+  village: one(villages, {
+    fields: [educationEnquiries.villageId],
+    references: [villages.id],
+  }),
+  resource: one(educationResources, {
+    fields: [educationEnquiries.resourceId],
+    references: [educationResources.id],
+  }),
+  category: one(educationCategories, {
+    fields: [educationEnquiries.categoryId],
+    references: [educationCategories.id],
+  }),
+  user: one(profiles, {
+    fields: [educationEnquiries.userId],
+    references: [profiles.id],
+  }),
+  assignee: one(profiles, {
+    fields: [educationEnquiries.assignedTo],
+    references: [profiles.id],
   }),
 }));
 
@@ -785,6 +1188,15 @@ export type NewUserVillageRoleModel = typeof userVillageRoles.$inferInsert;
 export type ComplaintModel = typeof complaints.$inferSelect;
 export type NewComplaintModel = typeof complaints.$inferInsert;
 
+export type ComplaintCategoryModel = typeof complaintCategories.$inferSelect;
+export type NewComplaintCategoryModel = typeof complaintCategories.$inferInsert;
+
+export type ComplaintAttachmentModel = typeof complaintAttachments.$inferSelect;
+export type NewComplaintAttachmentModel = typeof complaintAttachments.$inferInsert;
+
+export type ComplaintStatusHistoryModel = typeof complaintStatusHistory.$inferSelect;
+export type NewComplaintStatusHistoryModel = typeof complaintStatusHistory.$inferInsert;
+
 export type SocialWorkModel = typeof socialWorks.$inferSelect;
 export type NewSocialWorkModel = typeof socialWorks.$inferInsert;
 
@@ -802,6 +1214,18 @@ export type NewAnnouncementModel = typeof announcements.$inferInsert;
 
 export type PublicInfoModel = typeof publicInfos.$inferSelect;
 export type NewPublicInfoModel = typeof publicInfos.$inferInsert;
+
+export type EducationCategoryModel = typeof educationCategories.$inferSelect;
+export type NewEducationCategoryModel = typeof educationCategories.$inferInsert;
+
+export type EducationResourceModel = typeof educationResources.$inferSelect;
+export type NewEducationResourceModel = typeof educationResources.$inferInsert;
+
+export type EducationResourceLinkModel = typeof educationResourceLinks.$inferSelect;
+export type NewEducationResourceLinkModel = typeof educationResourceLinks.$inferInsert;
+
+export type EducationEnquiryModel = typeof educationEnquiries.$inferSelect;
+export type NewEducationEnquiryModel = typeof educationEnquiries.$inferInsert;
 
 export type ChatRoomModel = typeof chatRooms.$inferSelect;
 export type NewChatRoomModel = typeof chatRooms.$inferInsert;

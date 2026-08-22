@@ -30,6 +30,9 @@ export type PermissionCode =
   | 'announcements:global_broadcast'
   | 'public_info:manage'
   | 'elders:manage'
+  | 'education:view'
+  | 'education:manage'
+  | 'education:publish'
   | 'chat:participate'
   | 'chat:moderate'
   | 'audit:view'
@@ -243,21 +246,75 @@ export type ComplaintCategory =
 
 export type ComplaintStatus = 'NEW' | 'ACTION IN PROGRESS' | 'RESOLVED';
 
+export type ComplaintPriority = 'low' | 'medium' | 'high' | 'urgent';
+
+export type ComplaintAttachmentType = 'photo' | 'video' | 'document';
+
+export interface ComplaintCategoryItem {
+  id: string;
+  slug: string;
+  name: string;
+  nameHindi: string;
+  icon: string;
+  displayOrder: number;
+  isActive: boolean;
+}
+
+export interface ComplaintAttachment {
+  id: string;
+  complaintId: string;
+  type: ComplaintAttachmentType;
+  url: string;
+  caption?: string;
+  createdAt: string;
+}
+
+export interface ComplaintStatusHistoryEntry {
+  id: string;
+  complaintId: string;
+  fromStatus?: string | null;
+  toStatus: string;
+  changedBy?: string | null;
+  note?: string | null;
+  createdAt: string;
+}
+
 export interface Complaint {
   id: string;
   villageId?: string;
+  villageName?: string;
+  villageNameHindi?: string;
+  village?: {
+    id: string;
+    name: string;
+    nameHindi: string;
+    slug?: string;
+  } | null;
+  categoryId?: string;
   title: string;
+  titleHindi?: string;
   category: ComplaintCategory;
   description: string;
+  descriptionHindi?: string;
   location: string;
+  locationHindi?: string;
+  ward?: string;
+  wardHindi?: string;
   reporterName: string;
   reporterMobile: string;
   status: ComplaintStatus;
+  priority: ComplaintPriority;
+  /** @deprecated Use attachments array */
   photoUrl?: string;
+  /** @deprecated Use attachments array */
   videoUrl?: string;
-  isDemo?: boolean;
+  attachments?: ComplaintAttachment[];
+  statusHistory?: ComplaintStatusHistoryEntry[];
+  categoryRef?: ComplaintCategoryItem;
+  isActive?: boolean;
   createdAt: string;
   resolvedAt?: string;
+  updatedAt?: string;
 }
 
 export interface SocialWork {
@@ -333,6 +390,113 @@ export interface Elder {
   details?: string;
   photoUrl?: string;
   createdAt: string;
+}
+
+export type EducationScope = 'gramodaya' | 'government';
+export type EducationStatus = 'draft' | 'pending' | 'published' | 'archived';
+export type EducationResourceType =
+  | 'scheme'
+  | 'scholarship'
+  | 'course'
+  | 'institution'
+  | 'guidance'
+  | 'resource'
+  | 'other';
+export type EducationLinkType = 'portal' | 'pdf' | 'video' | 'form' | 'contact' | 'other';
+export type EducationEnquiryStatus = 'new' | 'in_progress' | 'resolved' | 'closed';
+
+export interface EducationResourceLink {
+  id: string;
+  resourceId: string;
+  label: string;
+  labelHindi?: string;
+  url: string;
+  type: EducationLinkType;
+  displayOrder: number;
+}
+
+export interface EducationResource {
+  id: string;
+  categoryId: string;
+  categorySlug?: string;
+  villageId?: string;
+  slug: string;
+  title: string;
+  titleHindi?: string;
+  /** i18n key for seeded content, e.g. "education.nsp.title" */
+  titleKey?: string;
+  description?: string;
+  descriptionHindi?: string;
+  descriptionKey?: string;
+  /** lucide-react icon name, resolved to a component on the client */
+  icon: string;
+  scope: EducationScope;
+  type: EducationResourceType;
+  status: EducationStatus;
+  eligibility?: string;
+  benefits?: string;
+  howToApply?: string;
+  documentsRequired?: string[];
+  eligibilityHindi?: string;
+  benefitsHindi?: string;
+  howToApplyHindi?: string;
+  documentsRequiredHindi?: string[];
+  tags?: string[];
+  provider?: string;
+  providerHindi?: string;
+  externalUrl?: string;
+  photoUrl?: string;
+  contactName?: string;
+  contactMobile?: string;
+  startDate?: string;
+  endDate?: string;
+  /** Label for the card's action button; empty falls back to "Learn more". */
+  ctaLabel?: string;
+  ctaLabelHindi?: string;
+  displayOrder: number;
+  metadata?: Record<string, any>;
+  links?: EducationResourceLink[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface EducationCategory {
+  id: string;
+  villageId?: string;
+  slug: string;
+  name: string;
+  nameHindi?: string;
+  nameKey?: string;
+  overview?: string;
+  overviewHindi?: string;
+  overviewKey?: string;
+  icon: string;
+  displayOrder: number;
+  status: EducationStatus;
+  metadata?: Record<string, any>;
+  resourceCount?: number;
+  resources?: EducationResource[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface EducationEnquiry {
+  id: string;
+  villageId?: string;
+  resourceId?: string;
+  categoryId?: string;
+  userId?: string;
+  name: string;
+  mobile: string;
+  email?: string;
+  studentClass?: string;
+  message: string;
+  status: EducationEnquiryStatus;
+  assignedTo?: string;
+  response?: string;
+  resolvedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface AuditLog {

@@ -6,7 +6,7 @@ import { ProtectedRoute } from '@/src/components/common';
 
 export default function AdminProblemsPage() {
   return (
-    <ProtectedRoute requiredRole="SUPER_ADMIN" sectionTitle="Grievances Management">
+    <ProtectedRoute requiredRole="ADMIN" sectionTitle="Grievances Management">
       <AdminPanel initialTab="problems" />
     </ProtectedRoute>
   );

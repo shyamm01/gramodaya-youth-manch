@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '@/src/context/AppContext';
 import { useToast } from '@/src/context/ToastContext';
+import { apiClient } from '@/src/lib/apiClient';
 
 interface InviteMemberModalProps {
   isOpen: boolean;
@@ -70,20 +71,18 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({ isOpen, on
     );
 
     try {
-      const res = await fetch('/api/members/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: cleanName,
-          email: cleanEmail,
-          inviterName: authSession.email || (isEn ? 'Community Member' : 'ग्राम सदस्य'),
-          lang: isEn ? 'en' : 'hi',
-        }),
+      // Same reason as the permissions modal: this route requires auth, and
+      // only apiClient carries the token.
+      const data = await apiClient.post('/api/members/invite', {
+        name: cleanName,
+        email: cleanEmail,
+        inviterName: authSession.email || (isEn ? 'Community Member' : 'ग्राम सदस्य'),
+        lang: isEn ? 'en' : 'hi',
       });
 
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
+      // apiClient throws on a non-2xx, so reaching here means the request
+      // succeeded; only the payload's own success flag is left to check.
+      if (!data.success) {
         throw new Error(data.error || (isEn ? 'Failed to send invitation.' : 'निमंत्रण भेजने में विफल।'));
       }
 

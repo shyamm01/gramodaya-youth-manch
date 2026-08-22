@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+
 import { createClient } from '@/lib/supabase/client';
 import {
   Admin,
@@ -122,7 +123,7 @@ interface AppContextType {
   updateMember: (id: string, updates: Partial<Member>) => Promise<{ success: boolean; error?: string }>;
   deleteMember: (id: string) => Promise<void>;
   uploadPhoto: (targetType: 'admin' | 'member', targetId: string, photoUrl: string) => Promise<void>;
-  submitComplaint: (data: Omit<Complaint, 'id' | 'createdAt' | 'status'>) => Promise<{ success: boolean; error?: string }>;
+  submitComplaint: (data: Omit<Complaint, 'id' | 'createdAt' | 'status'> & { userId?: string }) => Promise<{ success: boolean; error?: string }>;
   updateComplaintStatus: (id: string, status: ComplaintStatus) => Promise<void>;
   deleteComplaint: (id: string) => Promise<void>;
   submitSocialWork: (data: Omit<SocialWork, 'id' | 'createdAt' | 'status'>) => Promise<{ success: boolean; error?: string }>;
@@ -468,7 +469,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const memberLogout = async () => {
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await authenticatedFetch("/api/auth/logout", { method: "POST" });
       await supabase.auth.signOut();
     } catch (e) {
       console.warn("Signout notice:", e);
@@ -494,7 +495,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const fetchGroupChat = async () => {
     try {
-      const res = await fetch("/api/group-chat");
+      const res = await authenticatedFetch("/api/group-chat");
       if (res.ok) {
         const text = await res.text();
         let data: any = null;
@@ -527,7 +528,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
     try {
-      const res = await fetch('/api/group-chat', {
+      const res = await authenticatedFetch('/api/group-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ senderName, senderMobile, senderPhoto, text }),
@@ -549,7 +550,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteGroupMessage = async (id: string) => {
     try {
-      const res = await fetch(`/api/group-chat/${id}`, { method: 'DELETE' });
+      const res = await authenticatedFetch(`/api/group-chat/${id}`, { method: 'DELETE' });
       if (res.ok) {
         await fetchGroupChat();
       }
@@ -558,6 +559,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  /**
+   * Every call to our own API goes through here.
+   *
+   * The JWT lives in localStorage as `gym_token` and there is no login route
+   * that mirrors it into a cookie, so a bare fetch() carries no credentials at
+   * all and the API answers 401. The education module never hit this because it
+   * calls through apiClient, whose axios interceptor attaches the same header
+   * this does — which is why that one module's CRUD worked while the rest
+   * silently failed.
+   */
   const authenticatedFetch = useCallback(
     async (url: string, init: RequestInit = {}) => {
       const token =
@@ -574,7 +585,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         headers['x-member-mobile'] = currentMemberMobile;
       }
 
-      return fetch(url, {
+      return globalThis.fetch(url, {
         ...init,
         headers,
         credentials: 'include',
@@ -583,8 +594,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [authSession.token, currentMemberMobile]
   );
 
+  /**
+   * Pulls the content collections the admin panel renders from context.
+   *
+   * Each endpoint returns { success, <key>: [...] }. A failure on one must not
+   * take the others down with it — a village with no gallery is not a reason to
+   * leave the events list empty — so each result is applied independently.
+   */
+  const loadCollections = useCallback(async () => {
+    const sources: Array<[string, string, (rows: any[]) => void]> = [
+      ['/api/events', 'events', (rows) => setEvents(rows as EventItem[])],
+      ['/api/gallery', 'gallery', (rows) => setGallery(rows as GalleryItem[])],
+      ['/api/elders', 'elders', (rows) => setElders(rows as Elder[])],
+      ['/api/complaints', 'complaints', (rows) => setComplaints(rows as Complaint[])],
+      ['/api/social-work', 'socialWorks', (rows) => setSocialWorks(rows as SocialWork[])],
+      ['/api/public-info', 'publicInfos', (rows) => setPublicInfos(rows as PublicInfo[])],
+      ['/api/announcements', 'announcements', (rows) => setAnnouncements(rows as Announcement[])],
+      // fetchMembers() exists and is exported for on-demand refreshes, but
+      // nothing ever called it on load, so the directory was empty too.
+      ['/api/members', 'members', (rows) => setMembers(rows as Member[])],
+    ];
+
+    await Promise.all(
+      sources.map(async ([url, key, apply]) => {
+        try {
+          const res = await authenticatedFetch(url, { credentials: 'include' });
+          if (!res.ok) return;
+          const data = await res.json();
+          if (data?.success && Array.isArray(data[key])) apply(data[key]);
+        } catch (e) {
+          console.warn(`Failed to load ${url}:`, e instanceof Error ? e.message : e);
+        }
+      })
+    );
+  }, [authenticatedFetch]);
+
   const refreshData = async (force = false, retryCount = 0) => {
     const now = Date.now();
+    // The throttle protects the bootstrap path from refetching on every render.
+    // Mutations pass force = true: a create the user just made has to appear
+    // now, not once a two-minute window happens to close.
     if (!force && lastDataFetchTimeRef.current > 0 && now - lastDataFetchTimeRef.current < 120000) {
       return;
     }
@@ -596,6 +645,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const [authData, villagesList] = await Promise.all([
         fetchAuthMeOnce(),
         fetchVillagesOnce(),
+        // Content collections. Until now refreshData fetched only the session
+        // and the village list, so events, gallery, elders, complaints, social
+        // works and public infos stayed at their initial [] for the lifetime of
+        // the app — every admin section rendered its empty state no matter what
+        // the database held. The public pages never showed it because they each
+        // fetch their own data directly.
+        loadCollections(),
       ]);
 
       if (authData?.user) {
@@ -702,7 +758,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const saveIntegrationConfig = async (id: string, apiKey: string) => {
     try {
-      const res = await fetch('/api/integrations/save', {
+      const res = await authenticatedFetch('/api/integrations/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -714,7 +770,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || 'Failed to save config.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Network error.' };
@@ -723,7 +779,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const testIntegration = async (id: string) => {
     try {
-      const res = await fetch('/api/integrations/test', {
+      const res = await authenticatedFetch('/api/integrations/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -733,7 +789,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       const data = await res.json();
-      await refreshData();
+      await refreshData(true);
       return data;
     } catch (e) {
       return { success: false, error: 'Connection test failed.' };
@@ -742,7 +798,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const disconnectIntegration = async (id: string) => {
     try {
-      const res = await fetch('/api/integrations/disconnect', {
+      const res = await authenticatedFetch('/api/integrations/disconnect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -753,7 +809,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || 'Failed to disconnect.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Network error.' };
@@ -766,14 +822,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const importDataJson = async (jsonData: any) => {
     try {
-      const res = await fetch('/api/data/import', {
+      const res = await authenticatedFetch('/api/data/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(jsonData),
       });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || 'Import failed.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true, message: data.message };
     } catch (e) {
       return { success: false, error: 'Network error during import.' };
@@ -782,10 +838,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const resetDataStore = async () => {
     try {
-      const res = await fetch('/api/data/reset', { method: 'POST' });
+      const res = await authenticatedFetch('/api/data/reset', { method: 'POST' });
       const data = await res.json();
       if (!res.ok) return { success: false, error: data.error || 'Reset failed.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true, message: data.message };
     } catch (e) {
       return { success: false, error: 'Network error during reset.' };
@@ -819,7 +875,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const resetMemberPassword = async (mobile: string, otp: string, newPassword: string) => {
     try {
-      const res = await fetch('/api/member/reset-password', {
+      const res = await authenticatedFetch('/api/member/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile, otp, newPassword }),
@@ -836,7 +892,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const resetAdminPassword = async (mobile: string, otp: string, newPassword: string) => {
     try {
-      const res = await fetch('/api/admin/reset-password', {
+      const res = await authenticatedFetch('/api/admin/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile, otp, newPassword }),
@@ -853,7 +909,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const setAdminPassword = async (emailOrMobile: string, resetToken: string, password: string) => {
     try {
-      const res = await fetch('/api/admin/set-password', {
+      const res = await authenticatedFetch('/api/admin/set-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mobile: emailOrMobile, resetToken, password }),
@@ -878,7 +934,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           email: data.admin.email || emailOrMobile,
         });
       }
-      await refreshData();
+      await refreshData(true);
       return { success: true, admin: data.admin };
     } catch (e) {
       return { success: false, error: 'सर्वर कनेक्शन त्रुटि।' };
@@ -887,7 +943,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const adminLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await authenticatedFetch('/api/auth/logout', { method: 'POST' });
       await supabase.auth.signOut();
     } catch (e) {
       /* ignore */
@@ -945,7 +1001,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               createdAt: posJoiningDate ? new Date(posJoiningDate).toISOString() : new Date().toISOString(),
             };
 
-      const res = await fetch('/api/members', {
+      const res = await authenticatedFetch('/api/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -959,7 +1015,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           member: data.member,
         };
       }
-      await refreshData();
+      await refreshData(true);
       return { success: true, member: data.member };
     } catch (e) {
       return { success: false, error: 'सर्वर से कनेक्ट करने में त्रुटि हुई।' };
@@ -972,12 +1028,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      await fetch(`/api/members/${id}`, {
+      await authenticatedFetch(`/api/members/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'active' }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -988,7 +1044,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: Admin login required.' };
     }
     try {
-      const res = await fetch(`/api/members/${id}`, {
+      const res = await authenticatedFetch(`/api/members/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1001,7 +1057,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!res.ok) {
         return { success: false, error: data.error || 'Failed to update member.' };
       }
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e.message || 'Server error.' };
@@ -1014,8 +1070,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      await fetch(`/api/members/${id}`, { method: 'DELETE' });
-      await refreshData();
+      await authenticatedFetch(`/api/members/${id}`, { method: 'DELETE' });
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1034,7 +1090,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
     try {
-      await fetch('/api/upload-photo', {
+      await authenticatedFetch('/api/upload-photo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetType, targetId, photoUrl }),
@@ -1042,14 +1098,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (selectedIdCardMember && selectedIdCardMember.id === targetId) {
         setSelectedIdCardMember({ ...selectedIdCardMember, photoUrl });
       }
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
   };
 
-  // Complaint Handlers
-  const submitComplaint = async (data: Omit<Complaint, 'id' | 'createdAt' | 'status'>) => {
+  // Complaint Handlers (optimistic updates)
+  const submitComplaint = async (data: Omit<Complaint, 'id' | 'createdAt' | 'status'> & { userId?: string }) => {
     if (!isApprovedMember) {
       return {
         success: false,
@@ -1057,14 +1113,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
     try {
-      const res = await fetch('/api/complaints', {
+      const currentUserId = authSession.currentMemberId || authSession.currentMember?.id || authSession.adminId || authSession.supabaseUserId;
+      const currentUserName = authSession.currentMemberName || authSession.adminName || authSession.currentMember?.name;
+      const currentUserMobile = authSession.currentMemberMobile || authSession.adminMobile || authSession.currentMember?.mobile;
+
+      // Auto-inject userId, reporter details, and villageId from session if not provided
+      const payload = {
+        ...data,
+        userId: data.userId || currentUserId,
+        reporterName: data.reporterName || currentUserName || 'Village Resident',
+        reporterMobile: data.reporterMobile || currentUserMobile || 'Hidden',
+        villageId: data.villageId || authSession.activeVillageId || authSession.adminVillageId,
+      };
+      const res = await authenticatedFetch('/api/complaints', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: JSON.stringify(payload),
       });
       const result = await res.json();
       if (!res.ok) return { success: false, error: result.error };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Failed to submit complaint.' };
@@ -1076,14 +1144,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Unauthorized attempt to update complaint status.');
       return;
     }
+
+    // Optimistic update: update local state immediately
+    const prevComplaints = [...complaints];
+    const idx = complaints.findIndex((c) => c.id === id);
+    if (idx !== -1) {
+      const updated = { ...complaints[idx], status };
+      if (status === 'RESOLVED') updated.resolvedAt = new Date().toISOString();
+      complaints[idx] = updated;
+    }
+
     try {
-      await fetch(`/api/complaints/${id}/status`, {
+      const res = await authenticatedFetch(`/api/complaints/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({
+          status,
+          adminName: authSession.adminName,
+          adminMobile: authSession.adminMobile,
+        }),
       });
-      await refreshData();
+      if (!res.ok) {
+        // Rollback on failure
+        if (idx !== -1) complaints[idx] = prevComplaints[idx];
+      }
+      await refreshData(true);
     } catch (e) {
+      // Rollback on error
+      if (idx !== -1) complaints[idx] = prevComplaints[idx];
       console.error(e);
     }
   };
@@ -1095,7 +1183,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      await fetch(`/api/complaints/${id}`, {
+      await authenticatedFetch(`/api/complaints/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1104,7 +1192,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           userMobile: currentMemberMobile,
         }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1116,7 +1204,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: You can only edit complaints you submitted or manage.' };
     }
     try {
-      const res = await fetch(`/api/complaints/${id}`, {
+      const res = await authenticatedFetch(`/api/complaints/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1126,7 +1214,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to edit complaint.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1142,7 +1230,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
     try {
-      const res = await fetch('/api/social-work', {
+      const res = await authenticatedFetch('/api/social-work', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -1151,7 +1239,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const result = await res.json().catch(() => ({}));
         return { success: false, error: result.error || 'Failed to submit social work.' };
       }
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1164,12 +1252,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      await fetch(`/api/social-work/${id}/status`, {
+      await authenticatedFetch(`/api/social-work/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1182,7 +1270,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      await fetch(`/api/social-work/${id}`, {
+      await authenticatedFetch(`/api/social-work/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1191,7 +1279,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           userMobile: currentMemberMobile,
         }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1203,7 +1291,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: You can only edit social work items you submitted.' };
     }
     try {
-      const res = await fetch(`/api/social-work/${id}`, {
+      const res = await authenticatedFetch(`/api/social-work/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1213,7 +1301,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to edit social work.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1229,7 +1317,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     }
     try {
-      const res = await fetch('/api/public-info', {
+      const res = await authenticatedFetch('/api/public-info', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -1238,7 +1326,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const result = await res.json().catch(() => ({}));
         return { success: false, error: result.error || 'Failed to submit info.' };
       }
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1251,12 +1339,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      await fetch(`/api/public-info/${id}/status`, {
+      await authenticatedFetch(`/api/public-info/${id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1269,7 +1357,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      await fetch(`/api/public-info/${id}`, {
+      await authenticatedFetch(`/api/public-info/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1278,7 +1366,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           userMobile: currentMemberMobile,
         }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1290,7 +1378,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: You can only edit public info you submitted.' };
     }
     try {
-      const res = await fetch(`/api/public-info/${id}`, {
+      const res = await authenticatedFetch(`/api/public-info/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1300,7 +1388,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to edit public info.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1313,7 +1401,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: Admin login required to publish announcements.' };
     }
     try {
-      const res = await fetch('/api/announcements', {
+      const res = await authenticatedFetch('/api/announcements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1323,7 +1411,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to publish announcement.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1335,7 +1423,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: Admin login required.' };
     }
     try {
-      const res = await fetch(`/api/announcements/${id}`, {
+      const res = await authenticatedFetch(`/api/announcements/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1346,7 +1434,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to update announcement.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e: any) {
       return { success: false, error: e.message || 'Server error.' };
@@ -1359,8 +1447,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      await fetch(`/api/announcements/${id}`, { method: 'DELETE' });
-      await refreshData();
+      await authenticatedFetch(`/api/announcements/${id}`, { method: 'DELETE' });
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1372,13 +1460,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: Admin login required to create events.' };
     }
     try {
-      const res = await fetch('/api/events', {
+      const res = await authenticatedFetch('/api/events', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
       if (!res.ok) return { success: false, error: 'Failed to create event.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1390,31 +1478,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: Admin login required to update events.' };
     }
     try {
-      const res = await fetch(`/api/events/${id}`, {
+      const res = await authenticatedFetch(`/api/events/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
       if (!res.ok) return { success: false, error: 'Failed to update event.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
     }
   };
 
+  // There is no /status subroute for events or gallery — only the [id] PATCH,
+  // which already accepts a partial update including status. These two used to
+  // call a path that does not exist and 404 without saying so.
   const updateEventStatus = async (id: string, status: EventStatus) => {
     if (!authSession.isAdminLoggedIn) {
       return { success: false, error: 'Unauthorized: Admin login required to update event status.' };
     }
     try {
-      const res = await fetch(`/api/events/${id}/status`, {
+      const res = await authenticatedFetch(`/api/events/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       });
       if (!res.ok) return { success: false, error: 'Failed to update status.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1427,8 +1518,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      await fetch(`/api/events/${id}`, { method: 'DELETE' });
-      await refreshData();
+      await authenticatedFetch(`/api/events/${id}`, { method: 'DELETE' });
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1438,7 +1529,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const uploadGalleryPhoto = async (caption: string, photoUrl: string, status?: 'pending' | 'published') => {
     try {
       const isUserAdmin = authSession.isAdminLoggedIn;
-      const res = await fetch('/api/gallery', {
+      const res = await authenticatedFetch('/api/gallery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1450,7 +1541,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to upload image.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1463,12 +1554,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      await fetch(`/api/gallery/${id}/status`, {
+      await authenticatedFetch(`/api/gallery/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'published' }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1480,12 +1571,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      await fetch(`/api/gallery/${id}`, {
+      await authenticatedFetch(`/api/gallery/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ caption }),
       });
-      await refreshData();
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1497,8 +1588,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      await fetch(`/api/gallery/${id}`, { method: 'DELETE' });
-      await refreshData();
+      await authenticatedFetch(`/api/gallery/${id}`, { method: 'DELETE' });
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1510,13 +1601,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: Admin login required to add elder records.' };
     }
     try {
-      const res = await fetch('/api/elders', {
+      const res = await authenticatedFetch('/api/elders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
       if (!res.ok) return { success: false, error: 'Failed to add elder.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1528,13 +1619,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: Admin login required to edit elder records.' };
     }
     try {
-      const res = await fetch(`/api/elders/${id}`, {
+      const res = await authenticatedFetch(`/api/elders/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
       if (!res.ok) return { success: false, error: 'Failed to update elder.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error.' };
@@ -1547,8 +1638,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
     try {
-      await fetch(`/api/elders/${id}`, { method: 'DELETE' });
-      await refreshData();
+      await authenticatedFetch(`/api/elders/${id}`, { method: 'DELETE' });
+      await refreshData(true);
     } catch (e) {
       console.error(e);
     }
@@ -1595,7 +1686,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: Admin login required to create villages.' };
     }
     try {
-      const res = await fetch('/api/villages', {
+      const res = await authenticatedFetch('/api/villages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1606,7 +1697,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const result = await res.json();
       if (!res.ok) return { success: false, error: result.error };
-      await refreshData();
+      await refreshData(true);
       return { success: true, village: result.village };
     } catch (e) {
       return { success: false, error: 'Failed to add village.' };
@@ -1618,7 +1709,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized to update this village.' };
     }
     try {
-      const res = await fetch(`/api/villages/${id}`, {
+      const res = await authenticatedFetch(`/api/villages/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1629,7 +1720,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const result = await res.json();
       if (!res.ok) return { success: false, error: result.error };
-      await refreshData();
+      await refreshData(true);
       return { success: true, village: result.village };
     } catch (e) {
       return { success: false, error: 'Failed to update village.' };
@@ -1641,7 +1732,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: Only Super Admin can delete villages.' };
     }
     try {
-      const res = await fetch(`/api/villages/${id}`, {
+      const res = await authenticatedFetch(`/api/villages/${id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1650,7 +1741,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }),
       });
       if (!res.ok) return { success: false, error: 'Failed to delete village.' };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Server error deleting village.' };
@@ -1668,14 +1759,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: You can only edit your own profile.' };
     }
     try {
-      const res = await fetch(`/api/members/${id}`, {
+      const res = await authenticatedFetch(`/api/members/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
       });
       const result = await res.json();
       if (!res.ok) return { success: false, error: result.error };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Failed to update profile.' };
@@ -1688,7 +1779,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { success: false, error: 'Unauthorized: Only Super Admin can change user roles.' };
     }
     try {
-      const res = await fetch(`/api/members/${id}`, {
+      const res = await authenticatedFetch(`/api/members/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1700,7 +1791,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       const result = await res.json();
       if (!res.ok) return { success: false, error: result.error };
-      await refreshData();
+      await refreshData(true);
       return { success: true };
     } catch (e) {
       return { success: false, error: 'Failed to change member role.' };
@@ -1721,7 +1812,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const promise = (async () => {
       try {
-        const res = await fetch('/api/members', { credentials: 'include' });
+        const res = await authenticatedFetch('/api/members', { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
           if (data.success && Array.isArray(data.members)) {
@@ -1747,7 +1838,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const fetchUserMessages = async (mobile: string): Promise<ChatMessage[]> => {
     if (!mobile) return [];
     try {
-      const res = await fetch(`/api/messages?userMobile=${encodeURIComponent(mobile)}`);
+      const res = await authenticatedFetch(`/api/messages?userMobile=${encodeURIComponent(mobile)}`);
       if (!res.ok) return [];
       const data = await res.json();
       return data.messages || [];
@@ -1765,7 +1856,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     text: string
   ) => {
     try {
-      const res = await fetch('/api/messages', {
+      const res = await authenticatedFetch('/api/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ senderMobile, senderName, recipientMobile, recipientName, text }),
@@ -1779,7 +1870,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const markMessagesRead = async (userMobile: string, partnerMobile: string) => {
     try {
-      await fetch('/api/messages/mark-read', {
+      await authenticatedFetch('/api/messages/mark-read', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userMobile, partnerMobile }),

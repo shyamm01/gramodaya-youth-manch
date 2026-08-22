@@ -9,3 +9,4 @@ export { ProtectedRoute } from './ProtectedRoute';
 export { WhatsAppIcon } from './WhatsAppIcon';
 export { GoogleIcon, FacebookIcon } from './SocialIcons';
 export { AddressFormFields } from './AddressFormFields';
+export { DynamicIcon, EDUCATION_ICONS } from './DynamicIcon';

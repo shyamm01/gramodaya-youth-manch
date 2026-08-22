@@ -5,15 +5,8 @@ import { useApp } from '../../context/AppContext';
 import { Calendar, MapPin, Plus, Trash2, Share2, Edit, Video } from 'lucide-react';
 import { EventItem, EventStatus } from '../../types';
 import { EventStatusBadge } from '../common/EntityLabels';
-import {
-  Button,
-  Card,
-  Input,
-  Textarea,
-  Dialog,
-  DatePicker,
-  ImageUploader,
-} from '../ui';
+import { Button, Card, Input, Textarea, Modal } from '../ui';
+import { DatePicker, ImageUploader } from '../inputs';
 import { WhatsAppIcon } from '../common';
 
 export const EventsSection: React.FC = () => {
@@ -310,7 +303,7 @@ export const EventsSection: React.FC = () => {
       )}
 
       {/* New / Edit Event Modal */}
-      <Dialog
+      <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingEventId ? 'कार्यक्रम संपादित करें' : 'नया कार्यक्रम जोड़ें'}
@@ -435,7 +428,7 @@ export const EventsSection: React.FC = () => {
             </Button>
           </div>
         </form>
-      </Dialog>
+      </Modal>
     </div>
   );
 };

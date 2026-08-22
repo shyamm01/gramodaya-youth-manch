@@ -4,7 +4,7 @@ import React from 'react';
 import { useApp } from '@/src/context/AppContext';
 import { ThemeToggle } from '@/src/components/common/ThemeToggle';
 import { Badge } from '@/src/components/ui/badge';
-import { AdminLocationSelector } from './AdminLocationSelector';
+import { AdminLocationSelector } from '../widgets/AdminLocationSelector';
 import { Menu, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 

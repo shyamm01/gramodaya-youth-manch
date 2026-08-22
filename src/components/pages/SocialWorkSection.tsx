@@ -4,15 +4,8 @@ import React, { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { HeartHandshake, Plus, Calendar, MapPin, Trash2, Share2 } from 'lucide-react';
-import {
-  Button,
-  Card,
-  Input,
-  Textarea,
-  Dialog,
-  DatePicker,
-  ImageUploader,
-} from '../ui';
+import { Button, Card, Input, Textarea, Modal } from '../ui';
+import { DatePicker, ImageUploader } from '../inputs';
 import { WhatsAppIcon } from '../common';
 
 export const SocialWorkSection: React.FC = () => {
@@ -323,7 +316,7 @@ export const SocialWorkSection: React.FC = () => {
       )}
 
       {/* Submit Social Work Modal */}
-      <Dialog
+      <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={t('socialWork.addNewBtn')}
@@ -441,7 +434,7 @@ export const SocialWorkSection: React.FC = () => {
             </Button>
           </div>
         </form>
-      </Dialog>
+      </Modal>
     </div>
   );
 };

@@ -16,6 +16,7 @@ import {
 import { SYSTEM_MODULES, ALL_SYSTEM_PERMISSIONS, ROLE_DEFAULT_PERMISSIONS } from '@/src/lib/permissions';
 import { Member } from '@/src/types';
 import { useApp } from '@/src/context/AppContext';
+import { apiClient } from '@/src/lib/apiClient';
 
 interface MemberPermissionsModalProps {
   isOpen: boolean;
@@ -85,16 +86,14 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
     try {
       setSaving(true);
       setStatusMsg(null);
-      const res = await fetch(`/api/permissions/${member.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          permissions: selectedPermissions,
-          adminName: authSession.adminName || 'Admin',
-          adminMobile: authSession.adminMobile || '',
-        }),
+      // apiClient, not fetch: the JWT lives in localStorage and only axios's
+      // interceptor attaches it, so a bare fetch here is an anonymous request
+      // and the route answers 401.
+      const data = await apiClient.post(`/api/permissions/${member.id}`, {
+        permissions: selectedPermissions,
+        adminName: authSession.adminName || 'Admin',
+        adminMobile: authSession.adminMobile || '',
       });
-      const data = await res.json();
       if (data.success) {
         setStatusMsg({ type: 'success', text: 'अनुमतियां सफलतापूर्वक अपडेट की गईं!' });
         if (onSuccess) onSuccess();

@@ -11,7 +11,8 @@ import {
   Calendar,
   Phone,
 } from 'lucide-react';
-import { Input, DatePicker, ImageUploader } from '../../ui';
+import { Input } from '../../ui';
+import { DatePicker, ImageUploader } from '../../inputs';
 import { useApp } from '../../../context/AppContext';
 import { INDIAN_STATES, DEFAULT_PANCHAYATS } from '@/src/data/geoData';
 

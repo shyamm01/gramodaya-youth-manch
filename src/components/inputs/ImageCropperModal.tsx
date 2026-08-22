@@ -17,7 +17,7 @@ import {
   Minus,
   Sparkles,
 } from 'lucide-react';
-import { Button } from './button';
+import { Button } from '../ui/button';
 import { computeDisplayDimensions, renderCroppedImage } from '@/src/lib/canvasCropper';
 
 export interface ImageCropperModalProps {

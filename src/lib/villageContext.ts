@@ -1,4 +1,7 @@
 import { extractTokenFromRequest, verifyJwtToken } from './jwtAuth';
+import { getDb } from '../db';
+import { villages } from '../db/schema';
+import { asc, eq } from 'drizzle-orm';
 
 const DEFAULT_VILLAGE_ID = 1;
 
@@ -72,4 +75,54 @@ export function createTtlCache<T>(ttlMs: number) {
       cache.set(key, { data, expiresAt: Date.now() + ttlMs });
     },
   };
+}
+
+// ── Village references for writes ────────────────────────────────────────────
+
+/**
+ * village_id is a foreign key, so a write must not pass an id that has no row.
+ *
+ * The routes used to default to 1, which is not a village on every deployment —
+ * this database's only village is 8 — and every create against a village-scoped
+ * table failed on the foreign key with a 500. Resolving through here verifies
+ * the id first and falls back to a real village, or to NULL where the column
+ * allows it, so a create can no longer fail on a number nobody chose.
+ */
+let cachedFallbackVillageId: number | null | undefined;
+
+async function firstExistingVillageId(): Promise<number | null> {
+  if (cachedFallbackVillageId !== undefined) return cachedFallbackVillageId;
+  const db = getDb();
+  if (!db) return null;
+  try {
+    const [row] = await db
+      .select({ id: villages.id })
+      .from(villages)
+      .orderBy(asc(villages.id))
+      .limit(1);
+    cachedFallbackVillageId = row?.id ?? null;
+  } catch {
+    cachedFallbackVillageId = null;
+  }
+  return cachedFallbackVillageId;
+}
+
+/** Verified village id for a write, or null when no village exists at all. */
+export async function resolveVillageRef(villageId: unknown): Promise<number | null> {
+  const numeric = Number(villageId);
+  if (Number.isFinite(numeric) && numeric > 0) {
+    const db = getDb();
+    if (!db) return null;
+    try {
+      const [row] = await db
+        .select({ id: villages.id })
+        .from(villages)
+        .where(eq(villages.id, numeric))
+        .limit(1);
+      if (row) return row.id;
+    } catch {
+      return null;
+    }
+  }
+  return firstExistingVillageId();
 }

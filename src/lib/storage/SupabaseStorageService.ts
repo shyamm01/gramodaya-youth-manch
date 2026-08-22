@@ -192,7 +192,17 @@ export class SupabaseStorageService implements IStorageService {
           return { success: true, publicUrl, path: data.path };
         }
 
-        return { success: false, error: error?.message || s3Error?.message || 'Upload failed' };
+        const reason = error?.message || s3Error?.message || 'Upload failed';
+        // "Bucket not found" is a provisioning problem, not something the person
+        // uploading did wrong — say what has to happen instead of making them
+        // retry a file that was never going to land anywhere.
+        if (/bucket not found/i.test(reason)) {
+          return {
+            success: false,
+            error: `Storage bucket "${bucket}" does not exist. Create it in Supabase → Storage (public), or set SUPABASE_SERVICE_ROLE_KEY so the app can create it.`,
+          };
+        }
+        return { success: false, error: reason };
       }
     } catch (err: any) {
       return { success: false, error: err?.message || 'Storage upload failed' };

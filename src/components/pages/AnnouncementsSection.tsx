@@ -8,7 +8,7 @@ import {
   Card,
   Input,
   Textarea,
-  Dialog,
+  Modal,
   Badge,
   Tabs,
   TabsList,
@@ -337,7 +337,7 @@ export const AnnouncementsSection: React.FC = () => {
       </Tabs>
 
       {/* New Announcement Modal */}
-      <Dialog
+      <Modal
         isOpen={isAnnModalOpen}
         onClose={() => setIsAnnModalOpen(false)}
         title="नई आधिकारिक घोषणा जारी करें"
@@ -390,10 +390,10 @@ export const AnnouncementsSection: React.FC = () => {
             </Button>
           </div>
         </form>
-      </Dialog>
+      </Modal>
 
       {/* Submit Public Info Modal */}
-      <Dialog
+      <Modal
         isOpen={isInfoModalOpen}
         onClose={() => setIsInfoModalOpen(false)}
         title="अपनी जन सूचना दें"
@@ -456,7 +456,7 @@ export const AnnouncementsSection: React.FC = () => {
             </Button>
           </div>
         </form>
-      </Dialog>
+      </Modal>
     </div>
   );
 };

@@ -4,14 +4,8 @@ import React, { useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useApp } from '../../context/AppContext';
 import { Image as ImageIcon, Plus, Trash2, Check, Edit2 } from 'lucide-react';
-import {
-  Button,
-  Card,
-  Input,
-  Dialog,
-  Badge,
-  ImageUploader,
-} from '../ui';
+import { Button, Card, Input, Modal, Badge } from '../ui';
+import { ImageUploader } from '../inputs';
 
 export const GallerySection: React.FC = () => {
   const {
@@ -297,7 +291,7 @@ export const GallerySection: React.FC = () => {
       )}
 
       {/* Upload Photo Modal */}
-      <Dialog
+      <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title="फोटो अपलोड करें"
@@ -353,7 +347,7 @@ export const GallerySection: React.FC = () => {
             </Button>
           </div>
         </form>
-      </Dialog>
+      </Modal>
     </div>
   );
 };

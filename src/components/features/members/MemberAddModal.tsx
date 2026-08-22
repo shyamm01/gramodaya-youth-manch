@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { Camera, UserCheck, CheckCircle2 } from 'lucide-react';
-import { Dialog, Avatar, AvatarImage, AvatarFallback, Input, Button, ImageUploader } from '../../ui';
+import { Modal, Avatar, AvatarImage, AvatarFallback, Input, Button } from '../../ui';
+import { ImageUploader } from '../../inputs';
 import { useApp } from '../../../context/AppContext';
 
 interface MemberAddModalProps {
@@ -67,7 +68,7 @@ export const MemberAddModal: React.FC<MemberAddModalProps> = ({
   };
 
   return (
-    <Dialog
+    <Modal
       isOpen={isOpen}
       onClose={onClose}
       title={t('members.addModalTitle')}
@@ -171,6 +172,6 @@ export const MemberAddModal: React.FC<MemberAddModalProps> = ({
           </Button>
         </div>
       </form>
-    </Dialog>
+    </Modal>
   );
 };
