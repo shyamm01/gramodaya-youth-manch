@@ -70,7 +70,7 @@ export async function GET(req: Request, context: RouteContext) {
         id: String(member.id),
         name: member.fullName,
         mobile: member.mobile,
-        role: member.role,
+        role: member.systemRole === 'MEMBER' ? 'MEMBER' : 'ADMIN',
         systemRole: member.systemRole,
         villageId: member.villageId ? String(member.villageId) : '8',
       },

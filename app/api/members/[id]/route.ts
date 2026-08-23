@@ -62,26 +62,17 @@ export async function PUT(
       if (mobile !== undefined) profileUpdateData.mobile = normalizeMobile(mobile);
       if (status !== undefined) {
         profileUpdateData.status = status;
-        profileUpdateData.isApproved = status === 'active';
       }
       const VALID_SYSTEM_ROLES = ['MEMBER', 'ADMIN', 'SUPER_ADMIN'];
-      const VALID_ROLES = ['MEMBER', 'ADMIN'];
 
       if (body.systemRole !== undefined) {
         if (VALID_SYSTEM_ROLES.includes(body.systemRole)) {
           profileUpdateData.systemRole = body.systemRole;
-          profileUpdateData.role = body.systemRole === 'MEMBER' ? 'MEMBER' : 'ADMIN';
         }
-        // else: unrecognized system_role value — ignored rather than silently coerced
       } else if (role !== undefined) {
         if (VALID_SYSTEM_ROLES.includes(role)) {
           profileUpdateData.systemRole = role;
-          profileUpdateData.role = role === 'MEMBER' ? 'MEMBER' : 'ADMIN';
-        } else if (VALID_ROLES.includes(role)) {
-          profileUpdateData.role = role;
-          profileUpdateData.systemRole = role;
         }
-        // else: unrecognized role value (e.g. legacy DISTRICT_ADMIN/VILLAGE_ADMIN/GUEST) — ignored
       }
       if (photoUrl !== undefined) {
         profileUpdateData.avatarUrl = photoUrl;
@@ -93,7 +84,6 @@ export async function PUT(
       if (villageId !== undefined && !isNaN(Number(villageId))) profileUpdateData.villageId = Number(villageId);
       if (body.houseNo !== undefined) profileUpdateData.houseNo = body.houseNo ? body.houseNo.trim() : null;
       if (body.street !== undefined) profileUpdateData.street = body.street ? body.street.trim() : null;
-      if (body.pincode !== undefined) profileUpdateData.pincode = body.pincode ? body.pincode.trim() : null;
       if (body.occupation !== undefined) profileUpdateData.occupation = body.occupation ? body.occupation.trim() : null;
       if (body.designation !== undefined) profileUpdateData.designation = body.designation ? body.designation.trim() : null;
       if (body.politicalBackground !== undefined) profileUpdateData.politicalBackground = body.politicalBackground ? body.politicalBackground.trim() : null;

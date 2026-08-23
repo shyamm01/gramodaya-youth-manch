@@ -19,7 +19,6 @@ export async function GET() {
       profileLeaders = await db.query.profiles.findMany({
         where: (p, { or, eq }) =>
           or(
-            eq(p.role, 'ADMIN'),
             eq(p.systemRole, 'ADMIN'),
             eq(p.systemRole, 'SUPER_ADMIN')
           ),
@@ -79,7 +78,6 @@ export async function GET() {
     const leaders = await db.query.members.findMany({
       where: (m, { or, eq }) =>
         or(
-          eq(m.role, 'ADMIN'),
           eq(m.systemRole, 'ADMIN'),
           eq(m.systemRole, 'SUPER_ADMIN')
         ),

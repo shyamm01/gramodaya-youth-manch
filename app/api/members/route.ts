@@ -62,7 +62,7 @@ export async function GET() {
           dob: p.dob || "",
           gender: p.gender || "",
           address: fullAddress,
-          pincode: p.pincode || v?.pincode || "241125",
+          pincode: v?.pincode || "241125",
           state: st?.nameHindi || st?.name || "Uttar Pradesh",
           district: dist?.nameHindi || dist?.name || "Hardoi",
           block: v?.blockNameHindi || v?.blockName || "Hardoi",
@@ -75,9 +75,9 @@ export async function GET() {
           designation: p.designation || "",
           politicalBackground: p.politicalBackground || "",
           bloodGroup: p.bloodGroup || "",
-          role: p.role || "MEMBER",
+          role: p.systemRole === "MEMBER" ? "MEMBER" : "ADMIN",
           systemRole: p.systemRole || "MEMBER",
-          isApproved: p.isApproved || p.status === 'active',
+          isApproved: p.status === 'active',
           createdAt: p.createdAt,
         };
       });
@@ -234,7 +234,6 @@ export async function POST(req: Request) {
           dob: dob || null,
           gender: gender || null,
           villageId: numericVillageId || 8,
-          pincode: pincode || "241125",
           houseNo: houseNo || null,
           street: street || null,
           occupation: occupation || null,
@@ -242,9 +241,7 @@ export async function POST(req: Request) {
           politicalBackground: politicalBackground || null,
           bloodGroup: bloodGroup || null,
           status: status as any,
-          role: role as any,
-          systemRole: systemRole as any,
-          isApproved: status === 'active',
+          systemRole: (systemRole || (role === 'ADMIN' ? 'ADMIN' : 'MEMBER')) as any,
         })
         .where(eq(schema.profiles.id, profileId))
         .returning();
