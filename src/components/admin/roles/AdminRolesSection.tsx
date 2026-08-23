@@ -21,6 +21,7 @@ import {
   Check,
 } from 'lucide-react';
 import { useApp } from '@/src/context/AppContext';
+import { useGetMembersQuery } from '@/src/store/api/adminApi';
 import { useRouter } from 'next/navigation';
 import { SYSTEM_MODULES, ALL_SYSTEM_PERMISSIONS, isSuperAdmin as checkIsSuperAdmin } from '@/src/lib/permissions';
 
@@ -76,7 +77,12 @@ export const clearRolesCache = () => {
 };
 
 export const AdminRolesSection: React.FC = () => {
-  const { authSession, lang, members } = useApp();
+  const { authSession, lang } = useApp();
+  // Collections come from RTK Query rather than AppContext: the context no
+  // longer bootstraps them on admin routes, because the panel's own cache
+  // already holds them. Subscribing here shares that cache — it does not add a
+  // request when another admin screen has already loaded the same collection.
+  const { data: members = [] } = useGetMembersQuery();
   const router = useRouter();
 
   const isSuper = Boolean(

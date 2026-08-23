@@ -2,10 +2,25 @@
 
 import React, { useMemo } from 'react';
 import { useApp } from '@/src/context/AppContext';
+import {
+  useGetMembersQuery,
+  useGetComplaintsQuery,
+  useGetSocialWorksQuery,
+  useGetEventsQuery,
+} from '@/src/store/api/adminApi';
 import { TrendingUp, TrendingDown, Users, ShieldAlert, HeartHandshake, CalendarCheck } from 'lucide-react';
 
 export const AdminMetricsCards: React.FC = () => {
-  const { members, complaints, socialWorks, events, activeVillageId, isSuperAdmin, authSession } = useApp();
+  const { activeVillageId, isSuperAdmin, authSession } = useApp();
+
+  // Collections come from RTK Query rather than AppContext: the context no
+  // longer bootstraps them on admin routes, because the panel's own cache
+  // already holds them. The sidebar and the charts subscribe to the same
+  // entries, so the dashboard loads each collection once between them.
+  const { data: members = [] } = useGetMembersQuery();
+  const { data: complaints = [] } = useGetComplaintsQuery();
+  const { data: socialWorks = [] } = useGetSocialWorksQuery();
+  const { data: events = [] } = useGetEventsQuery();
 
   const isSuperAdminUser = Boolean(
     isSuperAdmin ||

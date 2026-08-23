@@ -2,6 +2,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/src/context/AppContext';
+import {
+  useGetMembersQuery,
+  useGetComplaintsQuery,
+  useGetSocialWorksQuery,
+} from '@/src/store/api/adminApi';
 import { hasUserPermission, isSuperAdmin as checkIsSuperAdmin } from '@/src/lib/permissions';
 import {
   ShieldCheck,
@@ -52,7 +57,30 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   setMobileSidebarOpen,
   onOpenQuickCreate,
 }) => {
-  const { villages, stats, adminLogout, authSession, isSuperAdmin: contextIsSuperAdmin } = useApp();
+  const { villages, adminLogout, authSession, isSuperAdmin: contextIsSuperAdmin } = useApp();
+
+  /**
+   * The three badge counts, read from the same RTK Query cache the sections use.
+   *
+   * These came from AppContext's `stats`, which is derived from collections it
+   * bootstrapped on every page load — eight requests, of which the sidebar
+   * needed three, and which the admin sections then fetched again through RTK
+   * Query. Subscribing here instead means the sidebar shares those cache
+   * entries: opening /admin/members costs one members request for the table and
+   * the badge together, not two.
+   */
+  const { data: memberRows = [] } = useGetMembersQuery();
+  const { data: complaintRows = [] } = useGetComplaintsQuery();
+  const { data: socialWorkRows = [] } = useGetSocialWorksQuery();
+
+  const stats = useMemo(
+    () => ({
+      pendingMembers: memberRows.filter((m) => m.status === 'pending').length,
+      newProblems: complaintRows.filter((c) => c.status === 'NEW').length,
+      pendingSocialWork: socialWorkRows.filter((w) => w.status === 'pending').length,
+    }),
+    [memberRows, complaintRows, socialWorkRows]
+  );
 
   // Accordion open/collapse states
   const [usersAccordionOpen, setUsersAccordionOpen] = useState<boolean>(true);

@@ -208,6 +208,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const pathname = usePathname();
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  /**
+   * Whether we are inside the admin panel.
+   *
+   * Held in a ref so loadCollections can read it without taking `pathname` as
+   * a dependency — that would rebuild the callback on every navigation and
+   * re-run the bootstrap fetches each time.
+   */
+  const isAdminRoute = useRef<boolean>(false);
+  isAdminRoute.current = Boolean(pathname && /^\/(admin|super-admin)(\/|$)/.test(pathname));
+
   const [activeSection, setActiveSectionState] = useState<string>("home");
   const [historyStack, setHistoryStack] = useState<string[]>([]);
   const [lang, setLangState] = useState<string>("hi");
@@ -610,10 +620,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
    * leave the events list empty — so each result is applied independently.
    */
   const loadCollections = useCallback(async () => {
+    // The admin panel fetches through RTK Query now, with its own cache and
+    // tag invalidation. Bootstrapping these here as well would fetch the same
+    // rows a second time on every admin page load — the sidebar's three badge
+    // counts are the only thing the admin still needs, and AdminSidebar reads
+    // those from the same RTK Query cache the sections use.
+    if (isAdminRoute.current) return;
+
     const sources: Array<[string, string, (rows: any[]) => void]> = [
-      ['/api/events', 'events', (rows) => setEvents(rows as EventItem[])],
       ['/api/gallery', 'gallery', (rows) => setGallery(rows as GalleryItem[])],
-      ['/api/elders', 'elders', (rows) => setElders(rows as Elder[])],
       ['/api/complaints', 'complaints', (rows) => setComplaints(rows as Complaint[])],
       ['/api/social-work', 'socialWorks', (rows) => setSocialWorks(rows as SocialWork[])],
       ['/api/public-info', 'publicInfos', (rows) => setPublicInfos(rows as PublicInfo[])],
@@ -621,6 +636,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // fetchMembers() exists and is exported for on-demand refreshes, but
       // nothing ever called it on load, so the directory was empty too.
       ['/api/members', 'members', (rows) => setMembers(rows as Member[])],
+      // NOTE: /api/events and /api/elders used to be fetched here too. Nothing
+      // reads context `events` or `elders`, and the only stats derived from
+      // them — upcomingEvents, eldersCount — have no consumer either, so both
+      // requests were pure cost on every page load. The public events and
+      // elders pages fetch their own data. Re-add them here if something ever
+      // needs them from context, rather than assuming they are populated.
     ];
 
     await Promise.all(

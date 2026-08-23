@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/src/context/AppContext';
+import { useGetMembersQuery } from '@/src/store/api/adminApi';
 import { DatePicker } from '../../inputs/DatePicker';
 import {
   TrendingUp,
@@ -16,7 +17,12 @@ import {
 } from 'lucide-react';
 
 export const AdminMemberTrendChart: React.FC = () => {
-  const { members, activeVillageId, isSuperAdmin, authSession } = useApp();
+  const { activeVillageId, isSuperAdmin, authSession } = useApp();
+  // Collections come from RTK Query rather than AppContext: the context no
+  // longer bootstraps them on admin routes, because the panel's own cache
+  // already holds them. Subscribing here shares that cache — it does not add a
+  // request when another admin screen has already loaded the same collection.
+  const { data: members = [] } = useGetMembersQuery();
 
   const isSuperAdminUser = Boolean(
     isSuperAdmin ||
