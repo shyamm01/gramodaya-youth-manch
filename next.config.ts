@@ -10,6 +10,35 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/super-admin',
+        destination: '/admin',
+        permanent: false,
+      },
+      {
+        source: '/super-admin/:path*',
+        destination: '/admin/:path*',
+        permanent: false,
+      },
+      {
+        source: '/admin/security',
+        destination: '/admin/audit',
+        permanent: false,
+      },
+      {
+        source: '/admin/permissions/modules',
+        destination: '/admin/modules',
+        permanent: false,
+      },
+      {
+        source: '/admin/permissions/roles',
+        destination: '/admin/roles',
+        permanent: false,
+      },
+    ];
+  },
   async headers() {
     return [
       {

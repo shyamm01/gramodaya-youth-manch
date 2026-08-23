@@ -289,7 +289,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (newSection === activeSection) return;
     setHistoryStack((prev) => [...prev, activeSection]);
     setActiveSectionState(newSection);
-    const targetUrl = newSection === "home" ? "/" : newSection === "admin-panel" ? "/super-admin" : `/${newSection}`;
+    const targetUrl = newSection === "home" ? "/" : newSection === "admin-panel" ? "/admin" : `/${newSection}`;
     try {
       router.push(targetUrl);
     } catch (e) {

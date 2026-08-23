@@ -137,7 +137,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
-    const basePath = pathname?.startsWith('/admin') ? '/admin' : '/super-admin';
+    const basePath = '/admin';
     const targetUrl = newTab === 'dashboard' ? basePath : `${basePath}/${newTab}`;
     if (pathname !== targetUrl) {
       router.push(targetUrl);
@@ -1108,13 +1108,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       {/* ─────────────────────────────────────────────────────────────
           TAB: USER PERMISSIONS & ACCESS CONTROL MATRIX
       ───────────────────────────────────────────────────────────── */}
-      {(activeTab === 'permissions' || activeTab === 'permissions-modules' || activeTab === 'permissions-roles') && (
+      {(activeTab === 'permissions' || activeTab === 'modules' || activeTab === 'roles' || activeTab === 'audit' || activeTab === 'permissions-modules' || activeTab === 'permissions-roles' || activeTab === 'security') && (
         <AdminPermissionsSection
           initialSubTab={
-            activeTab === 'permissions-modules'
+            activeTab === 'modules' || activeTab === 'permissions-modules'
               ? 'modules'
-              : activeTab === 'permissions-roles'
+              : activeTab === 'roles' || activeTab === 'permissions-roles'
               ? 'roles'
+              : activeTab === 'audit' || activeTab === 'security'
+              ? 'audit'
               : 'workspace'
           }
         />

@@ -176,7 +176,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
               {authSession.isAdminLoggedIn ? (
                 <div className="space-y-2">
                   <Link
-                    href="/super-admin"
+                    href="/admin"
                     className="inline-flex items-center gap-2 px-3 py-2 bg-[#D97706] hover:bg-[#B45309] text-white rounded-xl text-xs font-bold transition shadow-sm"
                   >
                     <Shield className="w-3.5 h-3.5" />

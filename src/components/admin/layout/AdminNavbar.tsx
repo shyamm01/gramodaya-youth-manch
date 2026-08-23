@@ -17,7 +17,13 @@ export const AdminNavbar: React.FC<AdminNavbarProps> = ({
   activeTab,
   onOpenMobileSidebar,
 }) => {
-  const { isSuperAdmin } = useApp();
+  const { isSuperAdmin, authSession } = useApp();
+
+  const roleLabel = isSuperAdmin
+    ? 'Super Admin'
+    : authSession.systemRole === 'ADMIN' || authSession.role === 'ADMIN'
+    ? 'Village Admin'
+    : 'Admin Portal';
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-8 py-3 bg-white/85 dark:bg-[#070B14]/85 backdrop-blur-md border-b border-[#E4DFD5] dark:border-slate-800/80 transition-colors duration-200">
@@ -31,7 +37,7 @@ export const AdminNavbar: React.FC<AdminNavbarProps> = ({
         </button>
 
         <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-          <span className="text-slate-400 dark:text-slate-500">Super Admin</span>
+          <span className="text-slate-400 dark:text-slate-500">{roleLabel}</span>
           <span>/</span>
           <span className="text-slate-900 dark:text-white font-bold capitalize">
             {activeTab.replace('-', ' ')}

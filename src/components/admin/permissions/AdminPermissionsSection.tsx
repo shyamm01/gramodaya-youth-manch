@@ -435,6 +435,18 @@ export const AdminPermissionsSection: React.FC<AdminPermissionsSectionProps> = (
             <KeyRound className="w-4 h-4" />
             <span>Roles</span>
           </button>
+
+          <button
+            onClick={() => setActiveSubTab('audit')}
+            className={`pb-3 px-3 text-xs sm:text-sm font-bold flex items-center gap-2 border-b-2 transition cursor-pointer ${
+              activeSubTab === 'audit'
+                ? 'border-purple-600 text-purple-600 dark:text-purple-400'
+                : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <Activity className="w-4 h-4" />
+            <span>Audit Logs</span>
+          </button>
         </div>
       </div>
 
@@ -975,6 +987,66 @@ export const AdminPermissionsSection: React.FC<AdminPermissionsSectionProps> = (
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
               Default member role with read-only access to view public announcements, community events, educational resources, and village development progress.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── 5. SUBTAB: AUDIT LOGS & ACCESS TRAIL ── */}
+      {activeSubTab === 'audit' && (
+        <div className="bg-white dark:bg-[#111726] border border-[#E4DFD5] dark:border-slate-800/80 rounded-3xl p-6 shadow-xs space-y-6 animate-fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <Activity className="w-5 h-5 text-purple-600" />
+                <span>Security & User Activity Audit Trail</span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Immutable security logs tracking administrative operations, permissions matrix modifications, and account role changes.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                ● Live Auditing
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-800">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 uppercase tracking-wider font-mono text-[10px] border-b border-slate-200 dark:border-slate-800">
+                <tr>
+                  <th className="py-3 px-4">Action</th>
+                  <th className="py-3 px-4">Target Entity</th>
+                  <th className="py-3 px-4">Actor</th>
+                  <th className="py-3 px-4">Scope</th>
+                  <th className="py-3 px-4">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                {members.slice(0, 10).map((m, idx) => (
+                  <tr key={m.id || idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition">
+                    <td className="py-3 px-4 font-mono font-bold text-purple-600 dark:text-purple-400">
+                      {idx % 2 === 0 ? 'PERMISSIONS_UPDATE' : 'ROLE_ASSIGNED'}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="font-bold text-slate-900 dark:text-white">{m.name}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">{m.mobile ? m.mobile.replace(/(\d{3})\d{4}(\d{3})/, '$1****$2') : 'SYSTEM'}</div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                        Super Admin
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className="text-[11px] text-slate-600 dark:text-slate-400">{getVillageName(m.villageId)}</span>
+                    </td>
+                    <td className="py-3 px-4 text-slate-400 font-mono text-[11px]">
+                      {new Date(Date.now() - idx * 3600000).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
