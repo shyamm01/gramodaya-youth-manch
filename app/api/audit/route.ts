@@ -20,7 +20,7 @@ export interface AuditLogItem {
   severity?: 'INFO' | 'WARNING' | 'CRITICAL' | 'SUCCESS';
 }
 
-const SEED_AUDIT_LOGS: AuditLogItem[] = [
+const SEED_PERMISSION_AUDIT_LOGS: AuditLogItem[] = [
   {
     id: 1,
     villageId: 1,
@@ -29,109 +29,109 @@ const SEED_AUDIT_LOGS: AuditLogItem[] = [
     userName: 'Shyam Varan Pal',
     userRole: 'SUPER_ADMIN',
     userContact: '9506072678',
-    action: 'POLICY_PERMISSIONS_UPDATE',
-    details: 'Updated granular PBAC capability matrix for Village Admin role across 13 modules.',
-    targetEntity: 'Role: ADMIN',
-    targetUser: 'Village Administrators',
+    action: 'UPDATE_PERMISSIONS',
+    details: 'Updated 13 module capability permissions matrix for Suresh Yadav (Full write access to Grievances & Social Works).',
+    targetEntity: 'Member: Suresh Yadav',
+    targetUser: 'Suresh Yadav',
     ipAddress: '103.21.124.89',
-    timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    severity: 'INFO',
+    timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
+    severity: 'SUCCESS',
   },
   {
     id: 2,
-    villageId: 1,
-    villageName: 'Rasoolpur',
-    userId: 'u_admin_02',
-    userName: 'Ramesh Kumar',
-    userRole: 'ADMIN',
-    userContact: '9876500001',
-    action: 'PROFILE_UPDATED',
-    details: 'Updated personal profile data, designation (Panchayat Coordinator), and emergency contact for Suresh Yadav.',
-    targetEntity: 'Profile: Suresh Yadav',
-    targetUser: 'Suresh Yadav',
-    ipAddress: '157.34.89.12',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    severity: 'SUCCESS',
-  },
-  {
-    id: 3,
-    villageId: 1,
-    villageName: 'Rasoolpur',
-    userId: 'u_admin_02',
-    userName: 'Ramesh Kumar',
-    userRole: 'ADMIN',
-    userContact: '9876500001',
-    action: 'MEMBER_VERIFIED',
-    details: 'Approved member verification and KYC for citizen Amit Sharma (Mobile: 9876543211).',
-    targetEntity: 'Profile: Amit Sharma',
-    targetUser: 'Amit Sharma',
-    ipAddress: '157.34.89.12',
-    timestamp: new Date(Date.now() - 1000 * 60 * 55).toISOString(),
-    severity: 'SUCCESS',
-  },
-  {
-    id: 4,
-    villageId: 1,
-    villageName: 'Rasoolpur',
-    userId: 'u_admin_02',
-    userName: 'Ramesh Kumar',
-    userRole: 'ADMIN',
-    userContact: '9876500001',
-    action: 'GRIEVANCE_STATUS_UPDATE',
-    details: 'Changed status of complaint #104 (Solar street light repair) to IN_PROGRESS.',
-    targetEntity: 'Grievance #104',
-    targetUser: 'Grievance: Solar Light Repair',
-    ipAddress: '157.34.89.12',
-    timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    severity: 'INFO',
-  },
-  {
-    id: 5,
     villageId: 1,
     villageName: 'Rasoolpur',
     userId: 'u_super_01',
     userName: 'Shyam Varan Pal',
     userRole: 'SUPER_ADMIN',
     userContact: '9506072678',
-    action: 'MODULE_RUNTIME_TOGGLE',
-    details: 'Enabled runtime access for Live Chat & Community Discussions module.',
-    targetEntity: 'Module: live_chat',
-    targetUser: 'Module: live_chat',
+    action: 'ROLE_ASSIGNMENT',
+    details: 'Promoted member Amit Sharma to Village Admin authority role for Rasoolpur Chapter.',
+    targetEntity: 'Member: Amit Sharma',
+    targetUser: 'Amit Sharma',
+    ipAddress: '103.21.124.89',
+    timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+    severity: 'SUCCESS',
+  },
+  {
+    id: 3,
+    villageId: 1,
+    villageName: 'Rasoolpur',
+    userId: 'u_super_01',
+    userName: 'Shyam Varan Pal',
+    userRole: 'SUPER_ADMIN',
+    userContact: '9506072678',
+    action: 'UPDATE_PERMISSIONS',
+    details: 'Configured granular permissions for Sunita Devi (Read-only access across Education & Directory).',
+    targetEntity: 'Member: Sunita Devi',
+    targetUser: 'Sunita Devi',
+    ipAddress: '103.21.124.89',
+    timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
+    severity: 'INFO',
+  },
+  {
+    id: 4,
+    villageId: 1,
+    villageName: 'Rasoolpur',
+    userId: 'u_super_01',
+    userName: 'Shyam Varan Pal',
+    userRole: 'SUPER_ADMIN',
+    userContact: '9506072678',
+    action: 'ROLE_POLICY_UPDATE',
+    details: 'Updated capability preset permissions template for Field Volunteer role across 9 active modules.',
+    targetEntity: 'Role: VOLUNTEER',
+    targetUser: 'Volunteer Template',
     ipAddress: '103.21.124.89',
     timestamp: new Date(Date.now() - 1000 * 60 * 240).toISOString(),
     severity: 'INFO',
   },
   {
+    id: 5,
+    villageId: 1,
+    villageName: 'Rasoolpur',
+    userId: 'u_admin_02',
+    userName: 'Ramesh Kumar',
+    userRole: 'ADMIN',
+    userContact: '9876500001',
+    action: 'UPDATE_PERMISSIONS',
+    details: 'Granted event photo upload and gallery moderation capabilities to member Rajesh Verma.',
+    targetEntity: 'Member: Rajesh Verma',
+    targetUser: 'Rajesh Verma',
+    ipAddress: '157.34.89.12',
+    timestamp: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
+    severity: 'SUCCESS',
+  },
+  {
     id: 6,
     villageId: 1,
     villageName: 'Rasoolpur',
-    userId: 'u_sec_01',
-    userName: 'System Security Engine',
-    userRole: 'SYSTEM',
-    userContact: 'Internal Service',
-    action: 'AUTH_SESSION_LOGIN',
-    details: 'Successful administrator login via OTP authentication.',
-    targetEntity: 'Auth Session',
-    targetUser: 'Shyam Varan Pal',
+    userId: 'u_super_01',
+    userName: 'Shyam Varan Pal',
+    userRole: 'SUPER_ADMIN',
+    userContact: '9506072678',
+    action: 'ROLE_CREATED',
+    details: 'Registered custom authority role Health Coordinator with 6 health-related module permissions.',
+    targetEntity: 'Role: HEALTH_COORDINATOR',
+    targetUser: 'Custom Role',
     ipAddress: '103.21.124.89',
-    timestamp: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
+    timestamp: new Date(Date.now() - 1000 * 60 * 720).toISOString(),
     severity: 'SUCCESS',
   },
   {
     id: 7,
     villageId: 1,
     villageName: 'Rasoolpur',
-    userId: 'u_sec_01',
-    userName: 'System Security Engine',
-    userRole: 'SYSTEM',
-    userContact: 'Internal Service',
-    action: 'RATE_LIMIT_NOTICE',
-    details: 'Excessive rapid requests detected and throttled for IP 49.207.18.91.',
-    targetEntity: 'Firewall Filter',
-    targetUser: 'IP 49.207.18.91',
-    ipAddress: '49.207.18.91',
-    timestamp: new Date(Date.now() - 1000 * 60 * 720).toISOString(),
-    severity: 'WARNING',
+    userId: 'u_super_01',
+    userName: 'Shyam Varan Pal',
+    userRole: 'SUPER_ADMIN',
+    userContact: '9506072678',
+    action: 'ROLE_ASSIGNMENT',
+    details: 'Reassigned authority role of member Vikas Kumar from Member to Field Volunteer.',
+    targetEntity: 'Member: Vikas Kumar',
+    targetUser: 'Vikas Kumar',
+    ipAddress: '103.21.124.89',
+    timestamp: new Date(Date.now() - 1000 * 60 * 1440).toISOString(),
+    severity: 'INFO',
   },
 ];
 
@@ -140,11 +140,14 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const actionFilter = searchParams.get('action');
     const search = searchParams.get('search');
-    const limit = Number(searchParams.get('limit')) || 50;
+    const scope = searchParams.get('scope'); // 'permissions' or 'all'
+    const limit = Number(searchParams.get('limit')) || 100;
+
+    const isPermissionOnly = scope === 'permissions' || true; // User directive: audit logs under user & permissions should contain only update permissions related logs
 
     const db = getDb();
     if (!db) {
-      let filtered = [...SEED_AUDIT_LOGS];
+      let filtered = [...SEED_PERMISSION_AUDIT_LOGS];
       if (actionFilter && actionFilter !== 'ALL') {
         filtered = filtered.filter((l) => l.action.includes(actionFilter));
       }
@@ -181,7 +184,7 @@ export async function GET(req: Request) {
     // Auto-seed if empty
     if (dbLogs.length === 0) {
       try {
-        const seedPayload = SEED_AUDIT_LOGS.map((item) => ({
+        const seedPayload = SEED_PERMISSION_AUDIT_LOGS.map((item) => ({
           userName: item.userName,
           action: item.action,
           details: item.details || '',
@@ -199,14 +202,14 @@ export async function GET(req: Request) {
       }
     }
 
-    const enrichedLogs: AuditLogItem[] = (dbLogs.length > 0 ? dbLogs : SEED_AUDIT_LOGS).map((item: any) => {
+    const enrichedLogs: AuditLogItem[] = (dbLogs.length > 0 ? dbLogs : SEED_PERMISSION_AUDIT_LOGS).map((item: any) => {
       const actionUpper = (item.action || '').toUpperCase();
       let severity: 'INFO' | 'WARNING' | 'CRITICAL' | 'SUCCESS' = 'INFO';
       if (actionUpper.includes('WARNING') || actionUpper.includes('ALERT') || actionUpper.includes('FAIL')) {
         severity = 'WARNING';
       } else if (actionUpper.includes('DELETE') || actionUpper.includes('REVOKE') || actionUpper.includes('REMOVE')) {
         severity = 'CRITICAL';
-      } else if (actionUpper.includes('SUCCESS') || actionUpper.includes('APPROVE') || actionUpper.includes('VERIF') || actionUpper.includes('UPDATE')) {
+      } else if (actionUpper.includes('SUCCESS') || actionUpper.includes('APPROVE') || actionUpper.includes('VERIF') || actionUpper.includes('UPDATE') || actionUpper.includes('ASSIGN')) {
         severity = 'SUCCESS';
       }
 
@@ -218,22 +221,34 @@ export async function GET(req: Request) {
       let detectedTargetEntity = item.targetEntity || null;
 
       if (!detectedTargetUser && item.details) {
-        if (item.details.includes('for Suresh Yadav')) {
+        if (item.details.includes('Suresh Yadav')) {
           detectedTargetUser = 'Suresh Yadav';
-          detectedTargetEntity = 'Profile: Suresh Yadav';
+          detectedTargetEntity = 'Member: Suresh Yadav';
         } else if (item.details.includes('Amit Sharma')) {
           detectedTargetUser = 'Amit Sharma';
-          detectedTargetEntity = 'Profile: Amit Sharma';
+          detectedTargetEntity = 'Member: Amit Sharma';
         } else if (item.details.includes('Sunita Devi')) {
           detectedTargetUser = 'Sunita Devi';
-          detectedTargetEntity = 'Profile: Sunita Devi';
-        } else if (item.action === 'PROFILE_UPDATED') {
-          const match = item.details.match(/for ([^.\n]+)/i);
+          detectedTargetEntity = 'Member: Sunita Devi';
+        } else if (item.details.includes('Rajesh Verma')) {
+          detectedTargetUser = 'Rajesh Verma';
+          detectedTargetEntity = 'Member: Rajesh Verma';
+        } else if (item.details.includes('Vikas Kumar')) {
+          detectedTargetUser = 'Vikas Kumar';
+          detectedTargetEntity = 'Member: Vikas Kumar';
+        } else if (item.details.includes('for user ')) {
+          const match = item.details.match(/for user ([^.\n]+)/i);
           if (match && match[1]) {
             detectedTargetUser = match[1].trim();
-            detectedTargetEntity = `Profile: ${detectedTargetUser}`;
+            detectedTargetEntity = `Member: ${detectedTargetUser}`;
           }
         }
+      }
+
+      // Format clean action name
+      let cleanAction = item.action || 'UPDATE_PERMISSIONS';
+      if (cleanAction === 'POLICY_PERMISSIONS_UPDATE' || cleanAction === 'UPDATE_PERMISSIONS') {
+        cleanAction = 'UPDATE_PERMISSIONS';
       }
 
       return {
@@ -244,9 +259,9 @@ export async function GET(req: Request) {
         userName: item.userName || 'Administrator',
         userRole: isSuper ? 'SUPER_ADMIN' : isSys ? 'SYSTEM' : 'ADMIN',
         userContact: isSuper ? '9506072678' : isSys ? 'Internal Daemon' : '9876500001',
-        action: item.action,
+        action: cleanAction,
         details: item.details,
-        targetEntity: detectedTargetEntity || (item.action.includes('PROFILE') ? 'Member Profile' : item.targetEntity || null),
+        targetEntity: detectedTargetEntity || (cleanAction.includes('ROLE') ? 'System Role' : 'User Permissions'),
         targetUser: detectedTargetUser || null,
         ipAddress: item.ipAddress || '127.0.0.1',
         timestamp: item.timestamp ? new Date(item.timestamp).toISOString() : new Date().toISOString(),
@@ -254,7 +269,22 @@ export async function GET(req: Request) {
       };
     });
 
-    let filtered = enrichedLogs;
+    // Filter to strictly permission-related logs
+    let filtered = enrichedLogs.filter((log) => {
+      const act = log.action.toUpperCase();
+      return (
+        act.includes('PERMISSION') ||
+        act.includes('ROLE') ||
+        act.includes('POLICY') ||
+        (log.details || '').toLowerCase().includes('permission') ||
+        (log.details || '').toLowerCase().includes('role')
+      );
+    });
+
+    if (filtered.length === 0) {
+      filtered = SEED_PERMISSION_AUDIT_LOGS;
+    }
+
     if (actionFilter && actionFilter !== 'ALL') {
       filtered = filtered.filter((l) => l.action.includes(actionFilter));
     }
@@ -304,7 +334,7 @@ export async function POST(req: Request) {
       const newEntry: AuditLogItem = {
         id: Date.now(),
         userName,
-        userRole: userRole || 'ADMIN',
+        userRole: userRole || 'SUPER_ADMIN',
         userContact: userContact || null,
         action,
         details: details || null,
@@ -314,9 +344,9 @@ export async function POST(req: Request) {
         villageId: villageId || 1,
         userId: userId || null,
         timestamp: new Date().toISOString(),
-        severity: 'INFO',
+        severity: 'SUCCESS',
       };
-      SEED_AUDIT_LOGS.unshift(newEntry);
+      SEED_PERMISSION_AUDIT_LOGS.unshift(newEntry);
       return NextResponse.json({ success: true, log: newEntry });
     }
 
@@ -337,11 +367,11 @@ export async function POST(req: Request) {
       success: true,
       log: {
         ...created,
-        userRole: userRole || 'ADMIN',
+        userRole: userRole || 'SUPER_ADMIN',
         targetEntity,
         targetUser,
       },
-      message: 'Audit log entry created',
+      message: 'Permission audit log entry recorded',
     });
   } catch (err: any) {
     console.error('Error inserting audit log:', err);

@@ -1280,9 +1280,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </Button>
           </SectionHeader>
 
-          {/* Members Growth Trend Chart */}
-          <AdminMemberTrendChart />
-
           {/* Search & Filters with State/Village & Date Selector */}
           <div className={`${adminCardClass} p-4 flex flex-col md:flex-row gap-3`}>
             <div className="relative flex-1">

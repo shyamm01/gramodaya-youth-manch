@@ -28,6 +28,12 @@ import {
   Calendar,
   Contact,
   UserCog,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  ShieldAlert,
+  Lock,
 } from 'lucide-react';
 import { useApp } from '@/src/context/AppContext';
 import { AuditLogItem } from '@/app/api/audit/route';
@@ -113,6 +119,10 @@ export const AdminAuditSection: React.FC = () => {
   const [inspectingLog, setInspectingLog] = useState<AuditLogItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3000);
@@ -129,7 +139,7 @@ export const AdminAuditSection: React.FC = () => {
     try {
       setLoading(true);
       if (!inFlightAuditPromise || forceRefresh) {
-        inFlightAuditPromise = fetch('/api/audit?limit=100')
+        inFlightAuditPromise = fetch('/api/audit?scope=permissions&limit=200')
           .then((res) => res.json())
           .then((data) => {
             if (data.success && Array.isArray(data.logs)) {
@@ -148,7 +158,7 @@ export const AdminAuditSection: React.FC = () => {
         setLogs(result);
       }
     } catch (err: any) {
-      console.error('Failed to fetch audit logs:', err);
+      console.error('Failed to fetch permission audit logs:', err);
       showToast('Error loading audit logs from database.');
     } finally {
       setLoading(false);
@@ -159,9 +169,11 @@ export const AdminAuditSection: React.FC = () => {
     fetchAuditLogs();
   }, []);
 
-  // Filtered Logs
+  // Filtered Logs (Strictly Permission & Role Updates)
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
+      const act = log.action.toUpperCase();
+
       const matchesSearch =
         log.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -174,11 +186,9 @@ export const AdminAuditSection: React.FC = () => {
 
       const matchesCategory =
         categoryFilter === 'ALL' ||
-        (categoryFilter === 'PROFILE' && (log.action.includes('PROFILE') || log.action.includes('MEMBER'))) ||
-        (categoryFilter === 'AUTH' && log.action.includes('AUTH')) ||
-        (categoryFilter === 'POLICY' && log.action.includes('POLICY')) ||
-        (categoryFilter === 'MODULE' && log.action.includes('MODULE')) ||
-        (categoryFilter === 'GRIEVANCE' && log.action.includes('GRIEVANCE'));
+        (categoryFilter === 'MATRIX' && (act.includes('UPDATE_PERMISSIONS') || act.includes('POLICY_PERMISSIONS'))) ||
+        (categoryFilter === 'ROLE_ASSIGN' && (act.includes('ROLE_ASSIGNMENT') || act.includes('ROLE_ASSIGNED'))) ||
+        (categoryFilter === 'ROLE_TEMPLATE' && (act.includes('ROLE_POLICY') || act.includes('ROLE_CREATED') || act.includes('ROLE_UPDATED')));
 
       const matchesSeverity = severityFilter === 'ALL' || log.severity === severityFilter;
 
@@ -186,40 +196,55 @@ export const AdminAuditSection: React.FC = () => {
     });
   }, [logs, searchQuery, categoryFilter, severityFilter]);
 
-  // Statistics
+  // Auto-reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, categoryFilter, severityFilter, pageSize]);
+
+  // Paginated slice
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredLogs.slice(start, start + pageSize);
+  }, [filteredLogs, currentPage, pageSize]);
+
+  const startIndex = filteredLogs.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endIndex = Math.min(currentPage * pageSize, filteredLogs.length);
+
+  // Statistics tailored for Permissions
   const stats = useMemo(() => {
     const total = logs.length;
-    const profileUpdates = logs.filter((l) => l.action.includes('PROFILE') || l.action.includes('MEMBER')).length;
-    const adminActions = logs.filter((l) => l.action.includes('POLICY') || l.action.includes('MODULE') || l.action.includes('ROLE')).length;
-    const authEvents = logs.filter((l) => l.action.includes('AUTH') || l.action.includes('LOGIN')).length;
-    return { total, profileUpdates, adminActions, authEvents };
+    const matrixUpdates = logs.filter((l) => l.action.includes('UPDATE_PERMISSIONS') || l.action.includes('POLICY_PERMISSIONS')).length;
+    const roleAssignments = logs.filter((l) => l.action.includes('ROLE_ASSIGNMENT') || l.action.includes('ROLE_ASSIGNED')).length;
+    const templateChanges = logs.filter((l) => l.action.includes('ROLE_POLICY') || l.action.includes('ROLE_CREATED') || l.action.includes('ROLE_UPDATED')).length;
+    return { total, matrixUpdates, roleAssignments, templateChanges };
   }, [logs]);
 
   // Export to CSV
   const handleExportCSV = () => {
     if (logs.length === 0) {
-      showToast('No audit records to export.');
+      showToast('No permission audit records to export.');
       return;
     }
     const headers = [
       'ID',
       'Timestamp',
-      'Performed By (Actor)',
+      'Performed By (Admin Actor)',
       'Actor Role',
-      'Actor Contact',
-      'Whose Profile / Target Subject',
+      'Target User / Member',
+      'Target Entity',
       'Action Code',
       'Severity',
       'Event Details',
-      'IP Address',
+      'Origin IP',
     ];
     const rows = logs.map((l) => [
       l.id,
       `"${l.timestamp}"`,
       `"${l.userName}"`,
-      l.userRole || 'ADMIN',
-      `"${l.userContact || ''}"`,
-      `"${l.targetUser || l.targetEntity || ''}"`,
+      l.userRole || 'SUPER_ADMIN',
+      `"${l.targetUser || ''}"`,
+      `"${l.targetEntity || ''}"`,
       l.action,
       l.severity || 'INFO',
       `"${(l.details || '').replace(/"/g, '""')}"`,
@@ -229,11 +254,11 @@ export const AdminAuditSection: React.FC = () => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `permission_audit_logs_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    showToast('Exported audit logs to CSV successfully!');
+    showToast('Exported permission audit logs to CSV successfully!');
   };
 
   const formatDateTime = (ts: string) => {
@@ -248,6 +273,18 @@ export const AdminAuditSection: React.FC = () => {
   };
 
   const formatActionTitle = (action: string) => {
+    if (action === 'UPDATE_PERMISSIONS' || action === 'POLICY_PERMISSIONS_UPDATE') {
+      return 'Update Permissions';
+    }
+    if (action === 'ROLE_ASSIGNMENT' || action === 'ROLE_ASSIGNED') {
+      return 'Assign Role';
+    }
+    if (action === 'ROLE_POLICY_UPDATE') {
+      return 'Role Policy Update';
+    }
+    if (action === 'ROLE_CREATED') {
+      return 'Create Custom Role';
+    }
     return action
       .replace(/_/g, ' ')
       .toLowerCase()
@@ -269,19 +306,19 @@ export const AdminAuditSection: React.FC = () => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="w-12 h-12 rounded-2xl bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-400 flex items-center justify-center border border-purple-200/80 dark:border-purple-800/60 shadow-xs">
-              <Activity className="w-6 h-6" />
+              <KeyRound className="w-6 h-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-                  Security & Audit Logs
+                  Permission Audit Logs
                 </h1>
                 <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                  Live Audit Trail
+                  Permission Modifications
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                Complete traceability: see who performed each action, whose profile was modified, and exact change history.
+                Complete traceability of user permissions modifications, capability matrix updates, and role assignments.
               </p>
             </div>
           </div>
@@ -299,7 +336,7 @@ export const AdminAuditSection: React.FC = () => {
               type="button"
               onClick={() => fetchAuditLogs(true)}
               disabled={loading}
-              title="Refresh logs from database"
+              title="Refresh permission audit logs from database"
               className="p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition cursor-pointer"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -307,30 +344,30 @@ export const AdminAuditSection: React.FC = () => {
           </div>
         </div>
 
-        {/* 4 Metric Cards */}
+        {/* 4 Permission Metric Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800">
-            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Recorded Events</div>
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Permission Events</div>
             <div className="text-2xl font-black text-slate-900 dark:text-white mt-1">{stats.total}</div>
-            <div className="text-[10px] text-slate-400 mt-0.5">Database audit records</div>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-900/40">
-            <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">Profile & KYC Updates</div>
-            <div className="text-2xl font-black text-emerald-900 dark:text-emerald-200 mt-1">{stats.profileUpdates}</div>
-            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">Member accounts modified</div>
+            <div className="text-[10px] text-slate-400 mt-0.5">Permission audit records</div>
           </div>
 
           <div className="p-4 rounded-2xl bg-purple-50/70 dark:bg-purple-950/30 border border-purple-200/70 dark:border-purple-900/40">
-            <div className="text-[11px] font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wider">Admin Governance</div>
-            <div className="text-2xl font-black text-purple-900 dark:text-purple-200 mt-1">{stats.adminActions}</div>
-            <div className="text-[10px] text-purple-600 dark:text-purple-400 mt-0.5">Policy, roles & modules</div>
+            <div className="text-[11px] font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wider">Matrix Updates</div>
+            <div className="text-2xl font-black text-purple-900 dark:text-purple-200 mt-1">{stats.matrixUpdates}</div>
+            <div className="text-[10px] text-purple-600 dark:text-purple-400 mt-0.5">Granular PBAC modifications</div>
           </div>
 
           <div className="p-4 rounded-2xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-900/40">
-            <div className="text-[11px] font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Auth & Logins</div>
-            <div className="text-2xl font-black text-blue-900 dark:text-blue-200 mt-1">{stats.authEvents}</div>
-            <div className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">OTP logins & sessions</div>
+            <div className="text-[11px] font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Role Assignments</div>
+            <div className="text-2xl font-black text-blue-900 dark:text-blue-200 mt-1">{stats.roleAssignments}</div>
+            <div className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">Member authority changes</div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-900/40">
+            <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">Role Template Edits</div>
+            <div className="text-2xl font-black text-emerald-900 dark:text-emerald-200 mt-1">{stats.templateChanges}</div>
+            <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">Role definitions updated</div>
           </div>
         </div>
       </div>
@@ -341,7 +378,7 @@ export const AdminAuditSection: React.FC = () => {
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search actor, profile owner, action, or IP..."
+            placeholder="Search by actor, target member, or action..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white dark:bg-[#111726] border border-[#E4DFD5] dark:border-slate-800/80 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
@@ -354,12 +391,10 @@ export const AdminAuditSection: React.FC = () => {
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="px-3.5 py-2 rounded-xl bg-white dark:bg-[#111726] border border-[#E4DFD5] dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
           >
-            <option value="ALL">All Categories</option>
-            <option value="PROFILE">Profile & Member Updates</option>
-            <option value="POLICY">Policy & Permissions</option>
-            <option value="MODULE">Module Toggles</option>
-            <option value="AUTH">Auth & Logins</option>
-            <option value="GRIEVANCE">Grievances</option>
+            <option value="ALL">All Permission Updates</option>
+            <option value="MATRIX">Matrix Updates (UPDATE_PERMISSIONS)</option>
+            <option value="ROLE_ASSIGN">Role Assignments (ROLE_ASSIGNMENT)</option>
+            <option value="ROLE_TEMPLATE">Role Policy Templates (ROLE_POLICY)</option>
           </select>
 
           <select
@@ -376,184 +411,295 @@ export const AdminAuditSection: React.FC = () => {
         </div>
       </div>
 
-      {/* ── 3. AUDIT LOGS TABLE ── */}
+      {/* ── 3. PERMISSION AUDIT LOGS TABLE & PAGINATION ── */}
       <div className="bg-white dark:bg-[#111726] border border-[#E4DFD5] dark:border-slate-800/80 rounded-3xl overflow-hidden shadow-xs">
         {loading ? (
           <div className="p-12 text-center text-slate-400 space-y-3">
             <RefreshCw className="w-8 h-8 mx-auto animate-spin text-purple-600" />
-            <p className="text-xs font-medium">Fetching live audit logs from database...</p>
+            <p className="text-xs font-medium">Fetching permission audit trail from database...</p>
           </div>
         ) : filteredLogs.length === 0 ? (
           <div className="p-12 text-center text-slate-400 space-y-2">
-            <Activity className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
-            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No audit events found</p>
+            <KeyRound className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
+            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No permission updates found</p>
             <p className="text-xs">Try clearing search keywords or filters.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 uppercase tracking-wider font-mono text-[10px] border-b border-slate-200 dark:border-slate-800">
-                <tr>
-                  <th className="py-3.5 px-4 w-12 text-center">#</th>
-                  <th className="py-3.5 px-4 w-36">Date & Time</th>
-                  <th className="py-3.5 px-4 w-52">Actor (Performed By)</th>
-                  <th className="py-3.5 px-4 w-48">Whose Profile / Subject</th>
-                  <th className="py-3.5 px-4 w-48">Action Type</th>
-                  <th className="py-3.5 px-4">Summary & Details</th>
-                  <th className="py-3.5 px-4 text-center w-24">Severity</th>
-                  <th className="py-3.5 px-4 text-center w-28">Origin IP</th>
-                  <th className="py-3.5 px-4 text-right w-16">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                {filteredLogs.map((log, index) => {
-                  const severity = log.severity || 'INFO';
-                  const style = SEVERITY_STYLES[severity] || SEVERITY_STYLES.INFO;
-                  const Icon = style.icon;
-                  const roleStyle = ROLE_STYLES[log.userRole || 'ADMIN'] || ROLE_STYLES.ADMIN;
-                  const { date, time } = formatDateTime(log.timestamp);
-                  const actionTitle = formatActionTitle(log.action);
-                  const isProfileUpdate = log.action.includes('PROFILE') || log.action.includes('MEMBER');
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-slate-50/90 dark:bg-[#151c2e] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold text-[11px] border-b border-slate-200 dark:border-slate-800 select-none">
+                  <tr>
+                    <th className="py-3.5 px-4 w-12 text-center whitespace-nowrap">#</th>
+                    <th className="py-3.5 px-4 min-w-[150px] whitespace-nowrap">Date & Time</th>
+                    <th className="py-3.5 px-4 min-w-[200px] whitespace-nowrap">Performed By</th>
+                    <th className="py-3.5 px-4 min-w-[180px] whitespace-nowrap">Target Member / Role</th>
+                    <th className="py-3.5 px-4 min-w-[180px] whitespace-nowrap">Action Type</th>
+                    <th className="py-3.5 px-4 min-w-[260px] whitespace-nowrap">Summary & Details</th>
+                    <th className="py-3.5 px-4 text-center min-w-[110px] whitespace-nowrap">Severity</th>
+                    <th className="py-3.5 px-4 text-center min-w-[120px] whitespace-nowrap">Origin IP</th>
+                    <th className="py-3.5 px-4 text-right min-w-[80px] whitespace-nowrap">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
+                  {paginatedLogs.map((log, index) => {
+                    const severity = log.severity || 'INFO';
+                    const style = SEVERITY_STYLES[severity] || SEVERITY_STYLES.INFO;
+                    const Icon = style.icon;
+                    const roleStyle = ROLE_STYLES[log.userRole || 'SUPER_ADMIN'] || ROLE_STYLES.SUPER_ADMIN;
+                    const { date, time } = formatDateTime(log.timestamp);
+                    const actionTitle = formatActionTitle(log.action);
 
-                  return (
-                    <tr
-                      key={log.id || index}
-                      className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition group"
-                    >
-                      {/* # ID */}
-                      <td className="py-4 px-4 text-center font-mono text-slate-400 text-[11px]">
-                        {log.id || index + 1}
-                      </td>
+                    return (
+                      <tr
+                        key={log.id || index}
+                        className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition group"
+                      >
+                        {/* # ID */}
+                        <td className="py-4 px-4 text-center font-mono text-slate-400 text-[11px]">
+                          {log.id || (currentPage - 1) * pageSize + index + 1}
+                        </td>
 
-                      {/* Date & Time */}
-                      <td className="py-4 px-4 font-mono text-[11px] whitespace-nowrap">
-                        <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                          <Calendar className="w-3 h-3 text-slate-400" />
-                          <span>{date}</span>
-                        </div>
-                        <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                          <Clock className="w-3 h-3 text-slate-400" />
-                          <span>{time}</span>
-                        </div>
-                      </td>
-
-                      {/* Actor (Performed By) */}
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/80 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-bold text-xs flex items-center justify-center flex-shrink-0">
-                            {log.userName.charAt(0).toUpperCase()}
+                        {/* Date & Time */}
+                        <td className="py-4 px-4 font-mono text-[11px] whitespace-nowrap">
+                          <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                            <Calendar className="w-3 h-3 text-slate-400" />
+                            <span>{date}</span>
                           </div>
-                          <div>
-                            <div className="font-bold text-slate-900 dark:text-white text-xs">
-                              {log.userName}
-                            </div>
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${roleStyle.bg} ${roleStyle.text} border ${roleStyle.border}`}>
-                                {log.userRole || 'ADMIN'}
-                              </span>
-                              {log.userContact && (
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  {log.userContact}
-                                </span>
-                              )}
-                            </div>
+                          <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                            <Clock className="w-3 h-3 text-slate-400" />
+                            <span>{time}</span>
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Whose Profile / Target Subject */}
-                      <td className="py-4 px-4">
-                        {log.targetUser ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-bold text-[11px] flex items-center justify-center flex-shrink-0">
-                              {log.targetUser.charAt(0).toUpperCase()}
+                        {/* Actor (Performed By) */}
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/80 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-bold text-xs flex items-center justify-center flex-shrink-0">
+                              {log.userName.charAt(0).toUpperCase()}
                             </div>
                             <div>
                               <div className="font-bold text-slate-900 dark:text-white text-xs">
-                                {log.targetUser}
+                                {log.userName}
                               </div>
-                              <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
-                                {isProfileUpdate ? 'Member Profile' : 'Target Account'}
-                              </span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${roleStyle.bg} ${roleStyle.text} border ${roleStyle.border}`}>
+                                  {log.userRole || 'SUPER_ADMIN'}
+                                </span>
+                                {log.userContact && (
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    {log.userContact}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        ) : log.targetEntity ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-[10px] font-bold text-slate-700 dark:text-slate-300">
-                            <Target className="w-3 h-3 text-purple-500" />
-                            <span className="truncate max-w-[120px]" title={log.targetEntity}>
-                              {log.targetEntity}
+                        </td>
+
+                        {/* Target Member / Role */}
+                        <td className="py-4 px-4">
+                          {log.targetUser ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-bold text-[11px] flex items-center justify-center flex-shrink-0">
+                                {log.targetUser.charAt(0).toUpperCase()}
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-900 dark:text-white text-xs">
+                                  {log.targetUser}
+                                </div>
+                                <span className="text-[9px] font-mono text-purple-600 dark:text-purple-400 font-bold">
+                                  {log.targetEntity || 'Member Policy'}
+                                </span>
+                              </div>
+                            </div>
+                          ) : log.targetEntity ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                              <Target className="w-3 h-3 text-purple-500" />
+                              <span className="truncate max-w-[140px]" title={log.targetEntity}>
+                                {log.targetEntity}
+                              </span>
                             </span>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">—</span>
+                          )}
+                        </td>
+
+                        {/* Action Type */}
+                        <td className="py-4 px-4">
+                          <div className="font-bold text-slate-900 dark:text-white text-xs">
+                            {actionTitle}
+                          </div>
+                          <div className="font-mono text-[10px] text-purple-600 dark:text-purple-400 mt-0.5">
+                            {log.action}
+                          </div>
+                        </td>
+
+                        {/* Summary & Details */}
+                        <td className="py-4 px-4 max-w-sm">
+                          <p className="text-slate-700 dark:text-slate-300 text-xs truncate" title={log.details || ''}>
+                            {log.details || '—'}
+                          </p>
+                        </td>
+
+                        {/* Severity */}
+                        <td className="py-4 px-4 text-center whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${style.bg} ${style.text} border ${style.border}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
+                            <span>{severity}</span>
                           </span>
-                        ) : (
-                          <span className="text-slate-400 text-[11px]">—</span>
-                        )}
-                      </td>
+                        </td>
 
-                      {/* Action Type */}
-                      <td className="py-4 px-4">
-                        <div className="font-bold text-slate-900 dark:text-white text-xs">
-                          {actionTitle}
-                        </div>
-                        <div className="font-mono text-[10px] text-purple-600 dark:text-purple-400 mt-0.5">
-                          {log.action}
-                        </div>
-                      </td>
+                        {/* Origin IP */}
+                        <td className="py-4 px-4 text-center font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                          <span className="px-2 py-0.5 rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+                            {log.ipAddress || '127.0.0.1'}
+                          </span>
+                        </td>
 
-                      {/* Summary & Details */}
-                      <td className="py-4 px-4 max-w-xs">
-                        <p className="text-slate-700 dark:text-slate-300 text-xs truncate" title={log.details || ''}>
-                          {log.details || '—'}
-                        </p>
-                      </td>
+                        {/* Inspect Trigger */}
+                        <td className="py-4 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setInspectingLog(log)}
+                            className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/50 hover:bg-purple-100 text-purple-700 dark:text-purple-300 text-xs font-bold transition flex items-center gap-1 ml-auto cursor-pointer"
+                            title="Inspect Permission Event"
+                          >
+                            <Eye className="w-3 h-3" />
+                            <span>View</span>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-                      {/* Severity */}
-                      <td className="py-4 px-4 text-center whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold ${style.bg} ${style.text} border ${style.border}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`} />
-                          <span>{severity}</span>
-                        </span>
-                      </td>
+            {/* ── 4. PAGINATION CONTROLS FOOTER ── */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 sm:px-6 bg-slate-50/70 dark:bg-slate-900/60 border-t border-slate-200 dark:border-slate-800 text-xs">
+              <div className="flex items-center gap-3 text-slate-500 font-medium">
+                <span>
+                  Showing <strong className="text-slate-800 dark:text-slate-200">{startIndex}</strong> to{' '}
+                  <strong className="text-slate-800 dark:text-slate-200">{endIndex}</strong> of{' '}
+                  <strong className="text-slate-800 dark:text-slate-200">{filteredLogs.length}</strong> permission records
+                </span>
 
-                      {/* Origin IP */}
-                      <td className="py-4 px-4 text-center font-mono text-[11px] text-slate-500 whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                          {log.ipAddress || '127.0.0.1'}
-                        </span>
-                      </td>
+                <span className="text-slate-300 dark:text-slate-700">|</span>
 
-                      {/* Inspect Trigger */}
-                      <td className="py-4 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setInspectingLog(log)}
-                          className="px-2.5 py-1 rounded-lg bg-purple-50 dark:bg-purple-950/50 hover:bg-purple-100 text-purple-700 dark:text-purple-300 text-xs font-bold transition flex items-center gap-1 ml-auto cursor-pointer"
-                          title="Inspect Event Payload"
-                        >
-                          <Eye className="w-3 h-3" />
-                          <span>View</span>
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-slate-400">Rows:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => setPageSize(Number(e.target.value))}
+                    className="px-2 py-1 rounded-lg bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+                  >
+                    <option value={10}>10</option>
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Page Number Buttons */}
+              <div className="flex items-center gap-1">
+                {/* First Page */}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 transition cursor-pointer"
+                  title="First Page"
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </button>
+
+                {/* Previous Page */}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 transition font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Prev</span>
+                </button>
+
+                {/* Page Numbers */}
+                <div className="flex items-center gap-1 px-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((page) => {
+                      if (totalPages <= 7) return true;
+                      return (
+                        page === 1 ||
+                        page === totalPages ||
+                        Math.abs(page - currentPage) <= 1
+                      );
+                    })
+                    .map((page, i, arr) => {
+                      const prev = arr[i - 1];
+                      const isEllipsis = prev && page - prev > 1;
+
+                      return (
+                        <React.Fragment key={page}>
+                          {isEllipsis && (
+                            <span className="px-1 text-slate-400 font-mono">...</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setCurrentPage(page)}
+                            className={`min-w-[32px] h-8 rounded-lg text-xs font-bold font-mono transition cursor-pointer ${
+                              currentPage === page
+                                ? 'bg-purple-600 text-white shadow-xs'
+                                : 'bg-white dark:bg-[#111726] text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        </React.Fragment>
+                      );
+                    })}
+                </div>
+
+                {/* Next Page */}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 transition font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <span className="hidden sm:inline">Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Last Page */}
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 disabled:opacity-30 transition cursor-pointer"
+                  title="Last Page"
+                >
+                  <ChevronsRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
-      {/* ── 4. INSPECT AUDIT EVENT MODAL ── */}
+      {/* ── 5. INSPECT AUDIT EVENT MODAL ── */}
       {inspectingLog && (
         <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-xl w-full space-y-5 shadow-2xl animate-fade-in">
             <div className="flex items-start justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-2xl bg-purple-50 dark:bg-purple-950 text-purple-600 flex items-center justify-center border border-purple-200 dark:border-purple-800">
-                  <Activity className="w-5 h-5" />
+                  <KeyRound className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    Audit Event #{inspectingLog.id}
+                    Permission Event #{inspectingLog.id}
                   </h3>
                   <p className="text-xs font-mono text-purple-600 dark:text-purple-400">
                     {inspectingLog.action}
@@ -570,11 +716,11 @@ export const AdminAuditSection: React.FC = () => {
             </div>
 
             <div className="space-y-3 text-xs">
-              {/* Actor Card: Who Performed the Action */}
+              {/* Actor Card: Admin Who Performed the Action */}
               <div className="p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/50 space-y-2">
                 <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wider block flex items-center gap-1.5">
                   <UserCog className="w-3.5 h-3.5" />
-                  <span>Action Performed By (Actor)</span>
+                  <span>Admin Actor (Who Changed Permissions)</span>
                 </span>
                 <div className="flex items-center justify-between">
                   <div>
@@ -582,27 +728,27 @@ export const AdminAuditSection: React.FC = () => {
                       {inspectingLog.userName}
                     </div>
                     <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
-                      <span>{inspectingLog.userContact || 'Chapter Administrator'}</span>
+                      <span>{inspectingLog.userContact || 'Administrator'}</span>
                       <span>·</span>
                       <span>Rasoolpur Chapter</span>
                     </div>
                   </div>
                   <span className="px-2.5 py-1 rounded-md bg-purple-600 text-white font-mono font-bold text-[10px]">
-                    {inspectingLog.userRole || 'ADMIN'}
+                    {inspectingLog.userRole || 'SUPER_ADMIN'}
                   </span>
                 </div>
               </div>
 
-              {/* Target Profile Card: Whose Profile was Updated */}
+              {/* Target User Card: Whose Permissions were Modified */}
               {inspectingLog.targetUser && (
-                <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 space-y-2">
-                  <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider block flex items-center gap-1.5">
-                    <Contact className="w-3.5 h-3.5" />
-                    <span>Whose Profile Was Updated (Target User)</span>
+                <div className="p-4 rounded-2xl bg-purple-50/40 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-900/50 space-y-2">
+                  <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 uppercase tracking-wider block flex items-center gap-1.5">
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Target Member / User Modified</span>
                   </span>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200 font-bold text-xs flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 font-bold text-xs flex items-center justify-center">
                         {inspectingLog.targetUser.charAt(0).toUpperCase()}
                       </div>
                       <div>
@@ -610,33 +756,20 @@ export const AdminAuditSection: React.FC = () => {
                           {inspectingLog.targetUser}
                         </div>
                         <div className="text-[10px] text-slate-500">
-                          Registered Community Member · Rasoolpur Chapter
+                          {inspectingLog.targetEntity || 'Member Policy Matrix'}
                         </div>
                       </div>
                     </div>
-                    <span className="px-2.5 py-1 rounded-md bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300 font-mono font-bold text-[10px]">
-                      MEMBER PROFILE
+                    <span className="px-2.5 py-1 rounded-md bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 font-mono font-bold text-[10px]">
+                      PERMISSION TARGET
                     </span>
                   </div>
                 </div>
               )}
 
-              {/* Target & Subject Card (if non-user entity) */}
-              {!inspectingLog.targetUser && inspectingLog.targetEntity && (
-                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <Target className="w-3 h-3 text-purple-600" />
-                    <span>Target Subject Entity</span>
-                  </span>
-                  <span className="font-bold font-mono text-purple-600 dark:text-purple-400">
-                    {inspectingLog.targetEntity}
-                  </span>
-                </div>
-              )}
-
               {/* Event Description */}
               <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 space-y-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Event Summary & Change Log</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Policy Modifications Summary</span>
                 <p className="text-slate-800 dark:text-slate-200 leading-relaxed font-medium">
                   {inspectingLog.details || 'No extended payload available.'}
                 </p>

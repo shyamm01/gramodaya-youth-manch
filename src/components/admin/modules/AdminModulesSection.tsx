@@ -509,16 +509,16 @@ export const AdminModulesSection: React.FC = () => {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 uppercase tracking-wider font-mono text-[10px] border-b border-slate-200 dark:border-slate-800">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-50/90 dark:bg-[#151c2e] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold text-[11px] border-b border-slate-200 dark:border-slate-800 select-none">
                 <tr>
-                  <th className="py-3.5 px-4 w-12 text-center">#</th>
-                  <th className="py-3.5 px-4">Module Name</th>
-                  <th className="py-3.5 px-4">Slug / Key</th>
-                  <th className="py-3.5 px-4">Description</th>
-                  <th className="py-3.5 px-4 text-center">Capabilities</th>
-                  <th className="py-3.5 px-4 text-center">Status</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
+                  <th className="py-3.5 px-4 w-12 text-center whitespace-nowrap">#</th>
+                  <th className="py-3.5 px-4 min-w-[180px] whitespace-nowrap">Module Name</th>
+                  <th className="py-3.5 px-4 min-w-[140px] whitespace-nowrap">Slug / Key</th>
+                  <th className="py-3.5 px-4 min-w-[240px] whitespace-nowrap">Description</th>
+                  <th className="py-3.5 px-4 text-center min-w-[130px] whitespace-nowrap">Capabilities</th>
+                  <th className="py-3.5 px-4 text-center min-w-[110px] whitespace-nowrap">Status</th>
+                  <th className="py-3.5 px-4 text-right min-w-[100px] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
