@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Activity,
   Search,
@@ -36,6 +36,8 @@ import {
   Lock,
 } from 'lucide-react';
 import { useApp } from '@/src/context/AppContext';
+import { useGetMembersQuery } from '@/src/store/api/adminApi';
+import type { Member } from '@/src/types';
 import { AuditLogItem } from '@/app/api/audit/route';
 import { isSuperAdmin as checkIsSuperAdmin } from '@/src/lib/permissions';
 
@@ -101,8 +103,190 @@ const ROLE_STYLES: Record<string, { bg: string; text: string; border: string }> 
   },
 };
 
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** `42260727-30ef-4247-aaa1-0fea69257f1e` → `42260727…57f1e`. */
+const shortenId = (id: string) => (id.length > 16 ? `${id.slice(0, 8)}…${id.slice(-5)}` : id);
+
+export interface AuditIdentity {
+  name: string;
+  role?: string;
+  contact?: string | null;
+  photoUrl?: string | null;
+  /** Full id, kept for the title attribute so the raw value is still reachable. */
+  id?: string;
+  /** False when the row points at an id no current member matches. */
+  resolved: boolean;
+}
+
+
+/**
+ * The photo disc, shared by the table columns and the detail modal.
+ *
+ * The initial sits underneath and the photo covers it when there is one. A
+ * photo that 404s hides itself, which uncovers the initial again — the same
+ * layering ui/avatar uses, so a dead URL never leaves an empty square.
+ */
+const IdentityAvatar: React.FC<{
+  name: string;
+  photoUrl?: string | null;
+  resolved?: boolean;
+  size?: 'sm' | 'md';
+}> = ({ name, photoUrl, resolved = true, size = 'sm' }) => (
+  <div
+    className={`relative rounded-xl border overflow-hidden font-bold flex items-center justify-center flex-shrink-0 ${
+      size === 'md' ? 'w-10 h-10 text-sm' : 'w-8 h-8 text-xs'
+    } ${
+      resolved
+        ? 'bg-purple-50 dark:bg-purple-950/80 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300'
+        : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'
+    }`}
+  >
+    <span>{resolved ? name.charAt(0).toUpperCase() : '?'}</span>
+    {photoUrl && (
+      <img
+        src={photoUrl}
+        alt={name}
+        loading="lazy"
+        className="absolute inset-0 h-full w-full object-cover"
+        onError={(e) => {
+          (e.currentTarget as HTMLElement).style.display = 'none';
+        }}
+      />
+    )}
+  </div>
+);
+
+/**
+ * One person, rendered the same way wherever they appear in the log.
+ *
+ * The actor column already looked like this — disc, name, role badge, contact.
+ * The target column printed `log.targetUser` raw, which for permission changes
+ * is a member UUID, and then repeated the same UUID underneath as
+ * "Member: <uuid>". Two columns describing the same kind of thing looked
+ * nothing alike, and neither told you who the person actually was.
+ *
+ * Both columns share this now, so they cannot drift apart again.
+ */
+const IdentityChip: React.FC<AuditIdentity> = ({ name, role, contact, photoUrl, id, resolved }) => {
+  const roleStyle = ROLE_STYLES[role || 'SUPER_ADMIN'] || ROLE_STYLES.SUPER_ADMIN;
+  return (
+    <div className="flex items-center gap-2.5">
+      <IdentityAvatar name={name} photoUrl={photoUrl} resolved={resolved} />
+      <div className="min-w-0">
+        <div
+          className={`font-bold text-xs truncate ${
+            resolved
+              ? 'text-slate-900 dark:text-white'
+              : 'text-slate-500 dark:text-slate-400 font-mono'
+          }`}
+          title={id || name}
+        >
+          {name}
+        </div>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          {resolved ? (
+            <>
+              <span
+                className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${roleStyle.bg} ${roleStyle.text} border ${roleStyle.border}`}
+              >
+                {role || 'MEMBER'}
+              </span>
+              {contact && (
+                <span className="text-[10px] text-slate-400 font-mono">{contact}</span>
+              )}
+            </>
+          ) : (
+            <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+              NOT FOUND
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const AdminAuditSection: React.FC = () => {
   const { authSession } = useApp();
+
+  // The log stores who a change was applied to as a member id. Resolving it
+  // needs the directory, which RTK Query already has cached for the members
+  // screen — mounting this section reuses that entry rather than refetching.
+  const { data: members = [] } = useGetMembersQuery();
+  const membersById = useMemo(() => {
+    const map = new Map<string, Member>();
+    members.forEach((m) => map.set(String(m.id), m));
+    return map;
+  }, [members]);
+
+  /**
+   * Turns a log row's target into a person.
+   *
+   * `targetUser` is sometimes a display name written at the time and sometimes
+   * a member UUID; when it is a UUID the id also shows up inside targetEntity
+   * as "Member: <uuid>". Both routes are tried before giving up, and giving up
+   * still shortens the id rather than printing 36 characters into the column.
+   */
+  const resolveTarget = useCallback(
+    (log: AuditLogItem): AuditIdentity | null => {
+      const raw = (log.targetUser || '').trim();
+      const fromEntity = (log.targetEntity || '').match(
+        /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i
+      )?.[1];
+      const id = UUID_RE.test(raw) ? raw : fromEntity;
+
+      if (id) {
+        const member = membersById.get(id);
+        if (member) {
+          return {
+            name: member.name,
+            role: member.role || member.systemRole || 'MEMBER',
+            contact: member.mobile,
+            photoUrl: member.photoUrl,
+            id,
+            resolved: true,
+          };
+        }
+        return { name: shortenId(id), id, resolved: false };
+      }
+
+      // Not an id at all — a name recorded when the entry was written.
+      if (raw) return { name: raw, role: 'MEMBER', resolved: true };
+      return null;
+    },
+    [membersById]
+  );
+
+  /**
+   * The actor's identity, with their photo when we can find them.
+   *
+   * The name, role and contact still come from the log rather than the
+   * directory: they record who this person was at the time they acted, and a
+   * later rename or demotion must not rewrite history. Only the photo is looked
+   * up, because the log never stored one.
+   */
+  const resolveActor = useCallback(
+    (log: AuditLogItem): AuditIdentity => {
+      const byId = log.userId ? membersById.get(String(log.userId)) : undefined;
+      const member =
+        byId ||
+        (log.userContact
+          ? members.find((m) => m.mobile === log.userContact)
+          : undefined);
+
+      return {
+        name: log.userName,
+        role: log.userRole || 'SUPER_ADMIN',
+        contact: log.userContact,
+        photoUrl: member?.photoUrl,
+        id: log.userId || undefined,
+        resolved: true,
+      };
+    },
+    [membersById, members]
+  );
 
   const isSuper = Boolean(
     checkIsSuperAdmin(authSession) ||
@@ -180,6 +364,8 @@ export const AdminAuditSection: React.FC = () => {
         (log.details || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (log.userRole || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (log.targetUser || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        // Typing a member's name should find rows that only store their id.
+        (resolveTarget(log)?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (log.targetEntity || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
         (log.userContact || '').includes(searchQuery) ||
         (log.ipAddress || '').includes(searchQuery);
@@ -194,7 +380,7 @@ export const AdminAuditSection: React.FC = () => {
 
       return matchesSearch && matchesCategory && matchesSeverity;
     });
-  }, [logs, searchQuery, categoryFilter, severityFilter]);
+  }, [logs, searchQuery, categoryFilter, severityFilter, resolveTarget]);
 
   // Auto-reset page when filters change
   useEffect(() => {
@@ -231,7 +417,8 @@ export const AdminAuditSection: React.FC = () => {
       'Timestamp',
       'Performed By (Admin Actor)',
       'Actor Role',
-      'Target User / Member',
+      'Target Member (Name)',
+      'Target Member (ID)',
       'Target Entity',
       'Action Code',
       'Severity',
@@ -243,6 +430,7 @@ export const AdminAuditSection: React.FC = () => {
       `"${l.timestamp}"`,
       `"${l.userName}"`,
       l.userRole || 'SUPER_ADMIN',
+      `"${resolveTarget(l)?.name || l.targetUser || ''}"`,
       `"${l.targetUser || ''}"`,
       `"${l.targetEntity || ''}"`,
       l.action,
@@ -433,8 +621,8 @@ export const AdminAuditSection: React.FC = () => {
                     <th className="py-3.5 px-4 w-12 text-center whitespace-nowrap">#</th>
                     <th className="py-3.5 px-4 min-w-[150px] whitespace-nowrap">Date & Time</th>
                     <th className="py-3.5 px-4 min-w-[200px] whitespace-nowrap">Performed By</th>
-                    <th className="py-3.5 px-4 min-w-[180px] whitespace-nowrap">Target Member / Role</th>
                     <th className="py-3.5 px-4 min-w-[180px] whitespace-nowrap">Action Type</th>
+                    <th className="py-3.5 px-4 min-w-[200px] whitespace-nowrap">Target Member</th>
                     <th className="py-3.5 px-4 min-w-[260px] whitespace-nowrap">Summary & Details</th>
                     <th className="py-3.5 px-4 text-center min-w-[110px] whitespace-nowrap">Severity</th>
                     <th className="py-3.5 px-4 text-center min-w-[120px] whitespace-nowrap">Origin IP</th>
@@ -446,9 +634,9 @@ export const AdminAuditSection: React.FC = () => {
                     const severity = log.severity || 'INFO';
                     const style = SEVERITY_STYLES[severity] || SEVERITY_STYLES.INFO;
                     const Icon = style.icon;
-                    const roleStyle = ROLE_STYLES[log.userRole || 'SUPER_ADMIN'] || ROLE_STYLES.SUPER_ADMIN;
                     const { date, time } = formatDateTime(log.timestamp);
                     const actionTitle = formatActionTitle(log.action);
+                    const target = resolveTarget(log);
 
                     return (
                       <tr
@@ -474,54 +662,7 @@ export const AdminAuditSection: React.FC = () => {
 
                         {/* Actor (Performed By) */}
                         <td className="py-4 px-4">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-xl bg-purple-50 dark:bg-purple-950/80 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-bold text-xs flex items-center justify-center flex-shrink-0">
-                              {log.userName.charAt(0).toUpperCase()}
-                            </div>
-                            <div>
-                              <div className="font-bold text-slate-900 dark:text-white text-xs">
-                                {log.userName}
-                              </div>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${roleStyle.bg} ${roleStyle.text} border ${roleStyle.border}`}>
-                                  {log.userRole || 'SUPER_ADMIN'}
-                                </span>
-                                {log.userContact && (
-                                  <span className="text-[10px] text-slate-400 font-mono">
-                                    {log.userContact}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Target Member / Role */}
-                        <td className="py-4 px-4">
-                          {log.targetUser ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 font-bold text-[11px] flex items-center justify-center flex-shrink-0">
-                                {log.targetUser.charAt(0).toUpperCase()}
-                              </div>
-                              <div>
-                                <div className="font-bold text-slate-900 dark:text-white text-xs">
-                                  {log.targetUser}
-                                </div>
-                                <span className="text-[9px] font-mono text-purple-600 dark:text-purple-400 font-bold">
-                                  {log.targetEntity || 'Member Policy'}
-                                </span>
-                              </div>
-                            </div>
-                          ) : log.targetEntity ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-[10px] font-bold text-slate-700 dark:text-slate-300">
-                              <Target className="w-3 h-3 text-purple-500" />
-                              <span className="truncate max-w-[140px]" title={log.targetEntity}>
-                                {log.targetEntity}
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="text-slate-400 text-[11px]">—</span>
-                          )}
+                          <IdentityChip {...resolveActor(log)} />
                         </td>
 
                         {/* Action Type */}
@@ -532,6 +673,22 @@ export const AdminAuditSection: React.FC = () => {
                           <div className="font-mono text-[10px] text-purple-600 dark:text-purple-400 mt-0.5">
                             {log.action}
                           </div>
+                        </td>
+
+                        {/* Target Member — same chip as the actor column */}
+                        <td className="py-4 px-4">
+                          {target ? (
+                            <IdentityChip {...target} />
+                          ) : log.targetEntity ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                              <Target className="w-3 h-3 text-purple-500" />
+                              <span className="truncate max-w-[140px]" title={log.targetEntity}>
+                                {log.targetEntity}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-[11px]">—</span>
+                          )}
                         </td>
 
                         {/* Summary & Details */}
@@ -723,14 +880,21 @@ export const AdminAuditSection: React.FC = () => {
                   <span>Admin Actor (Who Changed Permissions)</span>
                 </span>
                 <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-bold text-slate-900 dark:text-white text-sm">
-                      {inspectingLog.userName}
-                    </div>
-                    <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
-                      <span>{inspectingLog.userContact || 'Administrator'}</span>
-                      <span>·</span>
-                      <span>Rasoolpur Chapter</span>
+                  <div className="flex items-center gap-3">
+                    <IdentityAvatar
+                      name={inspectingLog.userName}
+                      photoUrl={resolveActor(inspectingLog).photoUrl}
+                      size="md"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-white text-sm">
+                        {inspectingLog.userName}
+                      </div>
+                      <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                        <span>{inspectingLog.userContact || 'Administrator'}</span>
+                        <span>·</span>
+                        <span>Rasoolpur Chapter</span>
+                      </div>
                     </div>
                   </div>
                   <span className="px-2.5 py-1 rounded-md bg-purple-600 text-white font-mono font-bold text-[10px]">
@@ -747,19 +911,14 @@ export const AdminAuditSection: React.FC = () => {
                     <span>Target Member / User Modified</span>
                   </span>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-xl bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 font-bold text-xs flex items-center justify-center">
-                        {inspectingLog.targetUser.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="font-bold text-slate-900 dark:text-white text-xs">
-                          {inspectingLog.targetUser}
-                        </div>
-                        <div className="text-[10px] text-slate-500">
-                          {inspectingLog.targetEntity || 'Member Policy Matrix'}
-                        </div>
-                      </div>
-                    </div>
+                    {(() => {
+                      const target = resolveTarget(inspectingLog);
+                      return target ? (
+                        <IdentityChip {...target} />
+                      ) : (
+                        <span className="text-slate-400 text-[11px]">—</span>
+                      );
+                    })()}
                     <span className="px-2.5 py-1 rounded-md bg-purple-100 dark:bg-purple-900/60 text-purple-800 dark:text-purple-300 font-mono font-bold text-[10px]">
                       PERMISSION TARGET
                     </span>
