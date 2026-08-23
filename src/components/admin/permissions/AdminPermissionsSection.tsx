@@ -72,7 +72,7 @@ const CANONICAL_SYSTEM_MODULES: UserModulePermission[] = [
 ];
 
 export interface AdminPermissionsSectionProps {
-  initialSubTab?: 'workspace' | 'modules' | 'roles';
+  initialSubTab?: 'workspace' | 'modules' | 'roles' | 'audit';
 }
 
 export const AdminPermissionsSection: React.FC<AdminPermissionsSectionProps> = ({
@@ -80,7 +80,7 @@ export const AdminPermissionsSection: React.FC<AdminPermissionsSectionProps> = (
 }) => {
   const { members, villages, isSuperAdmin, authSession, changeMemberRole, refreshData } = useApp();
 
-  const [activeSubTab, setActiveSubTab] = useState<'workspace' | 'modules' | 'roles'>(initialSubTab);
+  const [activeSubTab, setActiveSubTab] = useState<'workspace' | 'modules' | 'roles' | 'audit'>(initialSubTab);
 
   useEffect(() => {
     if (initialSubTab) {
@@ -349,13 +349,13 @@ export const AdminPermissionsSection: React.FC<AdminPermissionsSectionProps> = (
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                <span>Access Management Workspace</span>
+                <span>Permissions & Access</span>
                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                  PBAC & CRUD Matrix
+                  PBAC Matrix
                 </span>
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-                Manage user permissions and granular CRUD access (Read, Write, Update, Delete) across all 13 canonical system modules.
+                Manage user permissions and granular CRUD access (Read, Write, Update, Delete) across system modules.
               </p>
             </div>
           </div>
@@ -392,7 +392,7 @@ export const AdminPermissionsSection: React.FC<AdminPermissionsSectionProps> = (
           </div>
 
           <div className="p-4 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-900/40">
-            <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">System Modules</div>
+            <div className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">Modules</div>
             <div className="text-2xl font-black text-emerald-900 dark:text-emerald-200 mt-1">13</div>
             <div className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">Protected immutable slugs</div>
           </div>
@@ -409,7 +409,7 @@ export const AdminPermissionsSection: React.FC<AdminPermissionsSectionProps> = (
             }`}
           >
             <Shield className="w-4 h-4" />
-            <span>Dedicated Access Workspace</span>
+            <span>Permissions</span>
           </button>
 
           <button
@@ -421,7 +421,7 @@ export const AdminPermissionsSection: React.FC<AdminPermissionsSectionProps> = (
             }`}
           >
             <Layers className="w-4 h-4" />
-            <span>13 System Modules Registry</span>
+            <span>Modules</span>
           </button>
 
           <button
@@ -433,7 +433,7 @@ export const AdminPermissionsSection: React.FC<AdminPermissionsSectionProps> = (
             }`}
           >
             <KeyRound className="w-4 h-4" />
-            <span>Role Presets & Capabilities</span>
+            <span>Roles</span>
           </button>
         </div>
       </div>

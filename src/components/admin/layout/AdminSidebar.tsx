@@ -95,28 +95,28 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   const userAccordionChildren = [
     {
       id: 'members',
-      label: 'Members Directory',
+      label: 'Members',
       icon: Users,
       count: stats.pendingMembers ? `${stats.pendingMembers} pending` : null,
     },
     {
       id: 'permissions',
-      label: 'Access Workspace (CRUD)',
+      label: 'Permissions',
       icon: ShieldCheck,
     },
     {
-      id: 'permissions-modules',
-      label: '13 System Modules',
+      id: 'modules',
+      label: 'Modules',
       icon: Layers,
     },
     {
-      id: 'permissions-roles',
-      label: 'Role Presets & Rules',
+      id: 'roles',
+      label: 'Roles',
       icon: KeyRound,
     },
     {
-      id: 'security',
-      label: 'User Audit & Access Trail',
+      id: 'audit',
+      label: 'Audit Logs',
       icon: Activity,
     },
   ];
@@ -125,22 +125,22 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   const settingsAccordionChildren = [
     {
       id: 'settings',
-      label: 'General Settings & Reset',
+      label: 'General Settings',
       icon: Settings,
     },
     {
       id: 'supabase-setup',
-      label: 'Database Schema & Setup',
+      label: 'Database Setup',
       icon: Database,
     },
     {
       id: 'api-integrations',
-      label: 'API Keys & Integrations',
+      label: 'API Integrations',
       icon: Key,
     },
   ];
 
-  const isUserChildActive = ['members', 'permissions', 'permissions-modules', 'permissions-roles', 'security'].includes(activeTab);
+  const isUserChildActive = ['members', 'permissions', 'modules', 'roles', 'audit', 'permissions-modules', 'permissions-roles', 'security'].includes(activeTab);
   const isSettingsChildActive = ['settings', 'supabase-setup', 'api-integrations'].includes(activeTab);
 
   return (

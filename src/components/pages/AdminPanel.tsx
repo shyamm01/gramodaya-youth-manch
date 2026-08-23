@@ -118,11 +118,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const derivedTab = useMemo(() => {
     if (pathname) {
-      const segment = pathname
-        .replace('/super-admin', '')
-        .replace('/admin', '')
-        .replace(/^\//, '');
-      if (segment) return segment;
+      const segment = pathname.replace(/^\/(super-admin|admin)\/?/, '');
+      if (segment) {
+        if (segment === 'permissions/modules' || segment === 'modules') return 'modules';
+        if (segment === 'permissions/roles' || segment === 'roles') return 'roles';
+        if (segment === 'permissions/audit' || segment === 'security' || segment === 'audit') return 'audit';
+        return segment;
+      }
     }
     return initialTab || 'dashboard';
   }, [pathname, initialTab]);
@@ -135,7 +137,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
-    const targetUrl = newTab === 'dashboard' ? '/super-admin' : `/super-admin/${newTab}`;
+    const basePath = pathname?.startsWith('/admin') ? '/admin' : '/super-admin';
+    const targetUrl = newTab === 'dashboard' ? basePath : `${basePath}/${newTab}`;
     if (pathname !== targetUrl) {
       router.push(targetUrl);
     }
