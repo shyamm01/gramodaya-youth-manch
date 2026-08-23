@@ -2,12 +2,7 @@
 
 import React from 'react';
 import { AdminPanel } from '@/src/components/pages';
-import { ProtectedRoute } from '@/src/components/common';
 
 export default function AdminDashboardPage() {
-  return (
-    <ProtectedRoute requiredRole="ADMIN" sectionTitle="Village Admin Console">
-      <AdminPanel initialTab="dashboard" requiredRole="ADMIN" />
-    </ProtectedRoute>
-  );
+  return <AdminPanel initialTab="dashboard" />;
 }

@@ -2,12 +2,7 @@
 
 import React from 'react';
 import { AdminPanel } from '@/src/components/pages';
-import { ProtectedRoute } from '@/src/components/common';
 
 export default function AdminEldersPage() {
-  return (
-    <ProtectedRoute requiredRole="SUPER_ADMIN" sectionTitle="Elder Honors">
-      <AdminPanel initialTab="elders" />
-    </ProtectedRoute>
-  );
+  return <AdminPanel initialTab="elders" />;
 }

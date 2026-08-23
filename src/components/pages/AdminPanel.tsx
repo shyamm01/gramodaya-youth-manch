@@ -11,7 +11,9 @@ import {
   AdminHelpdeskSection,
   AdminEducationSection,
   AdminPermissionsSection,
+  AdminUnauthorizedSection,
 } from '../admin';
+import { hasUserPermission, isSuperAdmin as checkIsSuperAdmin } from '@/src/lib/permissions';
 
 import {
   Shield,
@@ -967,6 +969,122 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  const isSuper = Boolean(
+    checkIsSuperAdmin(authSession) ||
+    authSession.systemRole === 'SUPER_ADMIN' ||
+    authSession.role === 'SUPER_ADMIN' ||
+    authSession.adminMobile === '9506072678'
+  );
+
+  const isAdminRole = Boolean(
+    isSuper ||
+    authSession.isAdminLoggedIn ||
+    authSession.role === 'ADMIN' ||
+    authSession.systemRole === 'ADMIN'
+  );
+
+  const authCheck = useMemo(() => {
+    if (isSuper) {
+      return { authorized: true, requiredCapability: 'SUPER_ADMIN', description: 'Full Super Administrator Authority' };
+    }
+
+    switch (activeTab) {
+      case 'dashboard':
+        return { authorized: true, requiredCapability: 'dashboard:view', description: 'Administrative Console Access' };
+
+      case 'members':
+        if (isAdminRole || hasUserPermission(authSession, 'members:view') || hasUserPermission(authSession, 'members:manage')) {
+          return { authorized: true, requiredCapability: 'members:view', description: 'Member Directory & Profile Management' };
+        }
+        return { authorized: false, requiredCapability: 'members:view', description: 'Requires Member Directory viewing or management permissions.' };
+
+      case 'permissions':
+      case 'modules':
+      case 'roles':
+      case 'permissions-modules':
+      case 'permissions-roles':
+        if (hasUserPermission(authSession, 'permissions:manage')) {
+          return { authorized: true, requiredCapability: 'permissions:manage', description: 'User Permissions Matrix & Access Control' };
+        }
+        return { authorized: false, requiredCapability: 'permissions:manage', description: 'Requires Policy-Based Access Control (PBAC) administrative permissions.' };
+
+      case 'audit':
+      case 'security':
+        if (hasUserPermission(authSession, 'audit:view')) {
+          return { authorized: true, requiredCapability: 'audit:view', description: 'Security Logs & User Activity Audit Trail' };
+        }
+        return { authorized: false, requiredCapability: 'audit:view', description: 'Requires System Security & Audit Trail viewing permissions.' };
+
+      case 'problems':
+        if (isAdminRole || hasUserPermission(authSession, 'complaints:view') || hasUserPermission(authSession, 'complaints:manage')) {
+          return { authorized: true, requiredCapability: 'complaints:view', description: 'Grievance Resolution & Complaint Triage' };
+        }
+        return { authorized: false, requiredCapability: 'complaints:view', description: 'Requires Grievance triage and resolution permissions.' };
+
+      case 'social-work':
+        if (isAdminRole || hasUserPermission(authSession, 'social_works:manage')) {
+          return { authorized: true, requiredCapability: 'social_works:manage', description: 'Social Initiatives & Community Projects' };
+        }
+        return { authorized: false, requiredCapability: 'social_works:manage', description: 'Requires Social Works management permissions.' };
+
+      case 'announcements':
+        if (isAdminRole || hasUserPermission(authSession, 'announcements:manage')) {
+          return { authorized: true, requiredCapability: 'announcements:manage', description: 'Official Announcements & Circulars' };
+        }
+        return { authorized: false, requiredCapability: 'announcements:manage', description: 'Requires Community Announcements publication permissions.' };
+
+      case 'events':
+        if (isAdminRole || hasUserPermission(authSession, 'events:manage')) {
+          return { authorized: true, requiredCapability: 'events:manage', description: 'Village Events & Community Programs' };
+        }
+        return { authorized: false, requiredCapability: 'events:manage', description: 'Requires Event coordination and scheduling permissions.' };
+
+      case 'villages':
+        if (isAdminRole || hasUserPermission(authSession, 'villages:manage')) {
+          return { authorized: true, requiredCapability: 'villages:manage', description: 'Village Chapter Directory & Ward Units' };
+        }
+        return { authorized: false, requiredCapability: 'villages:manage', description: 'Requires Village Chapter administrative permissions.' };
+
+      case 'gallery':
+        if (isAdminRole || hasUserPermission(authSession, 'gallery:manage') || hasUserPermission(authSession, 'gallery:upload')) {
+          return { authorized: true, requiredCapability: 'gallery:manage', description: 'Media Gallery & Album Publishing' };
+        }
+        return { authorized: false, requiredCapability: 'gallery:manage', description: 'Requires Media Gallery management permissions.' };
+
+      case 'elders':
+        if (isAdminRole || hasUserPermission(authSession, 'elders:manage')) {
+          return { authorized: true, requiredCapability: 'elders:manage', description: 'Elder Honors & Senior Citizen Directory' };
+        }
+        return { authorized: false, requiredCapability: 'elders:manage', description: 'Requires Elder Honors editorial permissions.' };
+
+      case 'education':
+        if (isAdminRole || hasUserPermission(authSession, 'education:manage')) {
+          return { authorized: true, requiredCapability: 'education:manage', description: 'Educational Resources & Scholarship Portal' };
+        }
+        return { authorized: false, requiredCapability: 'education:manage', description: 'Requires Education module administration permissions.' };
+
+      case 'helpdesk':
+      case 'helpline':
+        if (isAdminRole || hasUserPermission(authSession, 'helpdesk:manage') || hasUserPermission(authSession, 'helpline:manage')) {
+          return { authorized: true, requiredCapability: 'helpdesk:manage', description: 'Emergency Helpline & Citizen Support Desk' };
+        }
+        return { authorized: false, requiredCapability: 'helpdesk:manage', description: 'Requires Helpdesk and Support management permissions.' };
+
+      case 'settings':
+        if (isAdminRole || hasUserPermission(authSession, 'village:settings:update')) {
+          return { authorized: true, requiredCapability: 'village:settings:update', description: 'Organization Settings & Configuration' };
+        }
+        return { authorized: false, requiredCapability: 'village:settings:update', description: 'Requires Village Settings update permissions.' };
+
+      case 'supabase-setup':
+      case 'api-integrations':
+        return { authorized: false, requiredCapability: 'SUPER_ADMIN', description: 'Requires Global Super Administrator developer privileges.' };
+
+      default:
+        return { authorized: true, requiredCapability: 'general', description: 'General Access' };
+    }
+  }, [activeTab, authSession, isSuper, isAdminRole]);
+
   const handleTriggerQuickAction = (tab: string) => {
     if (tab === 'members') setIsAddMemberOpen(true);
   };
@@ -986,6 +1104,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
       )}
 
+      {/* Unauthorized Access Card if user profile lacks permissions for active module */}
+      {!authCheck.authorized ? (
+        <AdminUnauthorizedSection
+          tabName={activeTab}
+          requiredCapability={authCheck.requiredCapability}
+          description={authCheck.description}
+        />
+      ) : (
+        <>
       {/* ─────────────────────────────────────────────────────────────
           TAB 1: EXECUTIVE DASHBOARD OVERVIEW
       ───────────────────────────────────────────────────────────── */}
@@ -3565,6 +3692,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
       )}
+      </>
+      )}
+
       {/* Member Permissions Manager Modal */}
       <MemberPermissionsModal
         isOpen={Boolean(permissionsMember)}

@@ -12,6 +12,7 @@
 export * from './layout/AdminLayout';
 export * from './layout/AdminNavbar';
 export * from './layout/AdminSidebar';
+export * from './layout/AdminUnauthorizedSection';
 
 export * from './widgets/AdminMetricsCards';
 export * from './widgets/AdminActivityChart';

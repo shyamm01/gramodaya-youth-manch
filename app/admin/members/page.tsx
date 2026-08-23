@@ -2,12 +2,7 @@
 
 import React from 'react';
 import { AdminPanel } from '@/src/components/pages';
-import { ProtectedRoute } from '@/src/components/common';
 
 export default function AdminMembersPage() {
-  return (
-    <ProtectedRoute requiredRole="SUPER_ADMIN" sectionTitle="Members Directory">
-      <AdminPanel initialTab="members" />
-    </ProtectedRoute>
-  );
+  return <AdminPanel initialTab="members" />;
 }
