@@ -1,8 +1,13 @@
 'use client';
 
 import React from 'react';
-import { AdminPanel } from '@/src/components/pages';
+import { AdminShell } from '@/src/components/admin/layout/AdminShell';
+import { AdminAuditSection } from '@/src/components/admin/audit/AdminAuditSection';
 
 export default function AdminAuditPage() {
-  return <AdminPanel initialTab="audit" />;
+  return (
+    <AdminShell tab="audit">
+      <AdminAuditSection />
+    </AdminShell>
+  );
 }

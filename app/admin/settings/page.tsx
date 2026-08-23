@@ -1,8 +1,13 @@
 'use client';
 
 import React from 'react';
-import { AdminPanel } from '@/src/components/pages';
+import { AdminShell } from '@/src/components/admin/layout/AdminShell';
+import { AdminSettingsSection } from '@/src/components/admin/settings/AdminSettingsSection';
 
 export default function AdminSettingsPage() {
-  return <AdminPanel initialTab="settings" />;
+  return (
+    <AdminShell tab="settings">
+      <AdminSettingsSection />
+    </AdminShell>
+  );
 }

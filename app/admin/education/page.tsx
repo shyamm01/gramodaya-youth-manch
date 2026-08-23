@@ -1,8 +1,13 @@
 'use client';
 
 import React from 'react';
-import { AdminPanel } from '@/src/components/pages';
+import { AdminShell } from '@/src/components/admin/layout/AdminShell';
+import { AdminEducationSection } from '@/src/components/admin/sections/AdminEducationSection';
 
 export default function AdminEducationPage() {
-  return <AdminPanel initialTab="education" />;
+  return (
+    <AdminShell tab="education">
+      <AdminEducationSection />
+    </AdminShell>
+  );
 }

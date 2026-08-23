@@ -1,8 +1,13 @@
 'use client';
 
 import React from 'react';
-import { AdminPanel } from '@/src/components/pages';
+import { AdminShell } from '@/src/components/admin/layout/AdminShell';
+import { AdminDashboardSection } from '@/src/components/admin/dashboard/AdminDashboardSection';
 
 export default function AdminDashboardPage() {
-  return <AdminPanel initialTab="dashboard" />;
+  return (
+    <AdminShell tab="dashboard">
+      <AdminDashboardSection />
+    </AdminShell>
+  );
 }

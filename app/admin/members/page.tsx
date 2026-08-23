@@ -1,8 +1,13 @@
 'use client';
 
 import React from 'react';
-import { AdminPanel } from '@/src/components/pages';
+import { AdminShell } from '@/src/components/admin/layout/AdminShell';
+import { AdminMembersSection } from '@/src/components/admin/members/AdminMembersSection';
 
 export default function AdminMembersPage() {
-  return <AdminPanel initialTab="members" />;
+  return (
+    <AdminShell tab="members">
+      <AdminMembersSection />
+    </AdminShell>
+  );
 }

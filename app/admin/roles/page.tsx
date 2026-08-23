@@ -1,8 +1,13 @@
 'use client';
 
 import React from 'react';
-import { AdminPanel } from '@/src/components/pages';
+import { AdminShell } from '@/src/components/admin/layout/AdminShell';
+import { AdminRolesSection } from '@/src/components/admin/roles/AdminRolesSection';
 
 export default function AdminRolesPage() {
-  return <AdminPanel initialTab="roles" />;
+  return (
+    <AdminShell tab="roles">
+      <AdminRolesSection />
+    </AdminShell>
+  );
 }

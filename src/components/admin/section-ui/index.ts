@@ -17,3 +17,4 @@ export * from './SectionNotice';
 export * from './SectionFilters';
 export * from './SectionStates';
 export * from './SectionDialogs';
+export * from './CompactEditor';
