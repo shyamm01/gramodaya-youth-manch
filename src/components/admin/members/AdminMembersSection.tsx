@@ -22,9 +22,9 @@ import {
   SearchInput,
   SectionHeader,
   SectionShell,
-  SectionSkeleton,
   adminCardClass,
 } from '../section-ui';
+import { MembersBodySkeleton } from './MembersSkeleton';
 import { MemberCreateModal } from './MemberCreateModal';
 import { MemberEditorModal } from './MemberEditorModal';
 import { MemberPermissionsModal } from '@/src/components/modals/MemberPermissionsModal';
@@ -124,7 +124,7 @@ export const AdminMembersSection: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <SectionSkeleton variant="table" />
+        <MembersBodySkeleton />
       ) : (
         <div className={`${adminCardClass} overflow-hidden`}>
           <div className="overflow-x-auto">

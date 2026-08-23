@@ -25,11 +25,11 @@ import {
   SearchInput,
   SectionHeader,
   SectionShell,
-  SectionSkeleton,
   adminCardClass,
   adminInputClass,
   editorFieldClass,
 } from '../section-ui';
+import { EldersBodySkeleton } from './EldersSkeleton';
 
 const ElderEditor: React.FC<{ elder: Elder; onClose: () => void }> = ({ elder, onClose }) => {
   const [updateElder, { isLoading }] = useUpdateElderMutation();
@@ -230,7 +230,7 @@ export const AdminEldersSection: React.FC = () => {
       </EditorDialog>
 
       {isLoading ? (
-        <SectionSkeleton />
+        <EldersBodySkeleton />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {elders.length === 0 && (

@@ -28,11 +28,11 @@ import {
   SearchInput,
   SectionHeader,
   SectionShell,
-  SectionSkeleton,
   adminCardClass,
   adminInputClass,
   editorFieldClass,
 } from '../section-ui';
+import { GalleryBodySkeleton } from './GallerySkeleton';
 
 const CaptionEditor: React.FC<{ item: GalleryItem; onClose: () => void }> = ({ item, onClose }) => {
   const [updateGalleryItem, { isLoading }] = useUpdateGalleryItemMutation();
@@ -193,7 +193,7 @@ export const AdminGallerySection: React.FC = () => {
       </EditorDialog>
 
       {isLoading ? (
-        <SectionSkeleton />
+        <GalleryBodySkeleton />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {gallery.length === 0 && (

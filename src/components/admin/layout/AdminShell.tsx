@@ -5,39 +5,55 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Shield } from 'lucide-react';
 import { useApp } from '@/src/context/AppContext';
 import { useAppDispatch } from '@/src/store/hooks';
-import { setActiveTab } from '@/src/store/slices/adminUiSlice';
+import { setActiveTab, openForm } from '@/src/store/slices/adminUiSlice';
 import { AdminLayout } from './AdminLayout';
 import { AdminUnauthorizedSection } from './AdminUnauthorizedSection';
+import { deriveAdminTab, adminTabToPath, TAB_TO_SECTION } from './adminTabs';
 import { resolveAdminAccess } from '../access/adminAccessPolicy';
 
 /**
- * The chrome and the gate every admin route shares.
+ * The chrome and the gate around every admin screen.
  *
- * Each route used to render AdminPanel with an `initialTab` prop, so all
- * nineteen of them mounted the same 3,853-line component and rendered one
- * fifteenth of it. The tab now comes from the route itself and the section is
- * whatever the route chose to put in `children`, which is what lets Next code
- * split the panel: /admin/settings ships the settings screen, not the members
- * table and the grievance list as well.
+ * This lives in app/admin/layout.tsx rather than inside each page, which is
+ * what makes it survive navigation. Next keeps a layout mounted while the page
+ * beneath it swaps, so the sidebar's collapsed/expanded state, its open
+ * accordions and the scroll position all persist across a nav — when this sat
+ * inside the page, every link click remounted the sidebar and sprang it back
+ * open.
+ *
+ * The tab comes from the URL instead of a prop, so a page is now just its
+ * section component and there is nothing to keep in sync.
  */
-export const AdminShell: React.FC<{ tab: string; children: React.ReactNode }> = ({
-  tab,
-  children,
-}) => {
+export const AdminShell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { authSession } = useApp();
 
-  // The sidebar highlight and the quick-create target read the active tab from
-  // the store; the route is what sets it.
+  const tab = useMemo(() => deriveAdminTab(pathname), [pathname]);
+
+  // The sidebar highlight and the section widgets read the active tab from the
+  // store; the URL is what sets it.
   useEffect(() => {
     dispatch(setActiveTab(tab));
   }, [dispatch, tab]);
 
   const handleTabChange = (nextTab: string) => {
-    const target = nextTab === 'dashboard' ? '/admin' : `/admin/${nextTab}`;
+    const target = adminTabToPath(nextTab);
     if (pathname !== target) router.push(target);
+  };
+
+  /**
+   * Quick create navigates to the section and opens its create form.
+   *
+   * The form's open state lives in adminUi, so the shell can raise it on a
+   * section it does not import and has not mounted yet — the section reads
+   * `isFormOpen` when it arrives. Only members was ever wired up before, and
+   * only because AdminPanel happened to own that modal's useState.
+   */
+  const handleQuickCreate = (nextTab: string) => {
+    const section = TAB_TO_SECTION[nextTab];
+    if (section) dispatch(openForm(section));
   };
 
   const access = useMemo(() => resolveAdminAccess(tab, authSession), [tab, authSession]);
@@ -69,7 +85,11 @@ export const AdminShell: React.FC<{ tab: string; children: React.ReactNode }> = 
   }
 
   return (
-    <AdminLayout activeTab={tab} setActiveTab={handleTabChange}>
+    <AdminLayout
+      activeTab={tab}
+      setActiveTab={handleTabChange}
+      onTriggerQuickCreateAction={handleQuickCreate}
+    >
       {access.authorized ? (
         children
       ) : (

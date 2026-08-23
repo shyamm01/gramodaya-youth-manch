@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/src/context/AppContext';
-import { useRouter, usePathname } from 'next/navigation';
 import { hasUserPermission, isSuperAdmin as checkIsSuperAdmin } from '@/src/lib/permissions';
 import {
   ShieldCheck,
@@ -53,8 +52,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   setMobileSidebarOpen,
   onOpenQuickCreate,
 }) => {
-  const router = useRouter();
-  const pathname = usePathname();
   const { villages, stats, adminLogout, authSession, isSuperAdmin: contextIsSuperAdmin } = useApp();
 
   // Accordion open/collapse states

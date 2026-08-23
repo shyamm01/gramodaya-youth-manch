@@ -27,11 +27,11 @@ import {
   SearchInput,
   SectionHeader,
   SectionShell,
-  SectionSkeleton,
   adminCardClass,
   adminInputClass,
   editorFieldClass,
 } from '../section-ui';
+import { EventsBodySkeleton } from './EventsSkeleton';
 
 /** Mirrors the EventStatus union in src/types.ts. */
 const EVENT_STATUSES: EventStatus[] = ['DRAFT', 'PENDING', 'PUBLISHED', 'COMPLETED', 'CANCELLED'];
@@ -264,7 +264,7 @@ export const AdminEventsSection: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <SectionSkeleton />
+        <EventsBodySkeleton />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {events.length === 0 && (

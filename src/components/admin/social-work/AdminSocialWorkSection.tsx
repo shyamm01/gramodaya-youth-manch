@@ -28,10 +28,10 @@ import {
   SearchInput,
   SectionHeader,
   SectionShell,
-  SectionSkeleton,
   adminCardClass,
   adminInputClass,
 } from '../section-ui';
+import { SocialWorkBodySkeleton } from './SocialWorkSkeleton';
 import { SocialWorkEditorModal } from './SocialWorkEditorModal';
 
 const STATUS_OPTIONS = [
@@ -233,7 +233,7 @@ export const AdminSocialWorkSection: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <SectionSkeleton />
+        <SocialWorkBodySkeleton />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {socialWorks.length === 0 && (

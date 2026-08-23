@@ -28,10 +28,10 @@ import {
   SearchInput,
   SectionHeader,
   SectionShell,
-  SectionSkeleton,
   adminCardClass,
   adminInputClass,
 } from '../section-ui';
+import { GrievancesBodySkeleton } from './GrievancesSkeleton';
 import { ComplaintEditorModal } from './ComplaintEditorModal';
 
 /** Mirrors the ComplaintCategory union in src/types.ts. */
@@ -258,7 +258,7 @@ export const AdminGrievancesSection: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <SectionSkeleton />
+        <GrievancesBodySkeleton />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {complaints.length === 0 && (

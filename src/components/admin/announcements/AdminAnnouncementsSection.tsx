@@ -23,11 +23,11 @@ import {
   NoticeBanner,
   SectionHeader,
   SectionShell,
-  SectionSkeleton,
   adminCardClass,
   adminInputClass,
   editorFieldClass,
 } from '../section-ui';
+import { AnnouncementsBodySkeleton } from './AnnouncementsSkeleton';
 
 const AnnouncementEditor: React.FC<{ announcement: Announcement; onClose: () => void }> = ({
   announcement,
@@ -177,7 +177,7 @@ export const AdminAnnouncementsSection: React.FC = () => {
       </EditorDialog>
 
       {isLoading ? (
-        <SectionSkeleton variant="table" />
+        <AnnouncementsBodySkeleton />
       ) : (
         <div className="space-y-3">
           {announcements.length === 0 && <EmptyState message="No announcements published yet." />}

@@ -21,11 +21,11 @@ import {
   NoticeBanner,
   SectionHeader,
   SectionShell,
-  SectionSkeleton,
   adminCardClass,
   adminInputClass,
   editorFieldClass,
 } from '../section-ui';
+import { VillagesBodySkeleton } from './VillagesSkeleton';
 
 const VillageEditor: React.FC<{ village: Village; onClose: () => void }> = ({ village, onClose }) => {
   const [updateVillage, { isLoading }] = useUpdateVillageMutation();
@@ -218,7 +218,7 @@ export const AdminVillagesSection: React.FC = () => {
       </EditorDialog>
 
       {isLoading ? (
-        <SectionSkeleton />
+        <VillagesBodySkeleton />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {villages.length === 0 && (

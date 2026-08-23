@@ -1,16 +1,13 @@
-'use client';
-
 import React from 'react';
-import { AdminShell } from '@/src/components/admin/layout/AdminShell';
 
 /**
- * Supabase provisioning. Super-admin only: the access policy shows the unauthorized card to everyone else.
+ * Supabase provisioning. Super-admin only, so everyone else meets the unauthorized card from the access policy.
  *
- * AdminPanel had no `activeTab === 'supabase-setup'` branch, so this route has always
- * rendered the admin chrome with an empty body. That is preserved here rather
- * than papered over — the missing screen is a gap in the panel, not in this
- * refactor.
+ * The panel has never had a screen for this tab — AdminPanel had no branch for
+ * it either. The layout still supplies the sidebar, top bar and access gate;
+ * only the content area is empty. The missing screen is a gap in the panel, not
+ * in the routing.
  */
 export default function AdminSupabaseSetupPage() {
-  return <AdminShell tab="supabase-setup">{null}</AdminShell>;
+  return null;
 }
