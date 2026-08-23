@@ -23,5 +23,6 @@ export * from './widgets/AdminQuickCreateModal';
 export * from './sections/AdminHelpdeskSection';
 export * from './sections/AdminEducationSection';
 export * from './permissions/AdminPermissionsSection';
+export * from './modules/AdminModulesSection';
 
 export * from './section-ui';
