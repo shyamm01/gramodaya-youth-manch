@@ -320,5 +320,45 @@ export function resolveEffectivePermissions(
     effectivePermissions: Array.from(effectiveSet),
     can: (perm: PermissionCode | string) => hasUserPermission(session, perm, targetVillageId),
     canModule: (moduleId: AppModuleId) => hasUserPermission(session, `${moduleId}:*`, targetVillageId),
+    canModuleCrud: (moduleSlug: string, action: CrudAction) => hasModuleCrud(session, moduleSlug, action, targetVillageId),
   };
+}
+
+export type CrudAction = 'read' | 'write' | 'update' | 'delete';
+
+/**
+ * Check if a session has permission for a specific CRUD action on a module
+ */
+export function hasModuleCrud(
+  session: AuthSession | null | undefined,
+  moduleSlug: string,
+  action: CrudAction,
+  targetVillageId?: string
+): boolean {
+  if (!session) return false;
+  if (isSuperAdmin(session)) return true;
+
+  const isAdminRole = session.isAdminLoggedIn || session.role === 'ADMIN' || session.systemRole === 'ADMIN';
+
+  // Check village scoping if admin
+  if (targetVillageId && isAdminRole && session.activeVillageId && session.activeVillageId !== targetVillageId) {
+    return false;
+  }
+
+  // Action mapping to canonical permission codes as fallback
+  const actionCodeMap: Record<CrudAction, string[]> = {
+    read: [`${moduleSlug}:view`, `${moduleSlug}:manage`, `${moduleSlug}:*`],
+    write: [`${moduleSlug}:create`, `${moduleSlug}:upload`, `${moduleSlug}:participate`, `${moduleSlug}:manage`, `${moduleSlug}:*`],
+    update: [`${moduleSlug}:update`, `${moduleSlug}:update_status`, `${moduleSlug}:resolve`, `${moduleSlug}:publish`, `${moduleSlug}:moderate`, `${moduleSlug}:manage`, `${moduleSlug}:*`],
+    delete: [`${moduleSlug}:delete`, `${moduleSlug}:moderate`, `${moduleSlug}:manage`, `${moduleSlug}:*`],
+  };
+
+  const possibleCodes = actionCodeMap[action] || [];
+  for (const code of possibleCodes) {
+    if (hasUserPermission(session, code, targetVillageId)) {
+      return true;
+    }
+  }
+
+  return false;
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/src/db';
 import * as schema from '@/src/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, asc } from 'drizzle-orm';
 import { logAuditAction } from '@/src/lib/authUtils';
 import { ALL_SYSTEM_PERMISSIONS, ROLE_DEFAULT_PERMISSIONS } from '@/src/lib/permissions';
 import { requireAuth } from '@/src/lib/jwtAuth';
@@ -16,8 +16,7 @@ export async function GET(req: Request, context: RouteContext) {
     if (!auth.success) return auth.response;
 
     const { memberId: rawMemberId } = await context.params;
-    const memberId = Number(rawMemberId);
-    if (!memberId || isNaN(memberId)) {
+    if (!rawMemberId || rawMemberId.trim() === '') {
       return NextResponse.json(
         { success: false, error: 'Valid member ID is required.' },
         { status: 400 }
@@ -47,22 +46,83 @@ export async function GET(req: Request, context: RouteContext) {
       );
     }
 
-    // 2. Fetch explicit permission overrides
+    // 2. Fetch all canonical modules
+    const dbModules = await db
+      .select()
+      .from(schema.modules)
+      .orderBy(asc(schema.modules.displayOrder));
+
+    // 3. Fetch explicit user permissions from user_permissions table
     const userPerms = await db.query.userPermissions.findMany({
       where: (up, { eq }) => eq(up.userId, rawMemberId),
+      with: {
+        module: true,
+      },
     });
 
     const isSuperAdmin = member.systemRole === 'SUPER_ADMIN';
-    const roleDefaults = ROLE_DEFAULT_PERMISSIONS[member.systemRole] || [];
+    const isAdmin = member.systemRole === 'ADMIN';
 
-    const grantedOverrides = userPerms.filter((p) => p.isGranted).map((p) => p.permissionCode);
-    const revokedOverrides = userPerms.filter((p) => !p.isGranted).map((p) => p.permissionCode);
+    // 4. Construct Module CRUD Matrix
+    const userPermMap = new Map<string, typeof userPerms[0]>();
+    for (const up of userPerms) {
+      userPermMap.set(String(up.moduleId), up);
+    }
 
-    const effectivePermissions = isSuperAdmin
-      ? ALL_SYSTEM_PERMISSIONS.map((p) => p.code)
-      : Array.from(new Set([...roleDefaults, ...grantedOverrides])).filter(
-          (code) => !revokedOverrides.includes(code)
-        );
+    const moduleCrudList = dbModules.map((mod) => {
+      const existing = userPermMap.get(String(mod.id));
+      if (isSuperAdmin) {
+        return {
+          moduleId: String(mod.id),
+          moduleSlug: mod.slug,
+          moduleName: mod.name,
+          moduleNameHindi: mod.nameHindi,
+          icon: mod.icon,
+          description: mod.description,
+          canRead: true,
+          canWrite: true,
+          canUpdate: true,
+          canDelete: true,
+          isCustom: false,
+        };
+      }
+
+      if (existing) {
+        return {
+          moduleId: String(mod.id),
+          moduleSlug: mod.slug,
+          moduleName: mod.name,
+          moduleNameHindi: mod.nameHindi,
+          icon: mod.icon,
+          description: mod.description,
+          canRead: Boolean(existing.canRead),
+          canWrite: Boolean(existing.canWrite),
+          canUpdate: Boolean(existing.canUpdate),
+          canDelete: Boolean(existing.canDelete),
+          isCustom: true,
+        };
+      }
+
+      // Default role presets
+      const defaultRead = true; // All authenticated members can view public info/complaints
+      const defaultWrite = isAdmin || ['complaints', 'gallery', 'chat'].includes(mod.slug);
+      const defaultUpdate = isAdmin && mod.slug !== 'audit' && mod.slug !== 'settings';
+      const defaultDelete = isAdmin && ['complaints', 'gallery', 'social_works', 'events'].includes(mod.slug);
+
+      return {
+        moduleId: String(mod.id),
+        moduleSlug: mod.slug,
+        moduleName: mod.name,
+        moduleNameHindi: mod.nameHindi,
+        icon: mod.icon,
+        description: mod.description,
+        canRead: defaultRead,
+        canWrite: defaultWrite,
+        canUpdate: defaultUpdate,
+        canDelete: defaultDelete,
+        isCustom: false,
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -75,10 +135,7 @@ export async function GET(req: Request, context: RouteContext) {
         villageId: member.villageId ? String(member.villageId) : '8',
       },
       isSuperAdmin,
-      roleDefaults,
-      grantedOverrides,
-      revokedOverrides,
-      effectivePermissions,
+      modules: moduleCrudList,
       rawOverrides: userPerms,
     });
   } catch (err: any) {
@@ -106,11 +163,11 @@ export async function POST(req: Request, context: RouteContext) {
     }
 
     const body = await req.json();
-    const { permissions, grantedBy, grantedByMobile, reason } = body;
+    const { modulePermissions, grantedBy, grantedByMobile, reason } = body;
 
-    if (!Array.isArray(permissions)) {
+    if (!Array.isArray(modulePermissions)) {
       return NextResponse.json(
-        { success: false, error: 'Permissions array is required.' },
+        { success: false, error: 'modulePermissions array is required.' },
         { status: 400 }
       );
     }
@@ -123,29 +180,34 @@ export async function POST(req: Request, context: RouteContext) {
       );
     }
 
-    // 1. Remove existing user permission overrides
+    // 1. Remove existing user module permissions
     await db.delete(schema.userPermissions).where(eq(schema.userPermissions.userId, userId));
 
-    // 2. Insert new overrides
-    if (permissions.length > 0) {
-      await db.insert(schema.userPermissions).values(
-        permissions.map((p: any) => ({
-          userId,
-          permissionCode: p.code,
-          isGranted: p.isGranted !== false,
-          grantedBy: grantedBy || currentUser.name || 'Admin',
-        }))
-      );
+    // 2. Insert new module CRUD permissions
+    if (modulePermissions.length > 0) {
+      const inserts = modulePermissions.map((mp: any) => ({
+        userId,
+        moduleId: Number(mp.moduleId),
+        canRead: Boolean(mp.canRead),
+        canWrite: Boolean(mp.canWrite),
+        canUpdate: Boolean(mp.canUpdate),
+        canDelete: Boolean(mp.canDelete),
+        scopeType: (mp.scopeType || 'VILLAGE') as any,
+        scopeId: mp.scopeId ? Number(mp.scopeId) : null,
+        grantedBy: grantedBy || currentUser.name || 'Admin',
+      }));
+
+      await db.insert(schema.userPermissions).values(inserts);
     }
 
     logAuditAction(
-      `Updated custom permissions for User ${userId} (${permissions.length} items)`,
+      `Updated module CRUD permissions for User ${userId} (${modulePermissions.length} modules)`,
       grantedBy || currentUser.name || 'Admin',
       grantedByMobile || currentUser.mobile || '',
       `User ${userId}`
     );
 
-    return NextResponse.json({ success: true, count: permissions.length });
+    return NextResponse.json({ success: true, count: modulePermissions.length });
   } catch (err: any) {
     console.error('Error updating member permissions:', err);
     return NextResponse.json(

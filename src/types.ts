@@ -45,15 +45,49 @@ export interface Permission {
   description?: string;
 }
 
+export interface ModuleItem {
+  id: string | number;
+  slug: string;
+  name: string;
+  nameHindi: string;
+  icon: string;
+  description?: string;
+  displayOrder: number;
+  isActive: boolean;
+}
+
+export interface UserModulePermission {
+  id?: string | number;
+  userId?: string;
+  moduleId: string | number;
+  moduleSlug: string;
+  moduleName: string;
+  moduleNameHindi: string;
+  icon: string;
+  description?: string;
+  canRead: boolean;
+  canWrite: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+  scopeType?: RoleScope;
+  scopeId?: string | number | null;
+  isCustom?: boolean;
+}
+
 export interface UserPermission {
   id: string;
   userId: string;
-  permissionCode: PermissionCode;
+  permissionCode?: PermissionCode;
+  moduleId?: string | number;
+  canRead?: boolean;
+  canWrite?: boolean;
+  canUpdate?: boolean;
+  canDelete?: boolean;
   scopeType: RoleScope;
   scopeId?: string | null;
-  isGranted: boolean;
+  isGranted?: boolean;
   grantedBy?: string;
-  createdAt: string;
+  createdAt?: string;
 }
 
 export interface UserVillageRole {

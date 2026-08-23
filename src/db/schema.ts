@@ -284,38 +284,54 @@ export const profiles = pgTable(
 );
 
 /**
- * 3.1 PERMISSIONS (सिस्टम अनुमतियां)
+ * 3.1 MODULES (सिस्टम मॉड्यूल्स - Canonical System Modules)
  */
-export const permissions = pgTable('permissions', {
-  id: bigserial('id', { mode: 'number' }).primaryKey(),
-  code: text('code').notNull().unique(), // e.g. 'complaints:view'
-  name: text('name').notNull(),
-  module: text('module').notNull(), // 'complaints', 'members', 'events', etc.
-  description: text('description'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const modules = pgTable(
+  'modules',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    slug: text('slug').notNull().unique(), // Immutable identifier, e.g. 'complaints', 'members', 'events'
+    name: text('name').notNull(),
+    nameHindi: text('name_hindi').notNull(),
+    icon: text('icon').notNull().default('Layers'),
+    description: text('description'),
+    displayOrder: integer('display_order').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('idx_modules_slug').on(table.slug),
+    index('idx_modules_is_active').on(table.isActive),
+  ]
+);
 
 /**
- * 3.2 USER PERMISSIONS (उपयोगकर्ता स्तर की व्यक्तिगत अनुमतियां - PBAC Overrides)
+ * 3.2 USER PERMISSIONS (उपयोगकर्ता स्तर की मॉड्यूल अनुमतियां - User Module CRUD Permissions)
  */
 export const userPermissions = pgTable(
   'user_permissions',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     userId: uuid('user_id')
-      .references(() => profiles.id, { onDelete: 'cascade' }),
-    permissionCode: text('permission_code')
       .notNull()
-      .references(() => permissions.code, { onDelete: 'cascade' }),
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    moduleId: bigint('module_id', { mode: 'number' })
+      .notNull()
+      .references(() => modules.id, { onDelete: 'cascade' }),
+    canRead: boolean('can_read').notNull().default(false),
+    canWrite: boolean('can_write').notNull().default(false),
+    canUpdate: boolean('can_update').notNull().default(false),
+    canDelete: boolean('can_delete').notNull().default(false),
     scopeType: roleScopeEnum('scope_type').notNull().default('VILLAGE'),
     scopeId: bigint('scope_id', { mode: 'number' }),
-    isGranted: boolean('is_granted').notNull().default(true),
     grantedBy: text('granted_by'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('idx_user_permissions_user_id').on(table.userId),
-    index('idx_user_permissions_perm_code').on(table.permissionCode),
+    index('idx_user_permissions_module_id').on(table.moduleId),
     index('idx_user_permissions_scope').on(table.scopeType, table.scopeId),
   ]
 );
@@ -945,14 +961,14 @@ export const profilesRelations = relations(profiles, ({ one, many }) => ({
   auditLogs: many(auditLogs),
 }));
 
-export const permissionsRelations = relations(permissions, ({ many }) => ({
+export const modulesRelations = relations(modules, ({ many }) => ({
   userPermissions: many(userPermissions),
 }));
 
 export const userPermissionsRelations = relations(userPermissions, ({ one }) => ({
-  permission: one(permissions, {
-    fields: [userPermissions.permissionCode],
-    references: [permissions.code],
+  module: one(modules, {
+    fields: [userPermissions.moduleId],
+    references: [modules.id],
   }),
   user: one(profiles, {
     fields: [userPermissions.userId],
@@ -1173,8 +1189,8 @@ export type NewVillageModel = typeof villages.$inferInsert;
 export type ProfileModel = typeof profiles.$inferSelect;
 export type NewProfileModel = typeof profiles.$inferInsert;
 
-export type PermissionModel = typeof permissions.$inferSelect;
-export type NewPermissionModel = typeof permissions.$inferInsert;
+export type ModuleModel = typeof modules.$inferSelect;
+export type NewModuleModel = typeof modules.$inferInsert;
 
 export type UserPermissionModel = typeof userPermissions.$inferSelect;
 export type NewUserPermissionModel = typeof userPermissions.$inferInsert;
