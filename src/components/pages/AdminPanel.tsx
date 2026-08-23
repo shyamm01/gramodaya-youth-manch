@@ -53,6 +53,12 @@ import {
   Calendar as CalendarIcon,
   X,
   MapPin,
+  UserCheck,
+  ShieldCheck,
+  User,
+  Info,
+  Send,
+  Phone,
 } from 'lucide-react';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -207,6 +213,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
   const [newMemName, setNewMemName] = useState('');
   const [newMemMobile, setNewMemMobile] = useState('');
+  const [newMemEmail, setNewMemEmail] = useState('');
+  const [newInviteLink, setNewInviteLink] = useState<string | null>(null);
   const [newMemRole, setNewMemRole] = useState<'MEMBER' | 'ADMIN' | 'SUPER_ADMIN'>('MEMBER');
   const [newMemState, setNewMemState] = useState(villageSettings.state || 'Uttar Pradesh');
   const [newMemDistrict, setNewMemDistrict] = useState(villageSettings.district || 'Jaunpur');
@@ -555,25 +563,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Form Handlers
   const handleAddMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMemName || !newMemMobile) return;
-    setNewMemMsg("Registering member...");
+    if (!newMemName || !newMemMobile || !newMemEmail) {
+      setNewMemMsg("❌ Please fill in all required fields: Name, Mobile, and Email.");
+      return;
+    }
+
+    const cleanEmail = newMemEmail.trim().toLowerCase();
+    if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+      setNewMemMsg("❌ Please provide a valid email address.");
+      return;
+    }
+
+    setNewMemMsg("Registering member & generating activation email link...");
     try {
+      const targetVillage = newMemVillage || (effectiveVillageFilter !== "ALL" ? effectiveVillageFilter : "8");
       const res = await addMember({
-        name: newMemName,
-        mobile: newMemMobile,
-        villageId: isSuperAdminUser ? (newMemVillage || (effectiveVillageFilter !== "ALL" ? effectiveVillageFilter : "vil_rasoolpur")) : assignedAdminVillageId,
+        name: newMemName.trim(),
+        mobile: newMemMobile.trim(),
+        email: cleanEmail,
+        role: newMemRole || 'MEMBER',
+        systemRole: newMemRole || 'MEMBER',
+        status: 'active',
+        villageId: String(targetVillage),
         address: newMemAddress,
+        state: newMemState || 'Uttar Pradesh',
+        district: newMemDistrict || 'Hardoi',
+        adminName: authSession.currentMember?.name || 'Administrator',
+        adminMobile: authSession.adminMobile || authSession.currentMember?.mobile || '9506072678',
       });
+
       if (res.success) {
-        setNewMemMsg('✅ Member registered successfully!');
+        const link = (res as any).inviteLink || null;
+        if (link) setNewInviteLink(link);
+        setNewMemMsg(`✅ Member registered! An invitation & password setup email has been dispatched to ${cleanEmail}.`);
         setNewMemName('');
         setNewMemMobile('');
-        setTimeout(() => {
-          setIsAddMemberOpen(false);
-          setNewMemMsg('');
-        }, 1200);
+        setNewMemEmail('');
+        setNewMemAddress('');
+        if (!link) {
+          setTimeout(() => {
+            setIsAddMemberOpen(false);
+            setNewMemMsg('');
+            setNewInviteLink(null);
+          }, 3500);
+        }
       } else {
-        setNewMemMsg(`❌ Error: ${res.error || 'Failed'}`);
+        setNewMemMsg(`❌ Error: ${res.error || 'Failed to register member'}`);
       }
     } catch (err: any) {
       setNewMemMsg(`❌ Error: ${err?.message || 'Could not add member'}`);
@@ -2812,156 +2847,245 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
-          MODAL: ADD NEW MEMBER
+          MODAL: ADD NEW MEMBER (PREMIUM REDESIGNED POPUP)
       ───────────────────────────────────────────────────────────── */}
       {isAddMemberOpen && (
-        <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-lg w-full max-h-[92vh] overflow-y-auto space-y-4 shadow-2xl animate-fade-in">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-zinc-800/80">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                  Register New Member
-                </h3>
-                <p className="text-[11px] text-slate-500 dark:text-zinc-400">
-                  Create a new member profile and assign their organizational chapter
-                </p>
+        <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-5 animate-fade-in">
+          <div className="bg-white dark:bg-[#111726] border border-slate-200/90 dark:border-slate-800 rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* 1. Modal Sticky Header */}
+            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-xs">
+                  <UserCheck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                    Register New Member
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Create profile & dispatch instant email validation for password setup
+                  </p>
+                </div>
               </div>
               <button
-                onClick={() => setIsAddMemberOpen(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                type="button"
+                onClick={() => {
+                  setIsAddMemberOpen(false);
+                  setNewInviteLink(null);
+                  setNewMemMsg('');
+                }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-slate-800 transition cursor-pointer text-sm font-bold"
               >
                 ✕
               </button>
             </div>
 
-            {newMemMsg && (
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-xl flex items-center gap-2">
-                <span>{newMemMsg}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleAddMemberSubmit} className="space-y-4">
-              {/* Personal Details */}
-              <div className="space-y-2.5">
-                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-                  1. Member Identity
-                </h5>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
-                      Full Name <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Rahul Kumar"
-                      value={newMemName}
-                      onChange={(e) => setNewMemName(e.target.value)}
-                      className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
-                      Mobile Number <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      maxLength={10}
-                      placeholder="10-digit Mobile Number"
-                      value={newMemMobile}
-                      onChange={(e) => setNewMemMobile(e.target.value)}
-                      className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-mono outline-none focus:border-emerald-500"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Comprehensive Address with Live Pincode Lookup */}
-              <div className="p-3.5 bg-slate-50/60 dark:bg-zinc-900/50 rounded-2xl border border-slate-200 dark:border-[#27272a] space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-zinc-300">
-                    2. Address & Location (Pincode Auto-Fill)
-                  </h5>
-                  <span className="text-[10px] text-slate-500 dark:text-zinc-400">
-                    Auto-fills District & State
-                  </span>
-                </div>
-                <AddressFormFields
-                  value={{ fullAddress: newMemAddress }}
-                  selectedVillageId={newMemVillage}
-                  onVillageSelect={(vId) => setNewMemVillage(vId)}
-                  onChange={(d: AddressData) => {
-                    setNewMemAddress(d.fullAddress || '');
-                    if (d.state) setNewMemState(d.state);
-                    if (d.district) setNewMemDistrict(d.district);
-                    if (d.villageId) setNewMemVillage(d.villageId);
-                  }}
-                  lang="en"
-                />
-              </div>
-
-              {/* Organization Assignment */}
-              <div className="space-y-2.5">
-                <h5 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-zinc-400">
-                  3. Organization & Chapter Assignment
-                </h5>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
-                      Platform Role
-                    </label>
-                    <select
-                      value={newMemRole}
-                      onChange={(e) => setNewMemRole(e.target.value as any)}
-                      className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold cursor-pointer outline-none focus:border-emerald-500"
-                    >
-                      <option value="MEMBER">Member</option>
-                      <option value="ADMIN">Admin</option>
-                      <option value="SUPER_ADMIN">Super Admin</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
-                      Assigned Chapter
-                    </label>
-                    <select
-                      value={newMemVillage}
-                      onChange={(e) => setNewMemVillage(e.target.value)}
-                      className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold cursor-pointer outline-none focus:border-emerald-500"
-                    >
-                      {villages.map((v) => (
-                        <option key={v.id} value={v.id}>
-                          {v.name} {v.nameHindi ? `(${v.nameHindi})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <p className="text-[10px] text-slate-500 dark:text-zinc-400 leading-tight">
-                  * Note: The assigned chapter determines which village unit oversees this member and prints on their Digital ID Card.
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-zinc-800/80">
-                <button
-                  type="button"
-                  onClick={() => setIsAddMemberOpen(false)}
-                  className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 rounded-xl transition cursor-pointer"
+            {/* 2. Scrollable Form Body */}
+            <div className="p-6 overflow-y-auto space-y-5 flex-1">
+              {newMemMsg && (
+                <div
+                  className={`p-3.5 rounded-2xl text-xs font-bold flex items-center gap-2.5 transition-all ${
+                    newMemMsg.includes('❌')
+                      ? 'bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/60 text-rose-700 dark:text-rose-300'
+                      : 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300'
+                  }`}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl cursor-pointer shadow transition"
-                >
-                  Save Member
-                </button>
-              </div>
-            </form>
+                  <Sparkles className="w-4 h-4 shrink-0" />
+                  <span className="leading-snug">{newMemMsg}</span>
+                </div>
+              )}
+
+              {/* Direct Activation Link Box */}
+              {newInviteLink && (
+                <div className="p-4 rounded-2xl bg-amber-50/80 dark:bg-amber-950/40 border border-amber-200/90 dark:border-amber-900/60 space-y-2.5 shadow-xs animate-in fade-in">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-bold text-xs">
+                      <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                      <span>Direct Activation Link (One-Time Access)</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(newInviteLink);
+                        setNewMemMsg('📋 Activation link copied to clipboard!');
+                      }}
+                      className="px-3 py-1 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition cursor-pointer shadow-xs"
+                    >
+                      Copy Link
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    readOnly
+                    value={newInviteLink}
+                    className="w-full px-3 py-2 bg-white dark:bg-[#151c2e] border border-amber-200 dark:border-amber-800/80 rounded-xl text-[11px] font-mono text-slate-800 dark:text-slate-200 outline-none select-all"
+                  />
+                  <p className="text-[10px] text-amber-700/90 dark:text-amber-400 leading-tight">
+                    Share this link directly with the user if they wish to activate immediately without checking their inbox.
+                  </p>
+                </div>
+              )}
+
+              <form id="add-member-form" onSubmit={handleAddMemberSubmit} className="space-y-5">
+                {/* ── Section 1: Member Identity ── */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-800/80 space-y-3.5">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    <User className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>1. Member Identity & Login Credentials</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Full Name */}
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                        Full Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Rahul Kumar"
+                        value={newMemName}
+                        onChange={(e) => setNewMemName(e.target.value)}
+                        className="w-full h-10 px-3.5 bg-white dark:bg-[#151c2e] border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition font-medium"
+                      />
+                    </div>
+
+                    {/* Mobile Number */}
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                        Mobile Number <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        maxLength={10}
+                        placeholder="10-digit Mobile Number"
+                        value={newMemMobile}
+                        onChange={(e) => setNewMemMobile(e.target.value)}
+                        className="w-full h-10 px-3.5 bg-white dark:bg-[#151c2e] border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-white font-mono placeholder-slate-400 outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition font-medium"
+                      />
+                    </div>
+
+                    {/* Email Address */}
+                    <div className="sm:col-span-2">
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                        Email Address <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="email"
+                          required
+                          placeholder="e.g. rahul@example.com"
+                          value={newMemEmail}
+                          onChange={(e) => setNewMemEmail(e.target.value)}
+                          className="w-full h-10 px-3.5 bg-white dark:bg-[#151c2e] border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-white placeholder-slate-400 outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition font-medium"
+                        />
+                      </div>
+                      <div className="p-2.5 mt-2 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-900/40 flex items-start gap-2 text-[11px] text-emerald-800 dark:text-emerald-300">
+                        <Info className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                        <span>
+                          An official email validation & password setup link will be dispatched automatically. The member can click the link to set their password, or directly log in using Google Authentication with this email.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Section 2: Address & Location ── */}
+                <div className="p-4 sm:p-5 bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      <MapPin className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      <span>2. Address & Location (Pincode Auto-Fill)</span>
+                    </div>
+                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200/60 dark:border-emerald-800/60">
+                      Auto-fills District & State
+                    </span>
+                  </div>
+
+                  <AddressFormFields
+                    value={{ fullAddress: newMemAddress }}
+                    selectedVillageId={newMemVillage}
+                    onVillageSelect={(vId) => setNewMemVillage(vId)}
+                    onChange={(d: AddressData) => {
+                      setNewMemAddress(d.fullAddress || '');
+                      if (d.state) setNewMemState(d.state);
+                      if (d.district) setNewMemDistrict(d.district);
+                      if (d.villageId) setNewMemVillage(d.villageId);
+                    }}
+                    lang="en"
+                  />
+                </div>
+
+                {/* ── Section 3: Organization & Role ── */}
+                <div className="p-4 sm:p-5 bg-slate-50/70 dark:bg-slate-900/40 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 space-y-3.5">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                    <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>3. Organization & Chapter Assignment</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                        Platform Authority Role
+                      </label>
+                      <select
+                        value={newMemRole}
+                        onChange={(e) => setNewMemRole(e.target.value as any)}
+                        className="w-full h-10 px-3.5 bg-white dark:bg-[#151c2e] border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-white font-bold cursor-pointer outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition"
+                      >
+                        <option value="MEMBER">Member (Citizen)</option>
+                        <option value="ADMIN">Village Admin</option>
+                        <option value="SUPER_ADMIN">Super Administrator</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                        Assigned Chapter
+                      </label>
+                      <select
+                        value={newMemVillage}
+                        onChange={(e) => setNewMemVillage(e.target.value)}
+                        className="w-full h-10 px-3.5 bg-white dark:bg-[#151c2e] border border-slate-200 dark:border-slate-700/80 rounded-xl text-xs text-slate-900 dark:text-white font-bold cursor-pointer outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-500 transition"
+                      >
+                        {villages.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.name} {v.nameHindi ? `(${v.nameHindi})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-tight">
+                    * The assigned chapter determines which village unit oversees this member and prints on their Digital ID Card.
+                  </p>
+                </div>
+              </form>
+            </div>
+
+            {/* 3. Modal Sticky Action Footer */}
+            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddMemberOpen(false);
+                  setNewInviteLink(null);
+                  setNewMemMsg('');
+                }}
+                className="px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="add-member-form"
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl cursor-pointer shadow-md shadow-emerald-600/20 transition flex items-center gap-2"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Send Invitation & Save</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

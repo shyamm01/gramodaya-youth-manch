@@ -101,11 +101,17 @@ interface AppContextType {
           mobile: string;
           email?: string;
           password?: string;
+          role?: string;
+          systemRole?: string;
+          status?: string;
           photoUrl?: string;
           fatherName?: string;
           dob?: string;
           gender?: string;
           address?: string;
+          pincode?: string;
+          state?: string;
+          district?: string;
           villageId?: string;
           occupation?: string;
           designation?: string;
@@ -113,12 +119,14 @@ interface AppContextType {
           bloodGroup?: string;
           organizationName?: string;
           joiningDate?: string;
+          adminName?: string;
+          adminMobile?: string;
         },
     mobile?: string,
     photoUrl?: string,
     joiningDate?: string,
     organizationName?: string
-  ) => Promise<{ success: boolean; member?: Member; alreadyRegistered?: boolean; error?: string }>;
+  ) => Promise<{ success: boolean; member?: Member; inviteLink?: string | null; alreadyRegistered?: boolean; error?: string }>;
   approveMember: (id: string) => Promise<void>;
   updateMember: (id: string, updates: Partial<Member>) => Promise<{ success: boolean; error?: string }>;
   deleteMember: (id: string) => Promise<void>;
@@ -964,11 +972,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       | {
           name: string;
           mobile: string;
+          email?: string;
+          password?: string;
+          role?: string;
+          systemRole?: string;
+          status?: string;
           photoUrl?: string;
           fatherName?: string;
           dob?: string;
           gender?: string;
           address?: string;
+          pincode?: string;
+          state?: string;
+          district?: string;
           villageId?: string;
           occupation?: string;
           designation?: string;
@@ -976,6 +992,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           bloodGroup?: string;
           organizationName?: string;
           joiningDate?: string;
+          adminName?: string;
+          adminMobile?: string;
         },
     posMobile?: string,
     posPhotoUrl?: string,
@@ -986,8 +1004,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const payload =
         typeof nameOrData === 'object'
           ? {
-              ...nameOrData,
               status: authSession.isAdminLoggedIn ? 'active' : 'pending',
+              role: 'MEMBER',
+              systemRole: 'MEMBER',
+              ...nameOrData,
               createdAt: nameOrData.joiningDate
                 ? new Date(nameOrData.joiningDate).toISOString()
                 : new Date().toISOString(),
@@ -998,6 +1018,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               photoUrl: posPhotoUrl,
               organizationName: posOrganizationName || villageSettings.orgNameHindi || 'ग्रामोदय यूथ मंच',
               status: authSession.isAdminLoggedIn ? 'active' : 'pending',
+              role: 'MEMBER',
+              systemRole: 'MEMBER',
               createdAt: posJoiningDate ? new Date(posJoiningDate).toISOString() : new Date().toISOString(),
             };
 
@@ -1016,7 +1038,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       }
       await refreshData(true);
-      return { success: true, member: data.member };
+      return { success: true, member: data.member, inviteLink: data.inviteLink || null };
     } catch (e) {
       return { success: false, error: 'सर्वर से कनेक्ट करने में त्रुटि हुई।' };
     }
