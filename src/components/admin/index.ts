@@ -24,5 +24,6 @@ export * from './sections/AdminHelpdeskSection';
 export * from './sections/AdminEducationSection';
 export * from './permissions/AdminPermissionsSection';
 export * from './modules/AdminModulesSection';
+export * from './roles/AdminRolesSection';
 
 export * from './section-ui';

@@ -2,114 +2,81 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Layers,
+  KeyRound,
   Search,
   Plus,
   Edit2,
   Trash2,
-  ExternalLink,
   Shield,
   CheckCircle,
   XCircle,
-  ToggleLeft,
-  ToggleRight,
   RefreshCw,
   Sparkles,
   AlertTriangle,
-  Database,
-  KeyRound,
-  Info,
-  Users,
-  FileText,
-  HeartHandshake,
-  Calendar,
-  Image as ImageIcon,
-  Volume2,
-  BookOpen,
-  MessageSquare,
-  Activity,
-  Award,
+  Crown,
+  Lock,
   Globe,
-  Settings,
+  Sliders,
+  Users,
+  Check,
 } from 'lucide-react';
 import { useApp } from '@/src/context/AppContext';
 import { useRouter } from 'next/navigation';
-import { isSuperAdmin as checkIsSuperAdmin } from '@/src/lib/permissions';
+import { SYSTEM_MODULES, ALL_SYSTEM_PERMISSIONS, isSuperAdmin as checkIsSuperAdmin } from '@/src/lib/permissions';
 
-export interface DbModule {
-  id: number;
-  slug: string;
+export interface RoleItem {
+  id: string | number;
+  code: string;
   name: string;
   nameHindi: string;
-  icon?: string;
-  description?: string;
-  displayOrder?: number;
-  isActive: boolean;
-  permissionsCount?: number;
-  permissions?: any[];
+  description: string;
+  scope: 'GLOBAL' | 'VILLAGE';
+  isSystem: boolean;
+  permissions: string[];
+  permissionsCount: number;
+  membersCount?: number;
   createdAt?: string;
   updatedAt?: string;
 }
 
-const ICON_MAP: Record<string, any> = {
-  village: Globe,
-  members: Users,
-  complaints: FileText,
-  social_works: HeartHandshake,
-  events: Calendar,
-  gallery: ImageIcon,
-  announcements: Volume2,
-  public_info: Info,
-  elders: Award,
-  education: BookOpen,
-  chat: MessageSquare,
-  audit: Activity,
-  settings: Settings,
-  Globe,
-  Users,
-  FileText,
-  HeartHandshake,
-  Calendar,
-  ImageIcon,
-  Volume2,
-  Info,
-  Award,
-  BookOpen,
-  MessageSquare,
-  Activity,
-  Settings,
-  Layers,
-  Shield,
-  Database,
-};
-
-const ROUTE_MAP: Record<string, string> = {
-  village: '/admin/villages',
-  members: '/admin/members',
-  complaints: '/admin/problems',
-  social_works: '/admin/social-work',
-  events: '/admin/events',
-  gallery: '/admin/gallery',
-  announcements: '/admin/announcements',
-  public_info: '/admin/announcements',
-  elders: '/admin/elders',
-  education: '/admin/education',
-  chat: '/live-chat',
-  audit: '/admin/audit',
-  settings: '/admin/settings',
+const ROLE_COLORS: Record<string, { bg: string; text: string; border: string; icon: any }> = {
+  SUPER_ADMIN: {
+    bg: 'bg-purple-50 dark:bg-purple-950/60',
+    text: 'text-purple-700 dark:text-purple-300',
+    border: 'border-purple-200 dark:border-purple-800',
+    icon: Crown,
+  },
+  ADMIN: {
+    bg: 'bg-blue-50 dark:bg-blue-950/60',
+    text: 'text-blue-700 dark:text-blue-300',
+    border: 'border-blue-200 dark:border-blue-800',
+    icon: Shield,
+  },
+  VOLUNTEER: {
+    bg: 'bg-emerald-50 dark:bg-emerald-950/60',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    border: 'border-emerald-200 dark:border-emerald-800',
+    icon: Users,
+  },
+  MEMBER: {
+    bg: 'bg-slate-100 dark:bg-slate-800',
+    text: 'text-slate-700 dark:text-slate-300',
+    border: 'border-slate-200 dark:border-slate-700',
+    icon: KeyRound,
+  },
 };
 
 // Global in-memory cache and promise deduplicator
-let cachedModules: DbModule[] | null = null;
-let inFlightModulesPromise: Promise<DbModule[]> | null = null;
+let cachedRoles: RoleItem[] | null = null;
+let inFlightRolesPromise: Promise<RoleItem[]> | null = null;
 
-export const clearModulesCache = () => {
-  cachedModules = null;
-  inFlightModulesPromise = null;
+export const clearRolesCache = () => {
+  cachedRoles = null;
+  inFlightRolesPromise = null;
 };
 
-export const AdminModulesSection: React.FC = () => {
-  const { authSession, lang } = useApp();
+export const AdminRolesSection: React.FC = () => {
+  const { authSession, lang, members } = useApp();
   const router = useRouter();
 
   const isSuper = Boolean(
@@ -119,29 +86,27 @@ export const AdminModulesSection: React.FC = () => {
     authSession.adminMobile === '9506072678'
   );
 
-  const [modules, setModules] = useState<DbModule[]>(() => cachedModules || []);
-  const [loading, setLoading] = useState<boolean>(!cachedModules);
-  const [sourceInfo, setSourceInfo] = useState<string>('database');
+  const [roles, setRoles] = useState<RoleItem[]>(() => cachedRoles || []);
+  const [loading, setLoading] = useState<boolean>(!cachedRoles);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [scopeFilter, setScopeFilter] = useState<'all' | 'GLOBAL' | 'VILLAGE'>('all');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
-  const [editingModule, setEditingModule] = useState<DbModule | null>(null);
-  const [deletingModule, setDeletingModule] = useState<DbModule | null>(null);
-  const [inspectingModule, setInspectingModule] = useState<DbModule | null>(null);
+  const [editingRole, setEditingRole] = useState<RoleItem | null>(null);
+  const [deletingRole, setDeletingRole] = useState<RoleItem | null>(null);
+  const [inspectingRole, setInspectingRole] = useState<RoleItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // Form State
   const [formData, setFormData] = useState({
-    slug: '',
+    code: '',
     name: '',
     nameHindi: '',
-    icon: 'Layers',
     description: '',
-    displayOrder: 1,
-    isActive: true,
+    scope: 'VILLAGE' as 'GLOBAL' | 'VILLAGE',
+    permissions: [] as string[],
   });
 
   const showToast = (msg: string) => {
@@ -149,116 +114,114 @@ export const AdminModulesSection: React.FC = () => {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Fetch modules from API / Database with de-duplication & caching
-  const fetchModules = async (forceRefresh = false) => {
-    if (!forceRefresh && cachedModules) {
-      setModules(cachedModules);
+  // Fetch Roles from Database API with de-duplication & caching
+  const fetchRoles = async (forceRefresh = false) => {
+    if (!forceRefresh && cachedRoles) {
+      setRoles(cachedRoles);
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      if (!inFlightModulesPromise || forceRefresh) {
-        inFlightModulesPromise = fetch('/api/modules')
+      if (!inFlightRolesPromise || forceRefresh) {
+        inFlightRolesPromise = fetch('/api/roles')
           .then((res) => res.json())
           .then((data) => {
-            if (data.success && Array.isArray(data.modules)) {
-              cachedModules = data.modules;
-              return data.modules;
+            if (data.success && Array.isArray(data.roles)) {
+              cachedRoles = data.roles;
+              return data.roles;
             }
             return [];
           })
           .finally(() => {
-            inFlightModulesPromise = null;
+            inFlightRolesPromise = null;
           });
       }
 
-      const result = await inFlightModulesPromise;
+      const result = await inFlightRolesPromise;
       if (result && Array.isArray(result) && result.length > 0) {
-        setModules(result);
+        setRoles(result);
       }
     } catch (err: any) {
-      console.error('Failed to fetch modules:', err);
-      showToast('Error loading modules from database.');
+      console.error('Failed to fetch roles:', err);
+      showToast('Error loading roles from database.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchModules();
+    fetchRoles();
   }, []);
 
-  // Filter modules
-  const filteredModules = useMemo(() => {
-    return modules.filter((m) => {
-      const matchesSearch =
-        m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.nameHindi.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        m.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (m.description || '').toLowerCase().includes(searchQuery.toLowerCase());
-
-      const matchesStatus =
-        statusFilter === 'all' ||
-        (statusFilter === 'active' && m.isActive) ||
-        (statusFilter === 'inactive' && !m.isActive);
-
-      return matchesSearch && matchesStatus;
-    });
-  }, [modules, searchQuery, statusFilter]);
-
-  // Handle Toggle Active Status
-  const handleToggleStatus = async (mod: DbModule) => {
-    try {
-      const updatedStatus = !mod.isActive;
-      const res = await fetch(`/api/modules/${mod.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: updatedStatus }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setModules((prev) =>
-          prev.map((item) => (item.id === mod.id ? { ...item, isActive: updatedStatus } : item))
-        );
-        showToast(`Module '${mod.name}' is now ${updatedStatus ? 'ACTIVE' : 'INACTIVE'}`);
-      } else {
-        showToast(`Failed: ${data.error}`);
-      }
-    } catch (err: any) {
-      showToast(`Error: ${err?.message || 'Failed to update'}`);
-    }
+  // Compute members with each role
+  const getMemberCountForRole = (roleCode: string) => {
+    return members.filter((m) => {
+      if (roleCode === 'SUPER_ADMIN') return m.systemRole === 'SUPER_ADMIN' || m.role === 'SUPER_ADMIN';
+      if (roleCode === 'ADMIN') return m.systemRole === 'ADMIN' || m.role === 'ADMIN';
+      if (roleCode === 'VOLUNTEER') return (m.systemRole as string) === 'VOLUNTEER' || (m.role as any) === 'VOLUNTEER';
+      return m.systemRole === 'MEMBER' || m.role === 'MEMBER' || !m.role;
+    }).length;
   };
 
-  // Handle Create Module (POST)
+  // Filter roles
+  const filteredRoles = useMemo(() => {
+    return roles.filter((r) => {
+      const matchesSearch =
+        r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.nameHindi.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (r.description || '').toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesScope = scopeFilter === 'all' || r.scope === scopeFilter;
+
+      return matchesSearch && matchesScope;
+    });
+  }, [roles, searchQuery, scopeFilter]);
+
+  // Handle Toggle Permission in Form
+  const togglePermissionInForm = (permCode: string) => {
+    setFormData((prev) => {
+      const exists = prev.permissions.includes(permCode);
+      const nextPerms = exists
+        ? prev.permissions.filter((p) => p !== permCode)
+        : [...prev.permissions, permCode];
+      return { ...prev, permissions: nextPerms };
+    });
+  };
+
+  // Handle Select All Permissions for Module in Form
+  const toggleModulePermissionsInForm = (moduleSlug: string) => {
+    const modPerms = ALL_SYSTEM_PERMISSIONS.filter((p) => p.module === moduleSlug).map((p) => p.code as string);
+    setFormData((prev) => {
+      const hasAll = modPerms.every((p) => prev.permissions.includes(p));
+      const nextPerms = hasAll
+        ? prev.permissions.filter((p) => !modPerms.includes(p))
+        : Array.from(new Set([...prev.permissions, ...modPerms]));
+      return { ...prev, permissions: nextPerms };
+    });
+  };
+
+  // Handle Create Role (POST)
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.slug || !formData.nameHindi) {
+    if (!formData.name || !formData.code || !formData.nameHindi) {
       showToast('Please fill all required fields.');
       return;
     }
     try {
       setIsSubmitting(true);
-      const res = await fetch('/api/modules', {
+      const res = await fetch('/api/roles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`✅ Module '${formData.name}' created successfully!`);
+        showToast(`✅ Role '${formData.name}' created successfully!`);
         setIsAddModalOpen(false);
-        setFormData({
-          slug: '',
-          name: '',
-          nameHindi: '',
-          icon: 'Layers',
-          description: '',
-          displayOrder: modules.length + 1,
-          isActive: true,
-        });
-        fetchModules();
+        fetchRoles();
       } else {
         showToast(`❌ Error: ${data.error}`);
       }
@@ -269,29 +232,28 @@ export const AdminModulesSection: React.FC = () => {
     }
   };
 
-  // Handle Edit Module (PUT)
+  // Handle Edit Role (PUT)
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingModule) return;
+    if (!editingRole) return;
     try {
       setIsSubmitting(true);
-      const res = await fetch(`/api/modules/${editingModule.id}`, {
+      const res = await fetch(`/api/roles/${editingRole.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formData.name,
           nameHindi: formData.nameHindi,
-          icon: formData.icon,
           description: formData.description,
-          displayOrder: formData.displayOrder,
-          isActive: formData.isActive,
+          scope: formData.scope,
+          permissions: formData.permissions,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`✅ Module '${formData.name}' updated successfully!`);
-        setEditingModule(null);
-        fetchModules();
+        showToast(`✅ Role '${formData.name}' updated successfully!`);
+        setEditingRole(null);
+        fetchRoles();
       } else {
         showToast(`❌ Error: ${data.error}`);
       }
@@ -302,19 +264,19 @@ export const AdminModulesSection: React.FC = () => {
     }
   };
 
-  // Handle Delete Module (DELETE)
+  // Handle Delete Role (DELETE)
   const handleDeleteConfirm = async () => {
-    if (!deletingModule) return;
+    if (!deletingRole) return;
     try {
       setIsSubmitting(true);
-      const res = await fetch(`/api/modules/${deletingModule.id}`, {
+      const res = await fetch(`/api/roles/${deletingRole.id}`, {
         method: 'DELETE',
       });
       const data = await res.json();
       if (data.success) {
-        showToast(`✅ Module '${deletingModule.name}' deleted.`);
-        setDeletingModule(null);
-        fetchModules();
+        showToast(`✅ Role '${deletingRole.name}' deleted.`);
+        setDeletingRole(null);
+        fetchRoles();
       } else {
         showToast(`❌ Error: ${data.error}`);
       }
@@ -325,35 +287,33 @@ export const AdminModulesSection: React.FC = () => {
     }
   };
 
-  const openEditModal = (mod: DbModule) => {
-    setEditingModule(mod);
+  const openEditModal = (role: RoleItem) => {
+    setEditingRole(role);
     setFormData({
-      slug: mod.slug,
-      name: mod.name,
-      nameHindi: mod.nameHindi,
-      icon: mod.icon || 'Layers',
-      description: mod.description || '',
-      displayOrder: mod.displayOrder || 1,
-      isActive: mod.isActive,
+      code: role.code,
+      name: role.name,
+      nameHindi: role.nameHindi,
+      description: role.description || '',
+      scope: role.scope,
+      permissions: role.permissions || [],
     });
   };
 
   const openAddModal = () => {
     setFormData({
-      slug: '',
+      code: '',
       name: '',
       nameHindi: '',
-      icon: 'Layers',
       description: '',
-      displayOrder: modules.length + 1,
-      isActive: true,
+      scope: 'VILLAGE',
+      permissions: [],
     });
     setIsAddModalOpen(true);
   };
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Toast Alert */}
+      {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 px-5 py-3 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold text-xs shadow-2xl animate-fade-in flex items-center gap-2 border border-slate-700">
           <Sparkles className="w-4 h-4 text-purple-400 dark:text-purple-600" />
@@ -361,30 +321,30 @@ export const AdminModulesSection: React.FC = () => {
         </div>
       )}
 
-      {/* ── 1. MODULES HEADER ── */}
+      {/* ── 1. ROLES HEADER ── */}
       <div className="bg-white dark:bg-[#111726] border border-[#E4DFD5] dark:border-slate-800/80 rounded-3xl p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-              <Layers className="w-5 h-5 text-purple-600" />
-              <span>System Modules</span>
+              <KeyRound className="w-5 h-5 text-purple-600" />
+              <span>System Roles & Authority Profiles</span>
             </h1>
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-              {modules.length} Total
+              {roles.length} Roles
             </span>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
               ● Live DB
             </span>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Dynamic database list of all system modules with complete CRUD controls and capability rules.
+            Dynamic database list of system authority levels, RBAC scope boundaries, and default module capabilities.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
           <button
             type="button"
-            onClick={() => fetchModules(true)}
+            onClick={() => fetchRoles(true)}
             disabled={loading}
             title="Refresh database records"
             className="p-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition cursor-pointer"
@@ -399,19 +359,19 @@ export const AdminModulesSection: React.FC = () => {
               className="px-4 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-xs flex items-center gap-2 cursor-pointer active:scale-95"
             >
               <Plus className="w-4 h-4" />
-              <span>Add Module</span>
+              <span>Add Custom Role</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* ── 2. SEARCH & FILTER BAR ── */}
+      {/* ── 2. SEARCH & SCOPE FILTERS ── */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="text"
-            placeholder="Search modules by name or slug..."
+            placeholder="Search roles by title, code, or description..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white dark:bg-[#111726] border border-[#E4DFD5] dark:border-slate-800/80 text-xs font-medium text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
@@ -419,34 +379,38 @@ export const AdminModulesSection: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-1.5 w-full sm:w-auto">
-          {(['all', 'active', 'inactive'] as const).map((st) => (
+          {[
+            { id: 'all', label: 'All Roles' },
+            { id: 'GLOBAL', label: 'Global Authority' },
+            { id: 'VILLAGE', label: 'Village Scope' },
+          ].map((sc) => (
             <button
-              key={st}
-              onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition capitalize cursor-pointer ${
-                statusFilter === st
+              key={sc.id}
+              onClick={() => setScopeFilter(sc.id as any)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                scopeFilter === sc.id
                   ? 'bg-purple-600 text-white shadow-xs'
                   : 'bg-white dark:bg-[#111726] text-slate-600 dark:text-slate-400 border border-[#E4DFD5] dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
               }`}
             >
-              {st}
+              {sc.label}
             </button>
           ))}
         </div>
       </div>
 
-      {/* ── 3. DYNAMIC MODULES LIST TABLE ── */}
+      {/* ── 3. DYNAMIC ROLES LIST TABLE ── */}
       <div className="bg-white dark:bg-[#111726] border border-[#E4DFD5] dark:border-slate-800/80 rounded-3xl overflow-hidden shadow-xs">
         {loading ? (
           <div className="p-12 text-center text-slate-400 space-y-3">
             <RefreshCw className="w-8 h-8 mx-auto animate-spin text-purple-600" />
-            <p className="text-xs font-medium">Fetching modules from database...</p>
+            <p className="text-xs font-medium">Fetching roles from database...</p>
           </div>
-        ) : filteredModules.length === 0 ? (
+        ) : filteredRoles.length === 0 ? (
           <div className="p-12 text-center text-slate-400 space-y-2">
-            <Layers className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
-            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No modules found</p>
-            <p className="text-xs">Try adjusting your search criteria or add a new module.</p>
+            <KeyRound className="w-8 h-8 mx-auto text-slate-300 dark:text-slate-600" />
+            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">No roles found</p>
+            <p className="text-xs">Try adjusting your search criteria or add a custom role preset.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -454,122 +418,115 @@ export const AdminModulesSection: React.FC = () => {
               <thead className="bg-slate-50 dark:bg-slate-900/60 text-slate-500 uppercase tracking-wider font-mono text-[10px] border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-3.5 px-4 w-12 text-center">#</th>
-                  <th className="py-3.5 px-4">Module Name</th>
-                  <th className="py-3.5 px-4">Slug / Key</th>
+                  <th className="py-3.5 px-4">Role Profile</th>
+                  <th className="py-3.5 px-4">Code / Identifier</th>
+                  <th className="py-3.5 px-4">Scope</th>
                   <th className="py-3.5 px-4">Description</th>
                   <th className="py-3.5 px-4 text-center">Capabilities</th>
-                  <th className="py-3.5 px-4 text-center">Status</th>
+                  <th className="py-3.5 px-4 text-center">Assigned Users</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
-                {filteredModules.map((mod, index) => {
-                  const Icon = ICON_MAP[mod.slug] || ICON_MAP[mod.icon || 'Layers'] || Layers;
-                  const operationalRoute = ROUTE_MAP[mod.slug];
+                {filteredRoles.map((role, index) => {
+                  const style = ROLE_COLORS[role.code] || {
+                    bg: 'bg-indigo-50 dark:bg-indigo-950/60',
+                    text: 'text-indigo-700 dark:text-indigo-300',
+                    border: 'border-indigo-200 dark:border-indigo-800',
+                    icon: KeyRound,
+                  };
+                  const Icon = style.icon;
+                  const membersCount = getMemberCountForRole(role.code);
 
                   return (
                     <tr
-                      key={mod.id || mod.slug}
+                      key={role.id || role.code}
                       className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition group"
                     >
-                      {/* Order Number */}
+                      {/* Order */}
                       <td className="py-4 px-4 text-center font-mono text-slate-400 text-[11px]">
-                        {mod.displayOrder || index + 1}
+                        {index + 1}
                       </td>
 
                       {/* Name & Icon */}
                       <td className="py-4 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800/80 flex items-center justify-center text-purple-600 dark:text-purple-400 flex-shrink-0">
+                          <div className={`w-9 h-9 rounded-xl ${style.bg} border ${style.border} flex items-center justify-center ${style.text} flex-shrink-0`}>
                             <Icon className="w-4 h-4" />
                           </div>
                           <div>
-                            <div className="font-bold text-slate-900 dark:text-white text-xs">
-                              {mod.name}
+                            <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
+                              <span>{role.name}</span>
+                              {role.isSystem && (
+                                <span className="px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500 font-mono text-[9px] font-bold">
+                                  CORE
+                                </span>
+                              )}
                             </div>
                             <div className="text-[10px] text-slate-400">
-                              {mod.nameHindi}
+                              {role.nameHindi}
                             </div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Slug / Code */}
+                      {/* Code */}
                       <td className="py-4 px-4 font-mono">
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-bold">
-                          mod:{mod.slug}
+                        <span className={`px-2 py-0.5 rounded-md ${style.bg} ${style.text} border ${style.border} text-[11px] font-bold`}>
+                          {role.code}
+                        </span>
+                      </td>
+
+                      {/* Scope */}
+                      <td className="py-4 px-4">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                          {role.scope}
                         </span>
                       </td>
 
                       {/* Description */}
                       <td className="py-4 px-4 max-w-xs">
-                        <p className="text-slate-600 dark:text-slate-400 text-[11px] truncate" title={mod.description || ''}>
-                          {mod.description || '—'}
+                        <p className="text-slate-600 dark:text-slate-400 text-[11px] truncate" title={role.description}>
+                          {role.description || '—'}
                         </p>
                       </td>
 
-                      {/* Permissions / Capabilities Count */}
+                      {/* Capabilities Count */}
                       <td className="py-4 px-4 text-center">
                         <button
                           type="button"
-                          onClick={() => setInspectingModule(mod)}
+                          onClick={() => setInspectingRole(role)}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 text-[10px] font-mono font-bold border border-purple-200 dark:border-purple-800 hover:bg-purple-100 transition cursor-pointer"
                         >
                           <Shield className="w-3 h-3" />
-                          <span>{mod.permissionsCount || mod.permissions?.length || 0} Actions</span>
+                          <span>{role.permissionsCount || role.permissions?.length || 0} Actions</span>
                         </button>
                       </td>
 
-                      {/* Status Toggle */}
+                      {/* Active Members */}
                       <td className="py-4 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleStatus(mod)}
-                          className="inline-flex items-center gap-1.5 transition cursor-pointer"
-                          title={mod.isActive ? 'Active (Click to disable)' : 'Inactive (Click to enable)'}
-                        >
-                          {mod.isActive ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                              <CheckCircle className="w-3 h-3 text-emerald-500" />
-                              <span>Active</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 border border-slate-200 dark:border-slate-700">
-                              <XCircle className="w-3 h-3 text-slate-400" />
-                              <span>Inactive</span>
-                            </span>
-                          )}
-                        </button>
+                        <span className="px-2 py-0.5 rounded-md bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-mono text-[11px] font-bold">
+                          {membersCount} users
+                        </span>
                       </td>
 
-                      {/* CRUD Actions */}
+                      {/* Actions */}
                       <td className="py-4 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {operationalRoute && (
-                            <button
-                              type="button"
-                              onClick={() => router.push(operationalRoute)}
-                              title="Open Operational View"
-                              className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-purple-600 dark:hover:text-purple-400 transition cursor-pointer"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-
                           <button
                             type="button"
-                            onClick={() => openEditModal(mod)}
-                            title="Edit Module"
+                            onClick={() => openEditModal(role)}
+                            title="Edit Role Details & Permissions"
                             className="p-1.5 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-950/50 text-slate-500 hover:text-purple-600 dark:hover:text-purple-400 transition cursor-pointer"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
 
-                          {isSuper && (
+                          {!role.isSystem && isSuper && (
                             <button
                               type="button"
-                              onClick={() => setDeletingModule(mod)}
-                              title="Delete Module"
+                              onClick={() => setDeletingRole(role)}
+                              title="Delete Custom Role"
                               className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/50 text-slate-400 hover:text-rose-600 transition cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -586,10 +543,10 @@ export const AdminModulesSection: React.FC = () => {
         )}
       </div>
 
-      {/* ── 4. CREATE MODULE MODAL ── */}
+      {/* ── 4. CREATE ROLE MODAL ── */}
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-5 shadow-2xl animate-fade-in">
+          <div className="bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-2xl w-full max-h-[92vh] overflow-y-auto space-y-5 shadow-2xl animate-fade-in">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 flex items-center justify-center text-purple-600">
@@ -597,10 +554,10 @@ export const AdminModulesSection: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    Register New Module
+                    Create Custom Role
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Add a dynamic module definition into database
+                    Define a custom authority preset and assign granular module permissions
                   </p>
                 </div>
               </div>
@@ -617,12 +574,12 @@ export const AdminModulesSection: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    Name (English) *
+                    Role Name (English) *
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Health Camps"
+                    placeholder="e.g. Health Officer"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#181f33] border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
@@ -630,12 +587,12 @@ export const AdminModulesSection: React.FC = () => {
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    Name (Hindi) *
+                    Role Name (Hindi) *
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. स्वास्थ्य शिविर"
+                    placeholder="e.g. स्वास्थ्य अधिकारी"
                     value={formData.nameHindi}
                     onChange={(e) => setFormData({ ...formData, nameHindi: e.target.value })}
                     className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#181f33] border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
@@ -646,27 +603,29 @@ export const AdminModulesSection: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    Slug / Identifier *
+                    Role Code / Key *
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. health_camps"
-                    value={formData.slug}
-                    onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+                    placeholder="e.g. HEALTH_OFFICER"
+                    value={formData.code}
+                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                     className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#181f33] border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-mono text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    Display Order
+                    Scope Authority
                   </label>
-                  <input
-                    type="number"
-                    value={formData.displayOrder}
-                    onChange={(e) => setFormData({ ...formData, displayOrder: Number(e.target.value) })}
+                  <select
+                    value={formData.scope}
+                    onChange={(e) => setFormData({ ...formData, scope: e.target.value as any })}
                     className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#181f33] border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
-                  />
+                  >
+                    <option value="VILLAGE">Village Scope (Chapter specific)</option>
+                    <option value="GLOBAL">Global Authority (All villages)</option>
+                  </select>
                 </div>
               </div>
 
@@ -676,24 +635,80 @@ export const AdminModulesSection: React.FC = () => {
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="Summary of module purpose and scope..."
+                  placeholder="Outline responsibilities and operational authority for this role..."
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#181f33] border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
                 />
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="create_is_active"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
-                />
-                <label htmlFor="create_is_active" className="text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
-                  Activate module in runtime immediately
-                </label>
+              {/* Granular Permissions Checklist */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Shield className="w-4 h-4 text-purple-600" />
+                    <span>Assign Module Capabilities ({formData.permissions.length} Selected)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allCodes = ALL_SYSTEM_PERMISSIONS.map((p) => p.code);
+                      setFormData((prev) => ({
+                        ...prev,
+                        permissions: prev.permissions.length === allCodes.length ? [] : allCodes,
+                      }));
+                    }}
+                    className="text-[11px] font-bold text-purple-600 hover:underline cursor-pointer"
+                  >
+                    {formData.permissions.length === ALL_SYSTEM_PERMISSIONS.length ? 'Clear All' : 'Select All'}
+                  </button>
+                </div>
+
+                <div className="max-h-60 overflow-y-auto space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800 p-3">
+                  {SYSTEM_MODULES.map((mod) => {
+                    const modPerms = ALL_SYSTEM_PERMISSIONS.filter((p) => p.module === mod.id);
+                    const selectedCount = modPerms.filter((p) => formData.permissions.includes(p.code)).length;
+
+                    return (
+                      <div key={mod.id} className="bg-slate-50 dark:bg-slate-900/60 rounded-xl p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-slate-800 dark:text-slate-200">
+                            {mod.nameEnglish} ({mod.nameHindi})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleModulePermissionsInForm(mod.id)}
+                            className="text-[10px] font-mono font-bold text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+                          >
+                            {selectedCount === modPerms.length ? 'Deselect Module' : 'Select All Module'}
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          {modPerms.map((p) => {
+                            const isChecked = formData.permissions.includes(p.code);
+                            return (
+                              <label
+                                key={p.code}
+                                className={`flex items-center gap-2 p-1.5 rounded-lg text-[11px] transition cursor-pointer ${
+                                  isChecked ? 'bg-purple-100/70 dark:bg-purple-950/70 font-bold text-purple-900 dark:text-purple-200' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => togglePermissionInForm(p.code)}
+                                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                                />
+                                <span className="font-mono text-[10px]">{p.code.split(':')[1] || p.code}</span>
+                                <span className="text-[10px] text-slate-400 truncate">({p.name})</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
@@ -709,7 +724,7 @@ export const AdminModulesSection: React.FC = () => {
                   disabled={isSubmitting}
                   className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Saving...' : 'Create Module'}
+                  {isSubmitting ? 'Saving...' : 'Create Role'}
                 </button>
               </div>
             </form>
@@ -717,10 +732,10 @@ export const AdminModulesSection: React.FC = () => {
         </div>
       )}
 
-      {/* ── 5. EDIT MODULE MODAL ── */}
-      {editingModule && (
+      {/* ── 5. EDIT ROLE MODAL ── */}
+      {editingRole && (
         <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full space-y-5 shadow-2xl animate-fade-in">
+          <div className="bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-2xl w-full max-h-[92vh] overflow-y-auto space-y-5 shadow-2xl animate-fade-in">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
               <div className="flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 flex items-center justify-center text-purple-600">
@@ -728,16 +743,16 @@ export const AdminModulesSection: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    Edit Module
+                    Edit Role: {editingRole.name}
                   </h3>
                   <p className="text-[11px] text-slate-400 font-mono">
-                    Slug: {editingModule.slug}
+                    Code: {editingRole.code} {editingRole.isSystem && '· (System Core Role)'}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
-                onClick={() => setEditingModule(null)}
+                onClick={() => setEditingRole(null)}
                 className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white"
               >
                 ✕
@@ -748,7 +763,7 @@ export const AdminModulesSection: React.FC = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    Name (English) *
+                    Role Name (English) *
                   </label>
                   <input
                     type="text"
@@ -760,7 +775,7 @@ export const AdminModulesSection: React.FC = () => {
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                    Name (Hindi) *
+                    Role Name (Hindi) *
                   </label>
                   <input
                     type="text"
@@ -774,14 +789,16 @@ export const AdminModulesSection: React.FC = () => {
 
               <div>
                 <label className="text-[11px] font-bold text-slate-600 dark:text-slate-400 block mb-1">
-                  Display Order
+                  Scope Authority
                 </label>
-                <input
-                  type="number"
-                  value={formData.displayOrder}
-                  onChange={(e) => setFormData({ ...formData, displayOrder: Number(e.target.value) })}
+                <select
+                  value={formData.scope}
+                  onChange={(e) => setFormData({ ...formData, scope: e.target.value as any })}
                   className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#181f33] border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
-                />
+                >
+                  <option value="VILLAGE">Village Scope (Chapter specific)</option>
+                  <option value="GLOBAL">Global Authority (All villages)</option>
+                </select>
               </div>
 
               <div>
@@ -789,30 +806,86 @@ export const AdminModulesSection: React.FC = () => {
                   Description
                 </label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full px-3.5 py-2 bg-slate-50 dark:bg-[#181f33] border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white"
                 />
               </div>
 
-              <div className="flex items-center gap-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="edit_is_active"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
-                />
-                <label htmlFor="edit_is_active" className="text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
-                  Module is active and enabled in navigation
-                </label>
+              {/* Granular Permissions Checklist */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Shield className="w-4 h-4 text-purple-600" />
+                    <span>Module Capabilities ({formData.permissions.length} Selected)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allCodes = ALL_SYSTEM_PERMISSIONS.map((p) => p.code);
+                      setFormData((prev) => ({
+                        ...prev,
+                        permissions: prev.permissions.length === allCodes.length ? [] : allCodes,
+                      }));
+                    }}
+                    className="text-[11px] font-bold text-purple-600 hover:underline cursor-pointer"
+                  >
+                    {formData.permissions.length === ALL_SYSTEM_PERMISSIONS.length ? 'Clear All' : 'Select All'}
+                  </button>
+                </div>
+
+                <div className="max-h-60 overflow-y-auto space-y-3 rounded-2xl border border-slate-200 dark:border-slate-800 p-3">
+                  {SYSTEM_MODULES.map((mod) => {
+                    const modPerms = ALL_SYSTEM_PERMISSIONS.filter((p) => p.module === mod.id);
+                    const selectedCount = modPerms.filter((p) => formData.permissions.includes(p.code)).length;
+
+                    return (
+                      <div key={mod.id} className="bg-slate-50 dark:bg-slate-900/60 rounded-xl p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-slate-800 dark:text-slate-200">
+                            {mod.nameEnglish} ({mod.nameHindi})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleModulePermissionsInForm(mod.id)}
+                            className="text-[10px] font-mono font-bold text-purple-600 dark:text-purple-400 hover:underline cursor-pointer"
+                          >
+                            {selectedCount === modPerms.length ? 'Deselect Module' : 'Select All Module'}
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                          {modPerms.map((p) => {
+                            const isChecked = formData.permissions.includes(p.code);
+                            return (
+                              <label
+                                key={p.code}
+                                className={`flex items-center gap-2 p-1.5 rounded-lg text-[11px] transition cursor-pointer ${
+                                  isChecked ? 'bg-purple-100/70 dark:bg-purple-950/70 font-bold text-purple-900 dark:text-purple-200' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-800'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => togglePermissionInForm(p.code)}
+                                  className="rounded border-slate-300 text-purple-600 focus:ring-purple-500"
+                                />
+                                <span className="font-mono text-[10px]">{p.code.split(':')[1] || p.code}</span>
+                                <span className="text-[10px] text-slate-400 truncate">({p.name})</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
-                  onClick={() => setEditingModule(null)}
+                  onClick={() => setEditingRole(null)}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 dark:hover:text-white cursor-pointer"
                 >
                   Cancel
@@ -830,8 +903,8 @@ export const AdminModulesSection: React.FC = () => {
         </div>
       )}
 
-      {/* ── 6. DELETE CONFIRMATION DIALOG ── */}
-      {deletingModule && (
+      {/* ── 6. DELETE ROLE MODAL ── */}
+      {deletingRole && (
         <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-[#111726] border border-rose-200 dark:border-rose-900/50 rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fade-in text-center">
             <div className="w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 text-rose-600 flex items-center justify-center mx-auto">
@@ -840,17 +913,17 @@ export const AdminModulesSection: React.FC = () => {
 
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                Delete Module?
+                Delete Role Preset?
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Are you sure you want to delete module <span className="font-bold text-slate-900 dark:text-white">'{deletingModule.name}'</span> ({deletingModule.slug})?
+                Are you sure you want to delete custom role <span className="font-bold text-slate-900 dark:text-white">'{deletingRole.name}'</span> ({deletingRole.code})?
               </p>
             </div>
 
             <div className="flex items-center justify-center gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setDeletingModule(null)}
+                onClick={() => setDeletingRole(null)}
                 className="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer"
               >
                 Cancel
@@ -868,8 +941,8 @@ export const AdminModulesSection: React.FC = () => {
         </div>
       )}
 
-      {/* ── 7. INSPECT PBAC CAPABILITIES MODAL ── */}
-      {inspectingModule && (
+      {/* ── 7. INSPECT ROLE PERMISSIONS MODAL ── */}
+      {inspectingRole && (
         <div className="fixed inset-0 bg-black/60 dark:bg-black/80 backdrop-blur-xs z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl animate-fade-in">
             <div className="flex items-start justify-between">
@@ -879,51 +952,62 @@ export const AdminModulesSection: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    {inspectingModule.name} Capabilities
+                    {inspectingRole.name} Capabilities
                   </h3>
                   <p className="text-xs text-slate-400 font-mono">
-                    mod:{inspectingModule.slug} · {inspectingModule.permissions?.length || 0} PBAC rules
+                    {inspectingRole.code} · {inspectingRole.permissions?.length || 0} Actions Granted
                   </p>
                 </div>
               </div>
 
               <button
                 type="button"
-                onClick={() => setInspectingModule(null)}
+                onClick={() => setInspectingRole(null)}
                 className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800/80 overflow-hidden">
-              {(inspectingModule.permissions && inspectingModule.permissions.length > 0) ? (
-                inspectingModule.permissions.map((p: any) => (
-                  <div key={p.code} className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                    <div>
-                      <div className="font-mono font-bold text-xs text-purple-600 dark:text-purple-400">
-                        {p.code}
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden divide-y divide-slate-100 dark:divide-slate-800">
+                {SYSTEM_MODULES.map((mod) => {
+                  const modPerms = ALL_SYSTEM_PERMISSIONS.filter(
+                    (p) => p.module === mod.id && inspectingRole.permissions?.includes(p.code)
+                  );
+
+                  if (modPerms.length === 0) return null;
+
+                  return (
+                    <div key={mod.id} className="p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-purple-700 dark:text-purple-300">
+                          {mod.nameEnglish}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {modPerms.length} permissions
+                        </span>
                       </div>
-                      <div className="text-[11px] text-slate-500">
-                        {p.nameEnglish} ({p.nameHindi})
+                      <div className="flex flex-wrap gap-1.5">
+                        {modPerms.map((p) => (
+                          <span
+                            key={p.code}
+                            className="px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/50 border border-purple-200 dark:border-purple-800 text-[10px] font-mono text-purple-800 dark:text-purple-200"
+                          >
+                            {p.code}
+                          </span>
+                        ))}
                       </div>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
-                      Rule
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <div className="p-6 text-center text-xs text-slate-400">
-                  No explicit PBAC rules attached to this custom module.
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
-                onClick={() => setInspectingModule(null)}
+                onClick={() => setInspectingRole(null)}
                 className="px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition cursor-pointer"
               >
                 Close
@@ -931,13 +1015,14 @@ export const AdminModulesSection: React.FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setInspectingModule(null);
-                  router.push('/admin/permissions');
+                  const r = inspectingRole;
+                  setInspectingRole(null);
+                  openEditModal(r);
                 }}
                 className="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition shadow-xs flex items-center gap-1.5 cursor-pointer"
               >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>Configure Access Matrix</span>
+                <Edit2 className="w-3.5 h-3.5" />
+                <span>Edit Permissions</span>
               </button>
             </div>
           </div>

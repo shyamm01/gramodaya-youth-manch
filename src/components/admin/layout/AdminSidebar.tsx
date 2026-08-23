@@ -239,22 +239,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
   const handleTabClick = (tabId: string) => {
     setActiveTab(tabId);
-    const basePath = '/admin';
-    let targetUrl = basePath;
-
-    if (tabId === 'permissions-modules' || tabId === 'modules') {
-      targetUrl = `${basePath}/modules`;
-    } else if (tabId === 'permissions-roles' || tabId === 'roles') {
-      targetUrl = `${basePath}/roles`;
-    } else if (tabId === 'audit' || tabId === 'security') {
-      targetUrl = `${basePath}/audit`;
-    } else if (tabId !== 'dashboard') {
-      targetUrl = `${basePath}/${tabId}`;
-    }
-
-    if (pathname !== targetUrl) {
-      router.push(targetUrl);
-    }
     if (mobileSidebarOpen) {
       setMobileSidebarOpen(false);
     }
