@@ -32,61 +32,61 @@ export interface ModuleDefinition {
 
 export const ALL_SYSTEM_PERMISSIONS: SystemPermissionDef[] = [
   // 1. Village Chapter Module
-  { code: 'village:manage', name: 'ग्राम प्रबंधन (Village Management)', module: 'village', description: 'Create and configure villages and locations' },
-  { code: 'village:settings:update', name: 'ग्राम सेटिंग्स संपादन', module: 'settings', description: 'Update village profile, branding and slogans' },
+  { code: 'village:manage', name: 'Village Governance & Structure', module: 'village', description: 'Create and configure villages and chapters' },
+  { code: 'village:settings:update', name: 'Village Settings & Branding', module: 'settings', description: 'Update village profile, branding and slogans' },
   
   // 2. Members Module
-  { code: 'members:view', name: 'सदस्य सूची देखना', module: 'members', description: 'View village member directory' },
-  { code: 'members:create', name: 'नया सदस्य जोड़ना', module: 'members', description: 'Register new village members' },
-  { code: 'members:approve', name: 'सदस्य अनुमोदन (Approve)', module: 'members', description: 'Approve pending member registrations' },
-  { code: 'members:update', name: 'सदस्य डेटा संपादन', module: 'members', description: 'Edit member profile and details' },
-  { code: 'members:delete', name: 'सदस्य निष्कासन', module: 'members', description: 'Remove or archive members' },
-  { code: 'members:roles:assign', name: 'भूमिका आवंटन (Role Assignment)', module: 'members', description: 'Assign village admin and moderator roles' },
+  { code: 'members:view', name: 'View Members Directory', module: 'members', description: 'View village member directory' },
+  { code: 'members:create', name: 'Register New Member', module: 'members', description: 'Register new village members' },
+  { code: 'members:approve', name: 'Approve Member Registrations', module: 'members', description: 'Approve pending member registrations' },
+  { code: 'members:update', name: 'Edit Member Details', module: 'members', description: 'Edit member profile and details' },
+  { code: 'members:delete', name: 'Remove / Archive Member', module: 'members', description: 'Remove or archive members' },
+  { code: 'members:roles:assign', name: 'Assign Member Roles', module: 'members', description: 'Assign village admin and moderator roles' },
   
   // 3. Complaints / Grievances Module
-  { code: 'complaints:view', name: 'समस्याएं देखना', module: 'complaints', description: 'View public and member grievances' },
-  { code: 'complaints:create', name: 'समस्या दर्ज करना', module: 'complaints', description: 'Submit a new complaint or issue' },
-  { code: 'complaints:update', name: 'समस्या संपादन व स्थिति बदलना', module: 'complaints', description: 'Change status (In Progress, etc.)' },
-  { code: 'complaints:resolve', name: 'समस्या निस्तारण (Resolve)', module: 'complaints', description: 'Mark complaints as officially resolved' },
-  { code: 'complaints:delete', name: 'समस्या हटाना', module: 'complaints', description: 'Delete invalid complaint entries' },
+  { code: 'complaints:view', name: 'View Grievances & Complaints', module: 'complaints', description: 'View public and member grievances' },
+  { code: 'complaints:create', name: 'Submit New Grievance', module: 'complaints', description: 'Submit a new complaint or issue' },
+  { code: 'complaints:update', name: 'Update Grievance Status', module: 'complaints', description: 'Change status (In Progress, Investigating, etc.)' },
+  { code: 'complaints:resolve', name: 'Resolve Grievances', module: 'complaints', description: 'Mark complaints as officially resolved' },
+  { code: 'complaints:delete', name: 'Delete Grievance Entries', module: 'complaints', description: 'Delete invalid complaint entries' },
   
   // 4. Social Works Module
-  { code: 'social_works:manage', name: 'सामाजिक कार्य प्रबंधन', module: 'social_works', description: 'Create and update social development work' },
-  { code: 'social_works:publish', name: 'सामाजिक कार्य प्रकाशन', module: 'social_works', description: 'Approve and publish social initiatives' },
+  { code: 'social_works:manage', name: 'Manage Social Initiatives', module: 'social_works', description: 'Create and update social development work' },
+  { code: 'social_works:publish', name: 'Publish Social Initiatives', module: 'social_works', description: 'Approve and publish social initiatives' },
   
   // 5. Events Module
-  { code: 'events:manage', name: 'कार्यक्रम प्रबंधन', module: 'events', description: 'Create and edit village events' },
-  { code: 'events:publish', name: 'कार्यक्रम प्रकाशन', module: 'events', description: 'Publish events to community' },
+  { code: 'events:manage', name: 'Manage Village Events', module: 'events', description: 'Create and edit village events' },
+  { code: 'events:publish', name: 'Publish Village Events', module: 'events', description: 'Publish events to community calendar' },
   
   // 6. Gallery Module
-  { code: 'gallery:upload', name: 'गैलरी फोटो अपलोड', module: 'gallery', description: 'Upload photos to village gallery' },
-  { code: 'gallery:moderate', name: 'गैलरी मॉडरेशन', module: 'gallery', description: 'Approve/delete village photos' },
+  { code: 'gallery:upload', name: 'Upload Gallery Media', module: 'gallery', description: 'Upload photos to village gallery archive' },
+  { code: 'gallery:moderate', name: 'Moderate & Delete Gallery Media', module: 'gallery', description: 'Approve/delete village gallery media' },
   
   // 7. Announcements Module
-  { code: 'announcements:publish', name: 'ग्राम सूचना प्रकाशन', module: 'announcements', description: 'Publish official notices for village' },
-  { code: 'announcements:global_broadcast', name: 'वैश्विक सूचना प्रसारण', module: 'announcements', description: 'Publish global announcements across all villages' },
+  { code: 'announcements:publish', name: 'Publish Village Announcements', module: 'announcements', description: 'Publish official notices for village' },
+  { code: 'announcements:global_broadcast', name: 'Global Broadcast Announcements', module: 'announcements', description: 'Publish global announcements across all villages' },
   
   // 8. Public Information Module
-  { code: 'public_info:manage', name: 'सार्वजनिक सूचना प्रबंधन', module: 'public_info', description: 'Review citizen public information submissions' },
+  { code: 'public_info:manage', name: 'Manage Public Information Notices', module: 'public_info', description: 'Review citizen public information submissions' },
   
   // 9. Elders Care Module
-  { code: 'elders:manage', name: 'बुजुर्ग सूची प्रबंधन', module: 'elders', description: 'Manage village elder care registry' },
+  { code: 'elders:manage', name: 'Manage Elder Care Registry', module: 'elders', description: 'Manage village elder care registry and assistance' },
   
   // 10. Education Module
-  { code: 'education:view', name: 'शिक्षा सामग्री देखना', module: 'education', description: 'View education categories, schemes and enquiries' },
-  { code: 'education:manage', name: 'शिक्षा योजना प्रबंधन', module: 'education', description: 'Create and edit education categories, schemes and resources' },
-  { code: 'education:publish', name: 'शिक्षा सामग्री प्रकाशन', module: 'education', description: 'Publish, archive or delete education content and resolve enquiries' },
+  { code: 'education:view', name: 'View Educational Resources', module: 'education', description: 'View education categories, schemes and enquiries' },
+  { code: 'education:manage', name: 'Manage Schemes & Career Resources', module: 'education', description: 'Create and edit education categories, schemes and resources' },
+  { code: 'education:publish', name: 'Publish & Resolve Educational Enquiries', module: 'education', description: 'Publish education content and resolve enquiries' },
 
   // 11. Live Chat Module
-  { code: 'chat:participate', name: 'लाइव चैट में संवाद', module: 'chat', description: 'Send messages in community chat' },
-  { code: 'chat:moderate', name: 'चैट मॉडरेशन', module: 'chat', description: 'Delete inappropriate messages and manage rooms' },
+  { code: 'chat:participate', name: 'Participate in Live Chat', module: 'chat', description: 'Send messages in community live chat' },
+  { code: 'chat:moderate', name: 'Moderate Chat Channels', module: 'chat', description: 'Delete inappropriate messages and manage rooms' },
   
   // 12. Audit Module
-  { code: 'audit:view', name: 'ऑडिट लॉग्स देखना', module: 'audit', description: 'Inspect system activity and admin audit logs' },
+  { code: 'audit:view', name: 'View System Audit & Activity Logs', module: 'audit', description: 'Inspect system activity and admin audit logs' },
   
   // 13. Settings & Integrations Module
-  { code: 'permissions:manage', name: 'अनुमति प्रबंधन (User Permissions)', module: 'settings', description: 'Manage user-level permission overrides' },
-  { code: 'integrations:manage', name: 'सिस्टम एकीकरण', module: 'settings', description: 'Configure database, Supabase and external APIs' },
+  { code: 'permissions:manage', name: 'Manage Permissions & Policy Overrides', module: 'settings', description: 'Manage user-level permission overrides' },
+  { code: 'integrations:manage', name: 'System APIs & Database Integrations', module: 'settings', description: 'Configure database, Supabase and external APIs' },
 ];
 
 export const SYSTEM_MODULES: ModuleDefinition[] = [

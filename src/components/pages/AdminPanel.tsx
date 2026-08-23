@@ -13,6 +13,7 @@ import {
   AdminPermissionsSection,
   AdminModulesSection,
   AdminRolesSection,
+  AdminAuditSection,
   AdminUnauthorizedSection,
 } from '../admin';
 import { hasUserPermission, isSuperAdmin as checkIsSuperAdmin } from '@/src/lib/permissions';
@@ -1249,16 +1250,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
+          TAB: DEDICATED AUDIT & SECURITY ACTIVITY LOGS
+      ───────────────────────────────────────────────────────────── */}
+      {(activeTab === 'audit' || activeTab === 'security') && (
+        <AdminAuditSection />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
           TAB: USER PERMISSIONS & ACCESS CONTROL MATRIX
       ───────────────────────────────────────────────────────────── */}
-      {(activeTab === 'permissions' || activeTab === 'audit' || activeTab === 'security') && (
-        <AdminPermissionsSection
-          initialSubTab={
-            activeTab === 'audit' || activeTab === 'security'
-              ? 'audit'
-              : 'workspace'
-          }
-        />
+      {activeTab === 'permissions' && (
+        <AdminPermissionsSection />
       )}
 
       {/* ─────────────────────────────────────────────────────────────

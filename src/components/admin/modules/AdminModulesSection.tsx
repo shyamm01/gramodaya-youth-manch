@@ -223,6 +223,20 @@ export const AdminModulesSection: React.FC = () => {
           prev.map((item) => (item.id === mod.id ? { ...item, isActive: updatedStatus } : item))
         );
         showToast(`Module '${mod.name}' is now ${updatedStatus ? 'ACTIVE' : 'INACTIVE'}`);
+
+        // Record audit log
+        fetch('/api/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userName: authSession.currentMember?.name || 'Shyam Varan Pal',
+            userRole: authSession.systemRole || authSession.role || 'SUPER_ADMIN',
+            userContact: authSession.adminMobile || authSession.currentMember?.mobile || '9506072678',
+            action: 'MODULE_RUNTIME_TOGGLE',
+            details: `Toggled module runtime state for '${mod.name}' to ${updatedStatus ? 'ACTIVE' : 'INACTIVE'}.`,
+            targetEntity: `Module: ${mod.name} (${mod.slug})`,
+          }),
+        }).catch(() => {});
       } else {
         showToast(`Failed: ${data.error}`);
       }
@@ -249,6 +263,21 @@ export const AdminModulesSection: React.FC = () => {
       if (data.success) {
         showToast(`✅ Module '${formData.name}' created successfully!`);
         setIsAddModalOpen(false);
+
+        // Record audit log
+        fetch('/api/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userName: authSession.currentMember?.name || 'Shyam Varan Pal',
+            userRole: authSession.systemRole || authSession.role || 'SUPER_ADMIN',
+            userContact: authSession.adminMobile || authSession.currentMember?.mobile || '9506072678',
+            action: 'MODULE_REGISTERED',
+            details: `Registered new modular feature '${formData.name}' (slug: ${formData.slug}).`,
+            targetEntity: `Module: ${formData.name}`,
+          }),
+        }).catch(() => {});
+
         setFormData({
           slug: '',
           name: '',
@@ -258,7 +287,7 @@ export const AdminModulesSection: React.FC = () => {
           displayOrder: modules.length + 1,
           isActive: true,
         });
-        fetchModules();
+        fetchModules(true);
       } else {
         showToast(`❌ Error: ${data.error}`);
       }
@@ -290,8 +319,23 @@ export const AdminModulesSection: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         showToast(`✅ Module '${formData.name}' updated successfully!`);
+
+        // Record audit log
+        fetch('/api/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userName: authSession.currentMember?.name || 'Shyam Varan Pal',
+            userRole: authSession.systemRole || authSession.role || 'SUPER_ADMIN',
+            userContact: authSession.adminMobile || authSession.currentMember?.mobile || '9506072678',
+            action: 'MODULE_UPDATED',
+            details: `Updated metadata and configuration for module '${formData.name}' (${editingModule.slug}).`,
+            targetEntity: `Module: ${formData.name}`,
+          }),
+        }).catch(() => {});
+
         setEditingModule(null);
-        fetchModules();
+        fetchModules(true);
       } else {
         showToast(`❌ Error: ${data.error}`);
       }
@@ -313,8 +357,23 @@ export const AdminModulesSection: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         showToast(`✅ Module '${deletingModule.name}' deleted.`);
+
+        // Record audit log
+        fetch('/api/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userName: authSession.currentMember?.name || 'Shyam Varan Pal',
+            userRole: authSession.systemRole || authSession.role || 'SUPER_ADMIN',
+            userContact: authSession.adminMobile || authSession.currentMember?.mobile || '9506072678',
+            action: 'MODULE_DELETED',
+            details: `Deleted custom module '${deletingModule.name}' (${deletingModule.slug}).`,
+            targetEntity: `Module: ${deletingModule.name}`,
+          }),
+        }).catch(() => {});
+
         setDeletingModule(null);
-        fetchModules();
+        fetchModules(true);
       } else {
         showToast(`❌ Error: ${data.error}`);
       }
@@ -487,8 +546,8 @@ export const AdminModulesSection: React.FC = () => {
                             <div className="font-bold text-slate-900 dark:text-white text-xs">
                               {mod.name}
                             </div>
-                            <div className="text-[10px] text-slate-400">
-                              {mod.nameHindi}
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              mod:{mod.slug}
                             </div>
                           </div>
                         </div>

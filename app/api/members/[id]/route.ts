@@ -119,6 +119,22 @@ export async function PUT(
       updatedMember?.name || id
     );
 
+    if (db) {
+      try {
+        await db.insert(schema.auditLogs).values({
+          userName: adminName || currentUser.name || 'Administrator',
+          action: 'PROFILE_UPDATED',
+          details: `Updated personal profile data, contact details, and records for ${updatedMember?.name || id}.`,
+          ipAddress: req.headers.get('x-forwarded-for') || '127.0.0.1',
+          villageId: updatedMember?.villageId ? Number(updatedMember.villageId) : null,
+          userId: currentUser.id || null,
+          timestamp: new Date(),
+        });
+      } catch (auditErr) {
+        console.warn('Audit log insert note:', auditErr);
+      }
+    }
+
     return NextResponse.json({ success: true, member: updatedMember });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Error updating member' }, { status: 500 });

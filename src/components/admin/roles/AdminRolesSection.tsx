@@ -221,7 +221,22 @@ export const AdminRolesSection: React.FC = () => {
       if (data.success) {
         showToast(`✅ Role '${formData.name}' created successfully!`);
         setIsAddModalOpen(false);
-        fetchRoles();
+
+        // Record audit log
+        fetch('/api/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userName: authSession.currentMember?.name || 'Shyam Varan Pal',
+            userRole: authSession.systemRole || authSession.role || 'SUPER_ADMIN',
+            userContact: authSession.adminMobile || authSession.currentMember?.mobile || '9506072678',
+            action: 'ROLE_CREATED',
+            details: `Created new custom role '${formData.name}' (Code: ${formData.code}) with ${formData.permissions.length} capability permissions.`,
+            targetEntity: `Role: ${formData.name}`,
+          }),
+        }).catch(() => {});
+
+        fetchRoles(true);
       } else {
         showToast(`❌ Error: ${data.error}`);
       }
@@ -252,8 +267,23 @@ export const AdminRolesSection: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         showToast(`✅ Role '${formData.name}' updated successfully!`);
+
+        // Record audit log
+        fetch('/api/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userName: authSession.currentMember?.name || 'Shyam Varan Pal',
+            userRole: authSession.systemRole || authSession.role || 'SUPER_ADMIN',
+            userContact: authSession.adminMobile || authSession.currentMember?.mobile || '9506072678',
+            action: 'ROLE_UPDATED',
+            details: `Updated permissions and metadata for role '${formData.name}' (${editingRole.code}).`,
+            targetEntity: `Role: ${formData.name}`,
+          }),
+        }).catch(() => {});
+
         setEditingRole(null);
-        fetchRoles();
+        fetchRoles(true);
       } else {
         showToast(`❌ Error: ${data.error}`);
       }
@@ -275,8 +305,23 @@ export const AdminRolesSection: React.FC = () => {
       const data = await res.json();
       if (data.success) {
         showToast(`✅ Role '${deletingRole.name}' deleted.`);
+
+        // Record audit log
+        fetch('/api/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userName: authSession.currentMember?.name || 'Shyam Varan Pal',
+            userRole: authSession.systemRole || authSession.role || 'SUPER_ADMIN',
+            userContact: authSession.adminMobile || authSession.currentMember?.mobile || '9506072678',
+            action: 'ROLE_DELETED',
+            details: `Deleted custom role '${deletingRole.name}' (${deletingRole.code}).`,
+            targetEntity: `Role: ${deletingRole.name}`,
+          }),
+        }).catch(() => {});
+
         setDeletingRole(null);
-        fetchRoles();
+        fetchRoles(true);
       } else {
         showToast(`❌ Error: ${data.error}`);
       }
@@ -463,8 +508,8 @@ export const AdminRolesSection: React.FC = () => {
                                 </span>
                               )}
                             </div>
-                            <div className="text-[10px] text-slate-400">
-                              {role.nameHindi}
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              {role.code}
                             </div>
                           </div>
                         </div>
