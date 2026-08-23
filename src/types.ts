@@ -63,7 +63,7 @@ export interface UserModulePermission {
   moduleSlug: string;
   moduleName: string;
   moduleNameHindi: string;
-  icon: string;
+  icon?: string;
   description?: string;
   canRead: boolean;
   canWrite: boolean;

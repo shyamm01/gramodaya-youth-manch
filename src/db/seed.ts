@@ -135,19 +135,19 @@ export async function seedDatabase() {
     // 5. Seed Canonical System Modules
     console.log('Seeding Canonical System Modules...');
     const CANONICAL_MODULES = [
-      { slug: 'village', name: 'Village Management', nameHindi: 'ग्राम प्रबंधन', icon: 'Building2', description: 'मल्टी-विलेज प्रबंधन एवं क्षेत्रीय शाखाएं', displayOrder: 1 },
-      { slug: 'members', name: 'Members & Approvals', nameHindi: 'सदस्यता एवं अनुमोदन', icon: 'Users', description: 'सदस्य निर्देशिका, सत्यापन व सदस्यता भूमिकाएं', displayOrder: 2 },
-      { slug: 'complaints', name: 'Complaints & Grievances', nameHindi: 'जन समस्या एवं शिकायत निवारण', icon: 'AlertCircle', description: 'ग्राम स्तर की समस्याएं एवं निवारण स्थिति', displayOrder: 3 },
-      { slug: 'social_works', name: 'Social Development Works', nameHindi: 'सामाजिक विकास कार्य', icon: 'HeartHandshake', description: 'ग्राम विकास एवं सामाजिक कल्याण पहल', displayOrder: 4 },
-      { slug: 'events', name: 'Village Events', nameHindi: 'ग्राम कार्यक्रम व सभाएं', icon: 'Calendar', description: 'सामुदायिक बैठकें व उत्सव आयोजन', displayOrder: 5 },
-      { slug: 'gallery', name: 'Media Gallery', nameHindi: 'चित्रशाला एवं मीडिया', icon: 'Image', description: 'ग्रामोदय गतिविधियों का फोटो संग्रह', displayOrder: 6 },
-      { slug: 'announcements', name: 'Announcements & Alerts', nameHindi: 'सूचना एवं प्रसारण', icon: 'Megaphone', description: 'आधिकारिक सूचनाएं, अलर्ट व मुनादी', displayOrder: 7 },
-      { slug: 'public_info', name: 'Public Information Board', nameHindi: 'सार्वजनिक सूचना पट्ट', icon: 'FileText', description: 'पारदर्शिता व जनकल्याणकारी सूचनाएं', displayOrder: 8 },
-      { slug: 'elders', name: 'Elder Care & Respect', nameHindi: 'बुजुर्ग सम्मान एवं देखरेख', icon: 'UserCheck', description: 'वरिष्ठ नागरिकों की सूची व सहयोग', displayOrder: 9 },
-      { slug: 'education', name: 'Education & Career Guidance', nameHindi: 'शिक्षा एवं मार्गदर्शन', icon: 'GraduationCap', description: 'छात्रवृत्ति, सरकारी योजनाएं व कॅरियर सलाह', displayOrder: 10 },
-      { slug: 'chat', name: 'Community Live Chat', nameHindi: 'सामुदायिक लाइव चैट', icon: 'MessageSquare', description: 'ग्राम सदस्यों के बीच सीधा संवाद', displayOrder: 11 },
-      { slug: 'audit', name: 'Audit & Activity Logs', nameHindi: 'ऑडिट एवं गतिविधि लॉग्स', icon: 'Activity', description: 'सुरक्षा, गतिविधि ट्रैकिंग व सिस्टम लॉग्स', displayOrder: 12 },
-      { slug: 'settings', name: 'Settings & Permissions Matrix', nameHindi: 'सिस्टम सेटिंग्स व अनुमतियां', icon: 'Settings', description: 'उपयोगकर्ता अनुमतियां व सिस्टम विन्यास', displayOrder: 13 },
+      { slug: 'village', name: 'Village Management', nameHindi: 'ग्राम प्रबंधन', icon: 'Building2', description: 'Multi-village governance, chapter configurations, and geographical units', displayOrder: 1 },
+      { slug: 'members', name: 'Members & Approvals', nameHindi: 'सदस्यता एवं अनुमोदन', icon: 'Users', description: 'Member directory, verification workflows, and role assignments', displayOrder: 2 },
+      { slug: 'complaints', name: 'Complaints & Grievances', nameHindi: 'जन समस्या एवं शिकायत निवारण', icon: 'AlertCircle', description: 'Grievance logging, administrative triage, and status resolution', displayOrder: 3 },
+      { slug: 'social_works', name: 'Social Development Works', nameHindi: 'सामाजिक विकास कार्य', icon: 'HeartHandshake', description: 'Community welfare initiatives, development projects, and ground impact', displayOrder: 4 },
+      { slug: 'events', name: 'Village Events', nameHindi: 'ग्राम कार्यक्रम व सभाएं', icon: 'Calendar', description: 'Community meetings, festival gatherings, and program scheduling', displayOrder: 5 },
+      { slug: 'gallery', name: 'Media Gallery', nameHindi: 'चित्रशाला एवं मीडिया', icon: 'Image', description: 'Photo and media archive, event snapshots, and village gallery', displayOrder: 6 },
+      { slug: 'announcements', name: 'Announcements & Alerts', nameHindi: 'सूचना एवं प्रसारण', icon: 'Megaphone', description: 'Official public notices, alerts, and village broadcasts', displayOrder: 7 },
+      { slug: 'public_info', name: 'Public Information Board', nameHindi: 'सार्वजनिक सूचना पट्ट', icon: 'FileText', description: 'Transparency reports, public documents, and civic notices', displayOrder: 8 },
+      { slug: 'elders', name: 'Elder Care & Respect', nameHindi: 'बुजुर्ग सम्मान एवं देखरेख', icon: 'UserCheck', description: 'Senior citizen directory, honors, and elder care assistance', displayOrder: 9 },
+      { slug: 'education', name: 'Education & Career Guidance', nameHindi: 'शिक्षा एवं मार्गदर्शन', icon: 'GraduationCap', description: 'Scholarships, government schemes, and career counseling', displayOrder: 10 },
+      { slug: 'chat', name: 'Community Live Chat', nameHindi: 'सामुदायिक लाइव चैट', icon: 'MessageSquare', description: 'Real-time community discussions and direct communication', displayOrder: 11 },
+      { slug: 'audit', name: 'Audit & Activity Logs', nameHindi: 'ऑडिट एवं गतिविधि लॉग्स', icon: 'Activity', description: 'Security tracking, administrative activity history, and audit logs', displayOrder: 12 },
+      { slug: 'settings', name: 'Settings & Permissions Matrix', nameHindi: 'सिस्टम सेटिंग्स व अनुमतियां', icon: 'Settings', description: 'User permissions matrix and system configuration settings', displayOrder: 13 },
     ];
 
     for (const mod of CANONICAL_MODULES) {

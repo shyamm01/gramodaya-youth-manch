@@ -10,6 +10,7 @@ import {
   AdminMemberTrendChart,
   AdminHelpdeskSection,
   AdminEducationSection,
+  AdminPermissionsSection,
 } from '../admin';
 
 import {
@@ -1102,6 +1103,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       )}
 
       {/* ─────────────────────────────────────────────────────────────
+          TAB: USER PERMISSIONS & ACCESS CONTROL MATRIX
+      ───────────────────────────────────────────────────────────── */}
+      {(activeTab === 'permissions' || activeTab === 'permissions-modules' || activeTab === 'permissions-roles') && (
+        <AdminPermissionsSection
+          initialSubTab={
+            activeTab === 'permissions-modules'
+              ? 'modules'
+              : activeTab === 'permissions-roles'
+              ? 'roles'
+              : 'workspace'
+          }
+        />
+      )}
+
+      {/* ─────────────────────────────────────────────────────────────
           TAB 2: MEMBERS MANAGEMENT
       ───────────────────────────────────────────────────────────── */}
       {activeTab === 'members' && (
@@ -1162,9 +1178,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 className="px-3 py-2 bg-slate-50 dark:bg-[#18181c] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold outline-none cursor-pointer"
               >
                 <option value="ALL">All Roles</option>
-                <option value="MEMBER">Member (सदस्य)</option>
-                <option value="ADMIN">Admin (एडमिन)</option>
-                <option value="SUPER_ADMIN">Super Admin (मुख्य प्रशासक)</option>
+                <option value="MEMBER">Member</option>
+                <option value="ADMIN">Admin</option>
+                <option value="SUPER_ADMIN">Super Admin</option>
               </select>
 
               {/* Date Selector Filter for Member Registration */}
@@ -1264,7 +1280,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           <button
                             onClick={() => setPermissionsMember(mem)}
                             className="p-1.5 text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 transition cursor-pointer"
-                            title="अनुमतियां प्रबंधित करें (Manage Permissions)"
+                            title="Manage Permissions"
                           >
                             <Shield className="w-3.5 h-3.5" />
                           </button>
@@ -2758,15 +2774,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       onChange={(e) => setNewMemRole(e.target.value as any)}
                       className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold cursor-pointer outline-none focus:border-emerald-500"
                     >
-                      <option value="MEMBER">Member (सदस्य)</option>
-                      <option value="ADMIN">Admin (इकाई एडमिन)</option>
-                      <option value="SUPER_ADMIN">Super Admin (केंद्रीय व्यवस्थापक)</option>
+                      <option value="MEMBER">Member</option>
+                      <option value="ADMIN">Admin</option>
+                      <option value="SUPER_ADMIN">Super Admin</option>
                     </select>
                   </div>
 
                   <div>
                     <label className="text-[11px] font-semibold text-slate-700 dark:text-zinc-300 block mb-1">
-                      Assigned Chapter (ग्राम शाखा)
+                      Assigned Chapter
                     </label>
                     <select
                       value={newMemVillage}
@@ -2907,9 +2923,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       onChange={(e) => setEditMemRole(e.target.value as any)}
                       className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold cursor-pointer outline-none focus:border-emerald-500"
                     >
-                      <option value="MEMBER">Member (सदस्य)</option>
-                      <option value="ADMIN">Admin (एडमिन)</option>
-                      <option value="SUPER_ADMIN">Super Admin (मुख्य प्रशासक)</option>
+                      <option value="MEMBER">Member</option>
+                      <option value="ADMIN">Admin</option>
+                      <option value="SUPER_ADMIN">Super Admin</option>
                     </select>
                   </div>
                   <div>
@@ -2921,9 +2937,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       onChange={(e) => setEditMemStatus(e.target.value as any)}
                       className="w-full h-9.5 px-3 bg-slate-50 dark:bg-[#18181b] border border-slate-200 dark:border-[#27272a] rounded-xl text-xs text-slate-900 dark:text-white font-bold cursor-pointer outline-none focus:border-emerald-500"
                     >
-                      <option value="active">Active (सक्रिय)</option>
-                      <option value="pending">Pending (समीक्षाधीन)</option>
-                      <option value="suspended">Suspended (निलंबित)</option>
+                      <option value="active">Active</option>
+                      <option value="pending">Pending</option>
+                      <option value="suspended">Suspended</option>
                     </select>
                   </div>
                   <div>

@@ -30,7 +30,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   };
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-zinc-100 flex font-sans antialiased selection:bg-slate-200 dark:selection:bg-zinc-800 selection:text-slate-900 dark:selection:text-white transition-colors duration-200">
+    <div className="h-screen w-screen overflow-hidden bg-[#F8F6F0] dark:bg-[#070B14] text-slate-900 dark:text-slate-100 flex font-sans antialiased selection:bg-purple-100 dark:selection:bg-purple-950 selection:text-purple-900 dark:selection:text-purple-100 transition-colors duration-200">
       {/* Executive Collapsible Sidebar */}
       <AdminSidebar
         activeTab={activeTab}

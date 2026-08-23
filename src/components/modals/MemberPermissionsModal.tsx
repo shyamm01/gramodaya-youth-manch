@@ -32,7 +32,6 @@ import {
 } from 'lucide-react';
 import { Member, UserModulePermission } from '@/src/types';
 import { useApp } from '@/src/context/AppContext';
-import { apiClient } from '@/src/lib/apiClient';
 
 interface MemberPermissionsModalProps {
   isOpen: boolean;
@@ -57,6 +56,22 @@ const MODULE_ICONS: Record<string, React.ReactNode> = {
   settings: <Settings className="w-4 h-4" />,
 };
 
+const CANONICAL_SYSTEM_MODULES: UserModulePermission[] = [
+  { moduleId: '1', moduleSlug: 'village', moduleName: 'Village Management', moduleNameHindi: 'ग्राम प्रबंधन', description: 'Multi-village governance, chapter configurations, and geographical units', canRead: true, canWrite: false, canUpdate: false, canDelete: false },
+  { moduleId: '2', moduleSlug: 'members', moduleName: 'Members & Approvals', moduleNameHindi: 'सदस्यता एवं अनुमोदन', description: 'Member directory, verification workflows, and role assignments', canRead: true, canWrite: false, canUpdate: false, canDelete: false },
+  { moduleId: '3', moduleSlug: 'complaints', moduleName: 'Complaints & Grievances', moduleNameHindi: 'जन समस्या एवं शिकायत निवारण', description: 'Grievance logging, administrative triage, and status resolution', canRead: true, canWrite: true, canUpdate: false, canDelete: false },
+  { moduleId: '4', moduleSlug: 'social_works', moduleName: 'Social Development Works', moduleNameHindi: 'सामाजिक विकास कार्य', description: 'Community welfare initiatives, development projects, and ground impact', canRead: true, canWrite: false, canUpdate: false, canDelete: false },
+  { moduleId: '5', moduleSlug: 'events', moduleName: 'Village Events', moduleNameHindi: 'ग्राम कार्यक्रम व सभाएं', description: 'Community meetings, festival gatherings, and program scheduling', canRead: true, canWrite: false, canUpdate: false, canDelete: false },
+  { moduleId: '6', moduleSlug: 'gallery', moduleName: 'Media Gallery', moduleNameHindi: 'चित्रशाला एवं मीडिया', description: 'Photo and media archive, event snapshots, and village gallery', canRead: true, canWrite: true, canUpdate: false, canDelete: false },
+  { moduleId: '7', moduleSlug: 'announcements', moduleName: 'Announcements & Alerts', moduleNameHindi: 'सूचना एवं प्रसारण', description: 'Official public notices, alerts, and village broadcasts', canRead: true, canWrite: false, canUpdate: false, canDelete: false },
+  { moduleId: '8', moduleSlug: 'public_info', moduleName: 'Public Information Board', moduleNameHindi: 'सार्वजनिक सूचना पट्ट', description: 'Transparency reports, public documents, and civic notices', canRead: true, canWrite: false, canUpdate: false, canDelete: false },
+  { moduleId: '9', moduleSlug: 'elders', moduleName: 'Elder Care & Respect', moduleNameHindi: 'बुजुर्ग सम्मान एवं देखरेख', description: 'Senior citizen directory, honors, and elder care assistance', canRead: true, canWrite: false, canUpdate: false, canDelete: false },
+  { moduleId: '10', moduleSlug: 'education', moduleName: 'Education & Career Guidance', moduleNameHindi: 'शिक्षा एवं मार्गदर्शन', description: 'Scholarships, government schemes, and career counseling', canRead: true, canWrite: false, canUpdate: false, canDelete: false },
+  { moduleId: '11', moduleSlug: 'chat', moduleName: 'Community Live Chat', moduleNameHindi: 'सामुदायिक लाइव चैट', description: 'Real-time community discussions and direct communication', canRead: true, canWrite: true, canUpdate: false, canDelete: false },
+  { moduleId: '12', moduleSlug: 'audit', moduleName: 'Audit & Activity Logs', moduleNameHindi: 'ऑडिट एवं गतिविधि लॉग्स', description: 'Security tracking, administrative activity history, and audit logs', canRead: false, canWrite: false, canUpdate: false, canDelete: false },
+  { moduleId: '13', moduleSlug: 'settings', moduleName: 'Settings & Permissions Matrix', moduleNameHindi: 'सिस्टम सेटिंग्स व अनुमतियां', description: 'User permissions matrix and system configuration settings', canRead: false, canWrite: false, canUpdate: false, canDelete: false },
+];
+
 export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
   isOpen,
   onClose,
@@ -64,7 +79,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
   onSuccess,
 }) => {
   const { authSession } = useApp();
-  const [modulePermissions, setModulePermissions] = useState<UserModulePermission[]>([]);
+  const [modulePermissions, setModulePermissions] = useState<UserModulePermission[]>(CANONICAL_SYSTEM_MODULES);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [saving, setSaving] = useState<boolean>(false);
@@ -74,10 +89,28 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
     if (isOpen && member?.id) {
       setLoading(true);
       setStatusMsg(null);
+
+      // Baseline initialization
+      const isSuper = member.systemRole === 'SUPER_ADMIN';
+      const isAdmin = member.systemRole === 'ADMIN' || member.role === 'ADMIN';
+
+      const initial = CANONICAL_SYSTEM_MODULES.map((mod) => {
+        if (isSuper) {
+          return { ...mod, canRead: true, canWrite: true, canUpdate: true, canDelete: true };
+        }
+        if (isAdmin) {
+          const isCore = mod.moduleSlug === 'audit' || mod.moduleSlug === 'settings';
+          return { ...mod, canRead: true, canWrite: !isCore, canUpdate: !isCore, canDelete: !isCore };
+        }
+        const canWrite = ['complaints', 'gallery', 'chat'].includes(mod.moduleSlug);
+        return { ...mod, canRead: true, canWrite, canUpdate: false, canDelete: false };
+      });
+      setModulePermissions(initial);
+
       fetch(`/api/permissions/${member.id}`, { credentials: 'include' })
         .then((res) => res.json())
         .then((data) => {
-          if (data.success && Array.isArray(data.modules)) {
+          if (data.success && Array.isArray(data.modules) && data.modules.length > 0) {
             setModulePermissions(data.modules);
           }
         })
@@ -88,7 +121,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
           setLoading(false);
         });
     }
-  }, [isOpen, member?.id]);
+  }, [isOpen, member?.id, member?.systemRole]);
 
   const isSuperAdminUser = member?.systemRole === 'SUPER_ADMIN';
 
@@ -158,7 +191,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
             canRead: true,
             canWrite: !isCoreSystem,
             canUpdate: !isCoreSystem,
-            canDelete: ['complaints', 'gallery', 'social_works', 'events'].includes(slug),
+            canDelete: !isCoreSystem,
             isCustom: true,
           };
         }
@@ -170,32 +203,44 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
     );
   };
 
+  // Save Permissions to Backend API
   const handleSave = async () => {
+    if (!member?.id || isSuperAdminUser) return;
     try {
       setSaving(true);
       setStatusMsg(null);
 
-      const data = await apiClient.post(`/api/permissions/${member?.id}`, {
-        modulePermissions: modulePermissions.map((m) => ({
+      const payload = {
+        permissions: modulePermissions.map((m) => ({
           moduleId: m.moduleId,
+          moduleSlug: m.moduleSlug,
           canRead: m.canRead,
           canWrite: m.canWrite,
           canUpdate: m.canUpdate,
           canDelete: m.canDelete,
         })),
-        grantedBy: authSession.adminName || 'Admin',
-        grantedByMobile: authSession.adminMobile || '',
+      };
+
+      const res = await fetch(`/api/permissions/${member.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
       });
 
-      if (data.success) {
-        setStatusMsg({ type: 'success', text: 'मॉड्यूल अनुमतियां (CRUD) सफलतापूर्वक अपडेट की गईं!' });
-        if (onSuccess) onSuccess();
-        setTimeout(() => onClose(), 800);
-      } else {
-        setStatusMsg({ type: 'error', text: data.error || 'त्रुटि हुई' });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to save permissions');
       }
+
+      setStatusMsg({ type: 'success', text: 'Permissions saved successfully!' });
+      if (onSuccess) onSuccess();
+      setTimeout(() => {
+        onClose();
+      }, 1200);
     } catch (err: any) {
-      setStatusMsg({ type: 'error', text: 'सर्वर से संपर्क करने में त्रुटि हुई' });
+      console.error('Error updating permissions:', err);
+      setStatusMsg({ type: 'error', text: err.message || 'Error occurred while saving permissions' });
     } finally {
       setSaving(false);
     }
@@ -208,7 +253,6 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
     return modulePermissions.filter(
       (m) =>
         m.moduleName?.toLowerCase().includes(q) ||
-        m.moduleNameHindi?.toLowerCase().includes(q) ||
         m.moduleSlug?.toLowerCase().includes(q) ||
         m.description?.toLowerCase().includes(q)
     );
@@ -227,19 +271,19 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
             </div>
             <div>
               <h3 className="text-sm sm:text-base font-extrabold text-[#2C3327] dark:text-white flex items-center gap-2 flex-wrap">
-                <span>उपयोगकर्ता मॉड्यूल अनुमतियां (CRUD Matrix)</span>
+                <span>User Module Permissions (CRUD Matrix)</span>
                 <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                   {member.name}
                 </span>
               </h3>
               <p className="text-[11px] text-[#8C8675] dark:text-slate-400 font-medium">
-                सिस्टम रोल: <strong className="text-slate-800 dark:text-slate-200">{member.systemRole}</strong> • मोबाइल: {member.mobile || 'N/A'}
+                System Role: <strong className="text-slate-800 dark:text-slate-200">{member.systemRole}</strong> • Mobile: {member.mobile || 'N/A'}
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition"
+            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -250,7 +294,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
           <div className="mx-4 mt-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 flex items-center gap-2.5 text-xs text-amber-800 dark:text-amber-300">
             <Info className="w-4 h-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
             <span>
-              <strong>मुख्य प्रशासक (Super Admin):</strong> इस उपयोगकर्ता के पास सिस्टम के सभी १३ मॉड्यूल्स पर स्वतः पूर्ण CRUD (Read, Write, Update, Delete) अधिकार प्राप्त हैं।
+              <strong>Super Admin Privilege:</strong> This user automatically possesses full unrestricted CRUD (Read, Write, Update, Delete) permissions across all 13 canonical system modules.
             </span>
           </div>
         )}
@@ -260,42 +304,42 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
           <div className="px-4 py-3 border-b border-[#E0DCCF]/60 dark:border-slate-800/80 bg-slate-50/70 dark:bg-slate-900/40 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1 mr-1">
-                <Sparkles className="w-3 h-3 text-purple-500" /> त्वरित प्रीसेट:
+                <Sparkles className="w-3 h-3 text-purple-500" /> Quick Presets:
               </span>
               <button
                 type="button"
                 onClick={() => applyPreset('viewer')}
-                className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
               >
-                👁️ केवल दर्शक (Viewer)
+                👁️ Viewer
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset('volunteer')}
-                className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
               >
-                ➕ कार्यकर्ता (Volunteer)
+                ➕ Volunteer
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset('moderator')}
-                className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
               >
-                ✏️ मॉडरेटर (Moderator)
+                ✏️ Moderator
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset('admin')}
-                className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition cursor-pointer"
               >
-                👑 ग्राम एडमिन (Admin)
+                👑 Village Admin
               </button>
               <button
                 type="button"
                 onClick={() => applyPreset('all')}
-                className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900 transition"
+                className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-purple-50 dark:bg-purple-950/60 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:bg-purple-100 dark:hover:bg-purple-900 transition cursor-pointer"
               >
-                ⭐ पूर्ण अधिकार (All CRUD)
+                ⭐ Full CRUD
               </button>
             </div>
 
@@ -304,7 +348,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
               <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="मॉड्यूल खोजें (Search)..."
+                placeholder="Search modules..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-purple-500"
@@ -323,7 +367,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
             }`}
           >
             <span>{statusMsg.text}</span>
-            <button onClick={() => setStatusMsg(null)} className="text-xs opacity-70 hover:opacity-100">
+            <button onClick={() => setStatusMsg(null)} className="text-xs opacity-70 hover:opacity-100 cursor-pointer">
               ✕
             </button>
           </div>
@@ -333,7 +377,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
         <div className="flex-1 overflow-y-auto p-4 sm:p-5">
           {loading ? (
             <div className="py-20 text-center text-xs text-slate-500 font-medium animate-pulse">
-              मॉड्यूल अनुमतियां लोड हो रही हैं...
+              Loading module permissions...
             </div>
           ) : (
             <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm bg-white dark:bg-[#111827]">
@@ -341,7 +385,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-100/90 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold uppercase text-[10px] tracking-wider">
-                      <th className="py-3 px-4 min-w-[220px]">सिस्टम मॉड्यूल (Module)</th>
+                      <th className="py-3 px-4 min-w-[220px]">System Module</th>
                       <th className="py-3 px-3 text-center w-24">
                         <div className="flex items-center justify-center gap-1">
                           <Eye className="w-3 h-3 text-blue-500" /> Read
@@ -362,7 +406,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
                           <Trash2 className="w-3 h-3 text-rose-500" /> Delete
                         </div>
                       </th>
-                      <th className="py-3 px-4 text-right w-28">सभी (All)</th>
+                      <th className="py-3 px-4 text-right w-28">All Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-medium">
@@ -381,12 +425,11 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
                                 {MODULE_ICONS[mod.moduleSlug] || <Layers className="w-4 h-4" />}
                               </div>
                               <div>
-                                <div className="font-bold text-slate-900 dark:text-white text-xs flex items-center gap-1.5">
-                                  <span>{mod.moduleNameHindi}</span>
-                                  <span className="text-[10px] text-slate-400 font-normal">({mod.moduleName})</span>
+                                <div className="font-bold text-slate-900 dark:text-white text-xs">
+                                  {mod.moduleName}
                                 </div>
-                                <div className="text-[10px] text-slate-500 dark:text-slate-400">
-                                  {mod.description || `Slug: ${mod.moduleSlug}`}
+                                <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                                  slug: {mod.moduleSlug}
                                 </div>
                               </div>
                             </div>
@@ -403,7 +446,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
                                   ? 'bg-blue-600 text-white shadow-sm'
                                   : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                               } ${isSuperAdminUser ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
-                              title={mod.canRead ? 'Read अनुमत है' : 'Read प्रतिबंधित है'}
+                              title={mod.canRead ? 'Read enabled' : 'Read disabled'}
                             >
                               {mod.canRead ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <Eye className="w-3.5 h-3.5" />}
                             </button>
@@ -420,7 +463,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
                                   ? 'bg-emerald-600 text-white shadow-sm'
                                   : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                               } ${isSuperAdminUser ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
-                              title={mod.canWrite ? 'Write अनुमत है' : 'Write प्रतिबंधित है'}
+                              title={mod.canWrite ? 'Write enabled' : 'Write disabled'}
                             >
                               {mod.canWrite ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <PlusCircle className="w-3.5 h-3.5" />}
                             </button>
@@ -437,7 +480,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
                                   ? 'bg-amber-600 text-white shadow-sm'
                                   : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                               } ${isSuperAdminUser ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
-                              title={mod.canUpdate ? 'Update अनुमत है' : 'Update प्रतिबंधित है'}
+                              title={mod.canUpdate ? 'Update enabled' : 'Update disabled'}
                             >
                               {mod.canUpdate ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <Edit3 className="w-3.5 h-3.5" />}
                             </button>
@@ -454,7 +497,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
                                   ? 'bg-rose-600 text-white shadow-sm'
                                   : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                               } ${isSuperAdminUser ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
-                              title={mod.canDelete ? 'Delete अनुमत है' : 'Delete प्रतिबंधित है'}
+                              title={mod.canDelete ? 'Delete enabled' : 'Delete disabled'}
                             >
                               {mod.canDelete ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <Trash2 className="w-3.5 h-3.5" />}
                             </button>
@@ -466,13 +509,13 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
                               <button
                                 type="button"
                                 onClick={() => toggleModuleAll(mod.moduleId)}
-                                className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition ${
+                                className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition cursor-pointer ${
                                   isAllActive
                                     ? 'bg-purple-100 dark:bg-purple-950 text-purple-700 dark:text-purple-300'
                                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                                 }`}
                               >
-                                {isAllActive ? 'सभी हटाएं' : 'सभी चुनें'}
+                                {isAllActive ? 'Deselect All' : 'Select All'}
                               </button>
                             )}
                           </td>
@@ -489,7 +532,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
         {/* Footer */}
         <div className="p-4 border-t border-[#E0DCCF] dark:border-slate-800 flex items-center justify-between bg-[#F8F6F0] dark:bg-[#070B14]">
           <div className="text-xs text-slate-600 dark:text-slate-400 font-medium">
-            कुल मॉड्यूल्स:{' '}
+            Total Modules:{' '}
             <strong className="text-purple-700 dark:text-purple-400">
               {filteredModules.length}
             </strong>
@@ -498,9 +541,9 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition"
+              className="px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
             >
-              बंद करें
+              Close
             </button>
             {!isSuperAdminUser && (
               <button
@@ -510,7 +553,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
                 className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-purple-700 hover:bg-purple-800 dark:bg-purple-600 dark:hover:bg-purple-700 rounded-lg shadow-sm transition disabled:opacity-50 cursor-pointer"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>{saving ? 'सहेज रहे हैं...' : 'अनुमतियां सहेजें'}</span>
+                <span>{saving ? 'Saving...' : 'Save Permissions'}</span>
               </button>
             )}
           </div>
