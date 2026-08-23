@@ -54,56 +54,52 @@ export async function GET(
 
     const { complaint: c, villageName, villageNameHindi, villageSlug } = row;
 
-    const formatted = {
+    const formatted: Record<string, any> = {
       id: String(c.id),
-      villageId: c.villageId ? String(c.villageId) : null,
-      villageName: villageName || null,
-      villageNameHindi: villageNameHindi || null,
-      villageSlug: villageSlug || null,
-      village: c.villageId ? {
-        id: String(c.villageId),
-        name: villageName || 'Village',
-        nameHindi: villageNameHindi || 'ग्राम',
-        slug: villageSlug || '',
-      } : null,
+      villageId: c.villageId ? String(c.villageId) : undefined,
+      villageName: villageName || undefined,
+      villageNameHindi: villageNameHindi || undefined,
+      villageSlug: villageSlug || undefined,
       memberId: c.userId ? String(c.userId) : undefined,
       categoryId: c.categoryId ? String(c.categoryId) : undefined,
       title: c.title,
-      titleHindi: c.titleHindi || null,
+      titleHindi: c.titleHindi || undefined,
       category: c.category,
       description: c.description,
-      descriptionHindi: c.descriptionHindi || null,
+      descriptionHindi: c.descriptionHindi || undefined,
       location: c.location,
-      locationHindi: c.locationHindi || null,
+      locationHindi: c.locationHindi || undefined,
       ward: c.ward || undefined,
       wardHindi: c.wardHindi || undefined,
       reporterName: c.reporterName,
       reporterMobile: c.reporterMobile,
       status: c.status,
       priority: c.priority || "medium",
-      photoUrl: c.photoUrl || "",
-      videoUrl: c.videoUrl || "",
-      attachments: attachments.map((a) => ({
+      photoUrl: c.photoUrl || (attachments[0]?.url ? attachments[0].url : undefined),
+      resolvedAt: c.resolvedAt || undefined,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    };
+
+    if (attachments.length > 0) {
+      formatted.attachments = attachments.map((a) => ({
         id: String(a.id),
         type: a.type,
         url: a.url,
         caption: a.caption,
-        createdAt: a.createdAt ? new Date(a.createdAt).toISOString() : '',
-      })),
-      statusHistory: statusHistory.map((s) => ({
+      }));
+    }
+
+    if (statusHistory.length > 0) {
+      formatted.statusHistory = statusHistory.map((s) => ({
         id: String(s.id),
-        complaintId: String(s.complaintId),
         fromStatus: s.fromStatus,
         toStatus: s.toStatus,
         changedBy: s.changedBy,
         note: s.note,
         createdAt: s.createdAt ? new Date(s.createdAt).toISOString() : '',
-      })),
-      isActive: c.isActive !== undefined ? Boolean(c.isActive) : true,
-      resolvedAt: c.resolvedAt,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt,
-    };
+      }));
+    }
 
     return NextResponse.json({ success: true, complaint: formatted });
   } catch (error: any) {

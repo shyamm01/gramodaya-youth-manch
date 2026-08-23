@@ -74,42 +74,40 @@ export async function GET(req: Request) {
       }
     }
 
-    const formatted = rows.map(({ complaint: c, villageName, villageNameHindi, villageSlug }) => ({
-      id: String(c.id),
-      villageId: c.villageId ? String(c.villageId) : null,
-      villageName: villageName || null,
-      villageNameHindi: villageNameHindi || null,
-      villageSlug: villageSlug || null,
-      village: c.villageId ? {
-        id: String(c.villageId),
-        name: villageName || 'Village',
-        nameHindi: villageNameHindi || 'ग्राम',
-        slug: villageSlug || '',
-      } : null,
-      memberId: c.userId ? String(c.userId) : undefined,
-      categoryId: c.categoryId ? String(c.categoryId) : undefined,
-      title: c.title,
-      titleHindi: c.titleHindi || null,
-      category: c.category,
-      description: c.description,
-      descriptionHindi: c.descriptionHindi || null,
-      location: c.location,
-      locationHindi: c.locationHindi || null,
-      ward: c.ward || undefined,
-      wardHindi: c.wardHindi || undefined,
-      reporterName: c.reporterName,
-      reporterMobile: c.reporterMobile,
-      status: c.status,
-      priority: c.priority || "medium",
-      // Backward compat: still expose photoUrl/videoUrl
-      photoUrl: c.photoUrl || "",
-      videoUrl: c.videoUrl || "",
-      attachments: attachmentsMap[c.id] || [],
-      isActive: c.isActive !== undefined ? Boolean(c.isActive) : true,
-      resolvedAt: c.resolvedAt,
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt,
-    }));
+    const formatted = rows.map(({ complaint: c, villageName, villageNameHindi, villageSlug }) => {
+      const atts = attachmentsMap[c.id] || [];
+      const item: Record<string, any> = {
+        id: String(c.id),
+        villageId: c.villageId ? String(c.villageId) : undefined,
+        villageName: villageName || undefined,
+        villageNameHindi: villageNameHindi || undefined,
+        villageSlug: villageSlug || undefined,
+        categoryId: c.categoryId ? String(c.categoryId) : undefined,
+        title: c.title,
+        titleHindi: c.titleHindi || undefined,
+        category: c.category,
+        description: c.description,
+        descriptionHindi: c.descriptionHindi || undefined,
+        location: c.location,
+        locationHindi: c.locationHindi || undefined,
+        ward: c.ward || undefined,
+        wardHindi: c.wardHindi || undefined,
+        reporterName: c.reporterName,
+        reporterMobile: c.reporterMobile,
+        status: c.status,
+        priority: c.priority || "medium",
+        photoUrl: c.photoUrl || (atts[0]?.url ? atts[0].url : undefined),
+        resolvedAt: c.resolvedAt || undefined,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+      };
+
+      if (atts.length > 1) {
+        item.attachments = atts;
+      }
+
+      return item;
+    });
 
     // Optional: aggregate counts for filter badges
     let counts = null;
@@ -147,12 +145,19 @@ export async function GET(req: Request) {
     // Next cursor for pagination
     const nextCursor = rows.length === limit ? rows[rows.length - 1].complaint.id : null;
 
-    return NextResponse.json({
+    const responsePayload: Record<string, any> = {
       success: true,
       complaints: formatted,
-      nextCursor: nextCursor ? String(nextCursor) : null,
-      counts,
-    });
+    };
+
+    if (nextCursor) {
+      responsePayload.nextCursor = String(nextCursor);
+    }
+    if (counts) {
+      responsePayload.counts = counts;
+    }
+
+    return NextResponse.json(responsePayload);
   } catch (err: any) {
     console.error("Error fetching complaints:", err);
     return NextResponse.json({ success: false, error: "Failed to fetch complaints" }, { status: 500 });

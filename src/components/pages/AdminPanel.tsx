@@ -1469,7 +1469,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <span className="text-[10px] font-mono font-bold text-slate-400 dark:text-zinc-500 uppercase">
-                      {prob.category} • ID #{prob.id}
+                      {prob.category}
                     </span>
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">
                       {prob.title}
@@ -2973,7 +2973,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="bg-white dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fade-in">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Edit Grievance #{editingComplaint.id}
+                Edit Grievance
               </h3>
               <button
                 onClick={() => setEditingComplaint(null)}
@@ -3227,7 +3227,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           <div className="bg-white dark:bg-[#141417] border border-slate-200 dark:border-[#27272a] rounded-3xl p-6 max-w-md w-full space-y-4 shadow-2xl animate-fade-in">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                Edit Event #{editingEvent.id}
+                Edit Event
               </h3>
               <button
                 onClick={() => setEditingEvent(null)}

@@ -226,8 +226,8 @@ export const GrievanceDetailPage: React.FC<GrievanceDetailPageProps> = ({ id }) 
             {lang === 'en' ? 'Grievances' : 'ग्राम समस्याएं'}
           </Link>
           <ChevronRight className="w-3.5 h-3.5" />
-          <span className="font-mono font-bold text-slate-900 dark:text-white">
-            #{complaint.id}
+          <span className="font-semibold text-slate-900 dark:text-white truncate max-w-[240px]">
+            {displayTitle}
           </span>
         </div>
 
@@ -297,9 +297,6 @@ export const GrievanceDetailPage: React.FC<GrievanceDetailPageProps> = ({ id }) 
           <div className="p-6 sm:p-8 bg-white dark:bg-[#111726] border border-slate-200 dark:border-slate-800 rounded-3xl shadow-xs space-y-4">
             {/* Top Badges */}
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs font-mono font-black px-2.5 py-1 rounded-lg bg-slate-900 dark:bg-black text-amber-300 dark:text-emerald-300 border border-slate-700 dark:border-slate-800">
-                #{complaint.id}
-              </span>
               <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 px-2.5 py-1 rounded-lg">
                 <Building2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 {villageDisplayName}

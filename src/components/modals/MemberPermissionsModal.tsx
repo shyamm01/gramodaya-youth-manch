@@ -233,7 +233,7 @@ export const MemberPermissionsModal: React.FC<MemberPermissionsModalProps> = ({
                 </span>
               </h3>
               <p className="text-[11px] text-[#8C8675] dark:text-slate-400 font-medium">
-                सिस्टम रोल: <strong className="text-slate-800 dark:text-slate-200">{member.systemRole}</strong> • मोबाइल: {member.mobile || 'N/A'} • आईडी: #{member.id.slice(0, 8)}
+                सिस्टम रोल: <strong className="text-slate-800 dark:text-slate-200">{member.systemRole}</strong> • मोबाइल: {member.mobile || 'N/A'}
               </p>
             </div>
           </div>
