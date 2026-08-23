@@ -92,9 +92,6 @@ export const GrievanceDetailModal: React.FC<GrievanceDetailModalProps> = ({
         {/* Top Header Bar */}
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-100 dark:border-slate-800/80">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-mono font-black px-2.5 py-1 rounded-lg bg-slate-900 dark:bg-black text-amber-300 dark:text-emerald-300 border border-slate-700 dark:border-slate-800">
-              #{c.id}
-            </span>
             <Badge variant="secondary" className="text-xs rounded-lg font-bold">
               {getCategoryLabel(c.category, lang)}
             </Badge>

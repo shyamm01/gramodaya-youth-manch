@@ -100,15 +100,22 @@ export async function GET(req: Request) {
           }
         }
 
-        // Query custom permissions from public.user_permissions
+        // Query custom module permissions from public.user_permissions
         if (profileRecord?.id) {
           const permRows = await sql`
-            SELECT permission_code 
-            FROM public.user_permissions
-            WHERE user_id = ${profileRecord.id} AND is_granted = true
+            SELECT up.can_read, up.can_write, up.can_update, up.can_delete, m.slug as module_slug
+            FROM public.user_permissions up
+            JOIN public.modules m ON up.module_id = m.id
+            WHERE up.user_id = ${profileRecord.id}
           `;
           if (permRows && permRows.length > 0) {
-            customPermissions = permRows.map((r: any) => r.permission_code);
+            for (const r of permRows) {
+              const slug = r.module_slug;
+              if (r.can_read) customPermissions.push(`${slug}:view`);
+              if (r.can_write) customPermissions.push(`${slug}:create`, `${slug}:upload`, `${slug}:participate`);
+              if (r.can_update) customPermissions.push(`${slug}:update`, `${slug}:update_status`, `${slug}:resolve`, `${slug}:publish`, `${slug}:moderate`);
+              if (r.can_delete) customPermissions.push(`${slug}:delete`);
+            }
           }
         }
       } catch (dbErr) {
@@ -118,40 +125,42 @@ export async function GET(req: Request) {
 
     // 4. Resolve RBAC role & permissions
     const rawSystemRole = profileRecord?.system_role || payload?.systemRole || 'MEMBER';
-    const isSuper =
-      rawSystemRole === 'SUPER_ADMIN' ||
-      payload?.isSuperAdmin;
-    const effectiveSystemRole: 'SUPER_ADMIN' | 'ADMIN' | 'MEMBER' = isSuper ? 'SUPER_ADMIN' : rawSystemRole === 'ADMIN' ? 'ADMIN' : 'MEMBER';
-    const effectiveRole: 'ADMIN' | 'MEMBER' = (effectiveSystemRole === 'SUPER_ADMIN' || effectiveSystemRole === 'ADMIN' || profileRecord?.role === 'ADMIN') ? 'ADMIN' : 'MEMBER';
-    const isAdm = effectiveSystemRole === 'SUPER_ADMIN' || effectiveSystemRole === 'ADMIN';
+    const isSuper = rawSystemRole === 'SUPER_ADMIN' || payload?.isSuperAdmin;
+    const effectiveSystemRole: 'SUPER_ADMIN' | 'ADMIN' | 'MEMBER' = isSuper
+      ? 'SUPER_ADMIN'
+      : rawSystemRole === 'ADMIN'
+      ? 'ADMIN'
+      : 'MEMBER';
 
     const roleDefaultPerms = ROLE_DEFAULT_PERMISSIONS[effectiveSystemRole] || [];
-    const allPermissions = Array.from(new Set([...roleDefaultPerms, ...customPermissions, ...(payload?.permissions || [])]));
+    const allPermissions = Array.from(
+      new Set([...roleDefaultPerms, ...customPermissions, ...(payload?.permissions || [])])
+    );
 
+    // Optimized, deduplicated user profile
     const user = {
       id: String(profileRecord?.id || targetUserId || payload?.id || payload?.sub),
-      supabaseUserId: supabaseUser?.id || targetUserId || null,
       name: profileRecord?.full_name || payload?.name || 'Member',
-      fullName: profileRecord?.full_name || payload?.name || 'Member',
       mobile: profileRecord?.mobile || payload?.mobile || '',
       email: profileRecord?.email || payload?.email || '',
       photoUrl: profileRecord?.avatar_url || payload?.photoUrl || '',
-      avatarUrl: profileRecord?.avatar_url || payload?.photoUrl || '',
       status: profileRecord?.status || 'active',
-      role: effectiveRole,
       systemRole: effectiveSystemRole,
-      isAdmin: isAdm,
-      isSuperAdmin: isSuper,
       villageId: profileRecord?.village_id ? String(profileRecord.village_id) : payload?.villageId || '8',
       organizationName: profileRecord?.org_name_hindi || profileRecord?.org_name || 'ग्रामोदय यूथ मंच',
-      permissions: allPermissions,
+      permissions: isSuper ? ['*'] : allPermissions,
     };
 
-    return NextResponse.json({
+    const response: Record<string, any> = {
       authenticated: true,
       user,
-      token: token || null,
-    });
+    };
+
+    if (token) {
+      response.token = token;
+    }
+
+    return NextResponse.json(response);
   } catch (err: any) {
     console.error('Error verifying auth session in /api/auth/me:', err);
     return NextResponse.json({ authenticated: false, error: err.message }, { status: 500 });

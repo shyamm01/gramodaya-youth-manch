@@ -1,13 +1,8 @@
 'use client';
 
 import React from 'react';
-import { AdminPanel } from '@/src/components/pages';
-import { ProtectedRoute } from '@/src/components/common';
+import { AdminEducationSection } from '@/src/components/admin/sections/AdminEducationSection';
 
 export default function AdminEducationPage() {
-  return (
-    <ProtectedRoute requiredRole="SUPER_ADMIN" sectionTitle="Education">
-      <AdminPanel initialTab="education" />
-    </ProtectedRoute>
-  );
+  return <AdminEducationSection />;
 }

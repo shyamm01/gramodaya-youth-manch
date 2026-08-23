@@ -2,10 +2,25 @@
 
 import React, { useMemo } from 'react';
 import { useApp } from '@/src/context/AppContext';
+import {
+  useGetMembersQuery,
+  useGetComplaintsQuery,
+  useGetSocialWorksQuery,
+  useGetEventsQuery,
+} from '@/src/store/api/adminApi';
 import { TrendingUp, TrendingDown, Users, ShieldAlert, HeartHandshake, CalendarCheck } from 'lucide-react';
 
 export const AdminMetricsCards: React.FC = () => {
-  const { members, complaints, socialWorks, events, activeVillageId, isSuperAdmin, authSession } = useApp();
+  const { activeVillageId, isSuperAdmin, authSession } = useApp();
+
+  // Collections come from RTK Query rather than AppContext: the context no
+  // longer bootstraps them on admin routes, because the panel's own cache
+  // already holds them. The sidebar and the charts subscribe to the same
+  // entries, so the dashboard loads each collection once between them.
+  const { data: members = [] } = useGetMembersQuery();
+  const { data: complaints = [] } = useGetComplaintsQuery();
+  const { data: socialWorks = [] } = useGetSocialWorksQuery();
+  const { data: events = [] } = useGetEventsQuery();
 
   const isSuperAdminUser = Boolean(
     isSuperAdmin ||
@@ -55,9 +70,9 @@ export const AdminMetricsCards: React.FC = () => {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* Metric Card 1: Total Members */}
-      <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-3 shadow-xs hover:border-slate-300 dark:hover:border-[#383a42] transition">
+      <div className="bg-white dark:bg-[#111726] border border-[#E4DFD5] dark:border-slate-800/80 rounded-2xl p-5 space-y-3 shadow-xs hover:border-purple-300 dark:hover:border-purple-800/60 transition">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
             Total Members
           </span>
           <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
@@ -69,12 +84,12 @@ export const AdminMetricsCards: React.FC = () => {
             {activeMembersCount.toLocaleString()}
           </h3>
         </div>
-        <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
-          <span className="flex items-center gap-1 text-slate-800 dark:text-zinc-200 font-semibold">
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <span className="flex items-center gap-1 text-slate-800 dark:text-slate-200 font-semibold">
             Active community members <TrendingUp className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
           </span>
         </div>
-        <p className="text-[11px] text-slate-400 dark:text-zinc-500">
+        <p className="text-[11px] text-slate-400 dark:text-slate-500">
           {isSuperAdminUser && effectiveVillageId === 'ALL'
             ? 'Verified members across all village chapters'
             : 'Verified members in your assigned village'}
@@ -82,9 +97,9 @@ export const AdminMetricsCards: React.FC = () => {
       </div>
 
       {/* Metric Card 2: New Grievances */}
-      <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-3 shadow-xs hover:border-slate-300 dark:hover:border-[#383a42] transition">
+      <div className="bg-white dark:bg-[#111726] border border-[#E4DFD5] dark:border-slate-800/80 rounded-2xl p-5 space-y-3 shadow-xs hover:border-purple-300 dark:hover:border-purple-800/60 transition">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
             New Grievances
           </span>
           <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20">
@@ -96,20 +111,20 @@ export const AdminMetricsCards: React.FC = () => {
             {newProblemsCount}
           </h3>
         </div>
-        <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
-          <span className="flex items-center gap-1 text-slate-800 dark:text-zinc-200 font-semibold">
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <span className="flex items-center gap-1 text-slate-800 dark:text-slate-200 font-semibold">
             {scopedComplaints.length} total logged <TrendingDown className="w-3.5 h-3.5 text-rose-500" />
           </span>
         </div>
-        <p className="text-[11px] text-slate-400 dark:text-zinc-500">
+        <p className="text-[11px] text-slate-400 dark:text-slate-500">
           Grievances awaiting immediate admin triage
         </p>
       </div>
 
       {/* Metric Card 3: Resolution Rate */}
-      <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-3 shadow-xs hover:border-slate-300 dark:hover:border-[#383a42] transition">
+      <div className="bg-white dark:bg-[#111726] border border-[#E4DFD5] dark:border-slate-800/80 rounded-2xl p-5 space-y-3 shadow-xs hover:border-purple-300 dark:hover:border-purple-800/60 transition">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
             Resolved Rate
           </span>
           <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20">
@@ -121,20 +136,20 @@ export const AdminMetricsCards: React.FC = () => {
             {resolutionPercentage}%
           </h3>
         </div>
-        <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
-          <span className="flex items-center gap-1 text-slate-800 dark:text-zinc-200 font-semibold">
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <span className="flex items-center gap-1 text-slate-800 dark:text-slate-200 font-semibold">
             {resolvedCount} resolved issues <TrendingUp className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
           </span>
         </div>
-        <p className="text-[11px] text-slate-400 dark:text-zinc-500">
+        <p className="text-[11px] text-slate-400 dark:text-slate-500">
           Successful issue turnaround in scope
         </p>
       </div>
 
       {/* Metric Card 4: Social Initiatives */}
-      <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-5 space-y-3 shadow-xs hover:border-slate-300 dark:hover:border-[#383a42] transition">
+      <div className="bg-white dark:bg-[#111726] border border-[#E4DFD5] dark:border-slate-800/80 rounded-2xl p-5 space-y-3 shadow-xs hover:border-purple-300 dark:hover:border-purple-800/60 transition">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-500 dark:text-zinc-400">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
             Social Initiatives
           </span>
           <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-500/20">
@@ -146,12 +161,12 @@ export const AdminMetricsCards: React.FC = () => {
             {socialCount}
           </h3>
         </div>
-        <div className="pt-2 border-t border-slate-100 dark:border-[#1e1f24] flex items-center justify-between text-xs text-slate-500 dark:text-zinc-400">
-          <span className="flex items-center gap-1 text-slate-800 dark:text-zinc-200 font-semibold">
+        <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <span className="flex items-center gap-1 text-slate-800 dark:text-slate-200 font-semibold">
             {scopedEvents.length} events planned <TrendingUp className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
           </span>
         </div>
-        <p className="text-[11px] text-slate-400 dark:text-zinc-500">
+        <p className="text-[11px] text-slate-400 dark:text-slate-500">
           Community drives and welfare programs
         </p>
       </div>

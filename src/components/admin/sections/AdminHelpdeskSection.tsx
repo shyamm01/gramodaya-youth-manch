@@ -183,7 +183,7 @@ export const AdminHelpdeskSection: React.FC = () => {
     const newMsg: HelpdeskMessage = {
       id: `msg_admin_${Date.now()}`,
       senderMobile: 'ADMIN',
-      senderName: authSession.adminName || 'ग्रामोदय एडमिन',
+      senderName: authSession.adminName || 'Gramodaya Admin',
       recipientMobile: activeThread.citizenMobile,
       recipientName: activeThread.citizenName,
       text: textToSend,
@@ -209,7 +209,7 @@ export const AdminHelpdeskSection: React.FC = () => {
             id: newMsg.id,
             room_id: citizenRoomId,
             sender_mobile: 'ADMIN',
-            sender_name: authSession.adminName || 'ग्रामोदय एडमिन',
+            sender_name: authSession.adminName || 'Gramodaya Admin',
             text: textToSend,
             village_id: activeThread.villageId,
             created_at: newMsg.createdAt,
@@ -225,7 +225,7 @@ export const AdminHelpdeskSection: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           senderMobile: 'ADMIN',
-          senderName: authSession.adminName || 'ग्रामोदय एडमिन',
+          senderName: authSession.adminName || 'Gramodaya Admin',
           recipientMobile: activeThread.citizenMobile,
           recipientName: activeThread.citizenName,
           text: textToSend,

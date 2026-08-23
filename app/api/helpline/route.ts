@@ -28,7 +28,6 @@ export async function GET() {
         .from(schema.profiles)
         .where(
           or(
-            eq(schema.profiles.role, 'ADMIN'),
             eq(schema.profiles.systemRole, 'ADMIN'),
             eq(schema.profiles.systemRole, 'SUPER_ADMIN')
           )

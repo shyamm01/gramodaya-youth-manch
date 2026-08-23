@@ -18,18 +18,16 @@ export async function GET() {
       );
     }
 
-    const canonicalPermissions = await db
+    const dbModules = await db
       .select()
-      .from(schema.permissions)
-      .orderBy(asc(schema.permissions.code));
+      .from(schema.modules)
+      .orderBy(asc(schema.modules.displayOrder));
 
     return NextResponse.json({
       success: true,
-      modules: SYSTEM_MODULES,
-      permissions: canonicalPermissions.length > 0 ? canonicalPermissions : ALL_SYSTEM_PERMISSIONS,
+      modules: dbModules.length > 0 ? dbModules : SYSTEM_MODULES,
       roleTemplates: ROLE_DEFAULT_PERMISSIONS,
-      totalPermissions: ALL_SYSTEM_PERMISSIONS.length,
-      totalModules: SYSTEM_MODULES.length,
+      totalModules: dbModules.length > 0 ? dbModules.length : SYSTEM_MODULES.length,
     });
   } catch (err: any) {
     console.error('Error fetching permissions catalog:', err);

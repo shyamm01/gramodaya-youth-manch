@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/src/context/AppContext';
+import { useGetMembersQuery } from '@/src/store/api/adminApi';
 import { DatePicker } from '../../inputs/DatePicker';
 import {
   TrendingUp,
@@ -16,7 +17,12 @@ import {
 } from 'lucide-react';
 
 export const AdminMemberTrendChart: React.FC = () => {
-  const { members, activeVillageId, isSuperAdmin, authSession } = useApp();
+  const { activeVillageId, isSuperAdmin, authSession } = useApp();
+  // Collections come from RTK Query rather than AppContext: the context no
+  // longer bootstraps them on admin routes, because the panel's own cache
+  // already holds them. Subscribing here shares that cache — it does not add a
+  // request when another admin screen has already loaded the same collection.
+  const { data: members = [] } = useGetMembersQuery();
 
   const isSuperAdminUser = Boolean(
     isSuperAdmin ||
@@ -186,7 +192,7 @@ export const AdminMemberTrendChart: React.FC = () => {
   }, [points]);
 
   return (
-    <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-6 space-y-6 shadow-xs transition-colors">
+    <div className="bg-white dark:bg-[#111726] border border-[#E4DFD5] dark:border-slate-800/80 rounded-2xl p-6 space-y-6 shadow-xs transition-colors">
       {/* Header & Controls */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
@@ -215,7 +221,7 @@ export const AdminMemberTrendChart: React.FC = () => {
                   </span>
                 )}
               </h4>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Monthly onboarding velocity, active member acquisition, and retention
               </p>
             </div>
@@ -224,13 +230,13 @@ export const AdminMemberTrendChart: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Chart View Toggle (Area vs Bar) */}
-          <div className="flex items-center bg-slate-100 dark:bg-[#18181c] p-1 rounded-xl border border-slate-200 dark:border-[#27272a]">
+          <div className="flex items-center bg-slate-100 dark:bg-[#0B101D] p-1 rounded-xl border border-slate-200 dark:border-slate-800">
             <button
               onClick={() => setChartType('area')}
               className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
                 chartType === 'area'
-                  ? 'bg-white dark:bg-[#27272f] text-slate-900 dark:text-white shadow-2xs'
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-white dark:bg-purple-950/80 text-slate-900 dark:text-purple-300 shadow-2xs border border-purple-200 dark:border-purple-800'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
               title="Cumulative Growth Curve"
             >
@@ -241,8 +247,8 @@ export const AdminMemberTrendChart: React.FC = () => {
               onClick={() => setChartType('bar')}
               className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer flex items-center gap-1.5 ${
                 chartType === 'bar'
-                  ? 'bg-white dark:bg-[#27272f] text-slate-900 dark:text-white shadow-2xs'
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-white dark:bg-purple-950/80 text-slate-900 dark:text-purple-300 shadow-2xs border border-purple-200 dark:border-purple-800'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
               title="Additions Per Period"
             >

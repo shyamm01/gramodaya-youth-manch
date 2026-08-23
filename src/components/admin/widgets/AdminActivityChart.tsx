@@ -2,6 +2,12 @@
 
 import React, { useState, useMemo } from 'react';
 import { useApp } from '@/src/context/AppContext';
+import {
+  useGetMembersQuery,
+  useGetComplaintsQuery,
+  useGetSocialWorksQuery,
+  useGetEventsQuery,
+} from '@/src/store/api/adminApi';
 import { DatePicker } from '../../inputs/DatePicker';
 import {
   Activity,
@@ -14,7 +20,15 @@ import {
 } from 'lucide-react';
 
 export const AdminActivityChart: React.FC = () => {
-  const { complaints, socialWorks, events, members, activeVillageId, isSuperAdmin, authSession } = useApp();
+  const { activeVillageId, isSuperAdmin, authSession } = useApp();
+  // Collections come from RTK Query rather than AppContext: the context no
+  // longer bootstraps them on admin routes, because the panel's own cache
+  // already holds them. Subscribing here shares that cache — it does not add a
+  // request when another admin screen has already loaded the same collection.
+  const { data: members = [] } = useGetMembersQuery();
+  const { data: complaints = [] } = useGetComplaintsQuery();
+  const { data: socialWorks = [] } = useGetSocialWorksQuery();
+  const { data: events = [] } = useGetEventsQuery();
 
   const isSuperAdminUser = Boolean(
     isSuperAdmin ||
@@ -179,7 +193,7 @@ export const AdminActivityChart: React.FC = () => {
   const secondaryPaths = useMemo(() => createSmoothPaths(pointsSecondary), [pointsSecondary]);
 
   return (
-    <div className="bg-white dark:bg-[#121215] border border-slate-200 dark:border-[#222328] rounded-2xl p-6 space-y-6 shadow-xs transition-colors">
+    <div className="bg-white dark:bg-[#111726] border border-[#E4DFD5] dark:border-slate-800/80 rounded-2xl p-6 space-y-6 shadow-xs transition-colors">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -193,7 +207,7 @@ export const AdminActivityChart: React.FC = () => {
                   {totalVolume} Actions
                 </span>
               </h4>
-              <p className="text-xs text-slate-500 dark:text-zinc-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Civic interactions, grievances resolution rate, and participation trends
               </p>
             </div>
@@ -203,24 +217,24 @@ export const AdminActivityChart: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3">
           {/* Legend */}
           <div className="hidden sm:flex items-center gap-3 text-[11px] font-bold">
-            <span className="flex items-center gap-1.5 text-slate-700 dark:text-zinc-300">
+            <span className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
               Total Actions
             </span>
-            <span className="flex items-center gap-1.5 text-slate-500 dark:text-zinc-400">
+            <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-500 inline-block"></span>
               Resolved / Approved
             </span>
           </div>
 
           {/* Quick timeframe tabs */}
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-[#18181c] p-1 rounded-xl border border-slate-200 dark:border-[#27272a]">
+          <div className="flex items-center gap-1 bg-slate-100 dark:bg-[#0B101D] p-1 rounded-xl border border-slate-200 dark:border-slate-800">
             <button
               onClick={() => setChartTimeframe('3m')}
               className={`px-2.5 py-1 text-xs font-bold rounded-lg transition cursor-pointer ${
                 chartTimeframe === '3m'
-                  ? 'bg-white dark:bg-[#27272f] text-slate-900 dark:text-white shadow-2xs'
-                  : 'text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-white dark:bg-purple-950/80 text-slate-900 dark:text-purple-300 shadow-2xs border border-purple-200 dark:border-purple-800'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               3 Months

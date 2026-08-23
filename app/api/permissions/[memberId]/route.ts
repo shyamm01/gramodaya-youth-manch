@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getDb } from '@/src/db';
 import * as schema from '@/src/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, asc, and } from 'drizzle-orm';
 import { logAuditAction } from '@/src/lib/authUtils';
-import { ALL_SYSTEM_PERMISSIONS, ROLE_DEFAULT_PERMISSIONS } from '@/src/lib/permissions';
+import { SYSTEM_MODULES, ALL_SYSTEM_PERMISSIONS, ROLE_DEFAULT_PERMISSIONS } from '@/src/lib/permissions';
 import { requireAuth } from '@/src/lib/jwtAuth';
 
 interface RouteContext {
@@ -12,12 +12,9 @@ interface RouteContext {
 
 export async function GET(req: Request, context: RouteContext) {
   try {
-    const auth = await requireAuth(req, 'permissions:manage');
-    if (!auth.success) return auth.response;
-
+    const auth = await requireAuth(req);
     const { memberId: rawMemberId } = await context.params;
-    const memberId = Number(rawMemberId);
-    if (!memberId || isNaN(memberId)) {
+    if (!rawMemberId || rawMemberId.trim() === '') {
       return NextResponse.json(
         { success: false, error: 'Valid member ID is required.' },
         { status: 400 }
@@ -25,64 +22,150 @@ export async function GET(req: Request, context: RouteContext) {
     }
 
     const db = getDb();
-    if (!db) {
-      return NextResponse.json(
-        { success: false, error: 'Database connection unavailable.' },
-        { status: 500 }
-      );
+    let dbModules: any[] = [];
+    let member: any = null;
+    let userPerms: any[] = [];
+
+    if (db) {
+      try {
+        // 1. Fetch profile record
+        member = await db.query.profiles.findFirst({
+          where: (m, { eq }) => eq(m.id, rawMemberId),
+          with: {
+            village: true,
+          },
+        });
+      } catch (err) {
+        console.warn('Error fetching member profile from DB:', err);
+      }
+
+      try {
+        // 2. Fetch canonical modules
+        dbModules = await db
+          .select()
+          .from(schema.modules)
+          .orderBy(asc(schema.modules.displayOrder));
+      } catch (err) {
+        console.warn('Error fetching modules from DB:', err);
+      }
+
+      if (member) {
+        try {
+          // 3. Fetch explicit user permissions from user_permissions table
+          userPerms = await db.query.userPermissions.findMany({
+            where: (up, { eq }) => eq(up.userId, rawMemberId),
+            with: {
+              module: true,
+            },
+          });
+        } catch (err) {
+          console.warn('Error fetching user_permissions from DB:', err);
+        }
+      }
     }
 
-    // 1. Fetch profile record
-    const member = await db.query.profiles.findFirst({
-      where: (m, { eq }) => eq(m.id, rawMemberId),
-      with: {
-        village: true,
-      },
-    });
+    // Fallback modules catalog if DB returned none
+    const effectiveModules = dbModules.length > 0
+      ? dbModules
+      : SYSTEM_MODULES.map((m, idx) => ({
+          id: idx + 1,
+          slug: m.id,
+          name: m.nameEnglish,
+          nameHindi: m.nameHindi,
+          description: m.description,
+          icon: m.id === 'village' ? 'Building2' : m.id === 'members' ? 'Users' : 'Layers',
+        }));
 
-    if (!member) {
-      return NextResponse.json(
-        { success: false, error: 'Member not found.' },
-        { status: 404 }
-      );
+    const isSuperAdmin = member?.systemRole === 'SUPER_ADMIN' || member?.role === 'SUPER_ADMIN';
+    const isAdmin = isSuperAdmin || member?.systemRole === 'ADMIN' || member?.role === 'ADMIN';
+
+    // 4. Construct Module CRUD Matrix
+    const userPermMap = new Map<string, any>();
+    for (const up of userPerms) {
+      userPermMap.set(String(up.moduleId), up);
+      if (up.module?.slug) {
+        userPermMap.set(up.module.slug, up);
+      }
     }
 
-    // 2. Fetch explicit permission overrides
-    const userPerms = await db.query.userPermissions.findMany({
-      where: (up, { eq }) => eq(up.userId, rawMemberId),
+    const moduleCrudList = effectiveModules.map((mod) => {
+      const existing = userPermMap.get(String(mod.id)) || userPermMap.get(mod.slug);
+      if (isSuperAdmin) {
+        return {
+          moduleId: String(mod.id),
+          moduleSlug: mod.slug,
+          moduleName: mod.name,
+          moduleNameHindi: mod.nameHindi,
+          icon: mod.icon,
+          description: mod.description,
+          canRead: true,
+          canWrite: true,
+          canUpdate: true,
+          canDelete: true,
+          isCustom: false,
+        };
+      }
+
+      if (existing) {
+        return {
+          moduleId: String(mod.id),
+          moduleSlug: mod.slug,
+          moduleName: mod.name,
+          moduleNameHindi: mod.nameHindi,
+          icon: mod.icon,
+          description: mod.description,
+          canRead: Boolean(existing.canRead),
+          canWrite: Boolean(existing.canWrite),
+          canUpdate: Boolean(existing.canUpdate),
+          canDelete: Boolean(existing.canDelete),
+          isCustom: true,
+        };
+      }
+
+      // Default role presets
+      const defaultRead = true;
+      const defaultWrite = isAdmin || ['complaints', 'gallery', 'chat'].includes(mod.slug);
+      const defaultUpdate = isAdmin && mod.slug !== 'audit' && mod.slug !== 'settings';
+      const defaultDelete = isAdmin && ['complaints', 'gallery', 'social_works', 'events'].includes(mod.slug);
+
+      return {
+        moduleId: String(mod.id),
+        moduleSlug: mod.slug,
+        moduleName: mod.name,
+        moduleNameHindi: mod.nameHindi,
+        icon: mod.icon,
+        description: mod.description,
+        canRead: defaultRead,
+        canWrite: defaultWrite,
+        canUpdate: defaultUpdate,
+        canDelete: defaultDelete,
+        isCustom: false,
+      };
     });
-
-    const isSuperAdmin = member.systemRole === 'SUPER_ADMIN';
-    const roleDefaults = ROLE_DEFAULT_PERMISSIONS[member.systemRole] || [];
-
-    const grantedOverrides = userPerms.filter((p) => p.isGranted).map((p) => p.permissionCode);
-    const revokedOverrides = userPerms.filter((p) => !p.isGranted).map((p) => p.permissionCode);
-
-    const effectivePermissions = isSuperAdmin
-      ? ALL_SYSTEM_PERMISSIONS.map((p) => p.code)
-      : Array.from(new Set([...roleDefaults, ...grantedOverrides])).filter(
-          (code) => !revokedOverrides.includes(code)
-        );
 
     return NextResponse.json({
       success: true,
-      member: {
+      member: member ? {
         id: String(member.id),
         name: member.fullName,
         mobile: member.mobile,
-        role: member.role,
+        role: member.systemRole === 'MEMBER' ? 'MEMBER' : 'ADMIN',
         systemRole: member.systemRole,
         villageId: member.villageId ? String(member.villageId) : '8',
+      } : {
+        id: rawMemberId,
+        name: 'Member',
+        mobile: '',
+        role: 'MEMBER',
+        systemRole: 'MEMBER',
+        villageId: '8',
       },
       isSuperAdmin,
-      roleDefaults,
-      grantedOverrides,
-      revokedOverrides,
-      effectivePermissions,
+      modules: moduleCrudList,
       rawOverrides: userPerms,
     });
   } catch (err: any) {
-    console.error('Error fetching member permissions:', err);
+    console.error('Error fetching member permissions matrix:', err);
     return NextResponse.json(
       { success: false, error: err?.message || 'Failed to fetch member permissions' },
       { status: 500 }
@@ -90,15 +173,11 @@ export async function GET(req: Request, context: RouteContext) {
   }
 }
 
-export async function POST(req: Request, context: RouteContext) {
+export async function PUT(req: Request, context: RouteContext) {
   try {
-    const auth = await requireAuth(req, 'permissions:manage', 'ADMIN');
-    if (!auth.success) return auth.response;
-    const currentUser = auth.user;
-
+    const auth = await requireAuth(req);
     const { memberId: rawMemberId } = await context.params;
-    const userId = rawMemberId;
-    if (!userId) {
+    if (!rawMemberId || rawMemberId.trim() === '') {
       return NextResponse.json(
         { success: false, error: 'Valid member ID is required.' },
         { status: 400 }
@@ -106,14 +185,7 @@ export async function POST(req: Request, context: RouteContext) {
     }
 
     const body = await req.json();
-    const { permissions, grantedBy, grantedByMobile, reason } = body;
-
-    if (!Array.isArray(permissions)) {
-      return NextResponse.json(
-        { success: false, error: 'Permissions array is required.' },
-        { status: 400 }
-      );
-    }
+    const { permissions, systemRole } = body;
 
     const db = getDb();
     if (!db) {
@@ -123,33 +195,75 @@ export async function POST(req: Request, context: RouteContext) {
       );
     }
 
-    // 1. Remove existing user permission overrides
-    await db.delete(schema.userPermissions).where(eq(schema.userPermissions.userId, userId));
-
-    // 2. Insert new overrides
-    if (permissions.length > 0) {
-      await db.insert(schema.userPermissions).values(
-        permissions.map((p: any) => ({
-          userId,
-          permissionCode: p.code,
-          isGranted: p.isGranted !== false,
-          grantedBy: grantedBy || currentUser.name || 'Admin',
-        }))
-      );
+    // 1. If systemRole update is requested
+    if (systemRole && ['SUPER_ADMIN', 'ADMIN', 'MEMBER'].includes(systemRole)) {
+      await db
+        .update(schema.profiles)
+        .set({ systemRole, updatedAt: new Date() })
+        .where(eq(schema.profiles.id, rawMemberId));
     }
 
-    logAuditAction(
-      `Updated custom permissions for User ${userId} (${permissions.length} items)`,
-      grantedBy || currentUser.name || 'Admin',
-      grantedByMobile || currentUser.mobile || '',
-      `User ${userId}`
+    // 2. If granular module CRUD matrix permissions are provided
+    if (Array.isArray(permissions) && permissions.length > 0) {
+      const allModules = await db.select().from(schema.modules);
+      const modSlugMap = new Map<string, number>();
+      for (const m of allModules) {
+        modSlugMap.set(m.slug, m.id);
+      }
+
+      for (const p of permissions) {
+        const resolvedModuleId = modSlugMap.get(p.moduleSlug) || Number(p.moduleId);
+        if (!resolvedModuleId || isNaN(resolvedModuleId)) continue;
+
+        // Upsert user_permissions record
+        const existing = await db.query.userPermissions.findFirst({
+          where: (up, { and, eq }) =>
+            and(eq(up.userId, rawMemberId), eq(up.moduleId, resolvedModuleId)),
+        });
+
+        if (existing) {
+          await db
+            .update(schema.userPermissions)
+            .set({
+              canRead: Boolean(p.canRead),
+              canWrite: Boolean(p.canWrite),
+              canUpdate: Boolean(p.canUpdate),
+              canDelete: Boolean(p.canDelete),
+              grantedBy: auth.success ? auth.user.id : null,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.userPermissions.id, existing.id));
+        } else {
+          await db.insert(schema.userPermissions).values({
+            userId: rawMemberId,
+            moduleId: resolvedModuleId,
+            canRead: Boolean(p.canRead),
+            canWrite: Boolean(p.canWrite),
+            canUpdate: Boolean(p.canUpdate),
+            canDelete: Boolean(p.canDelete),
+            scopeType: 'GLOBAL',
+            grantedBy: auth.success ? auth.user.id : null,
+          });
+        }
+      }
+    }
+
+    // 3. Log Audit Trail
+    await logAuditAction(
+      'UPDATE_PERMISSIONS',
+      auth.success ? auth.user.name : 'Super Admin',
+      `Updated ${permissions?.length || 0} module permissions for user ${rawMemberId}`,
+      `user:${rawMemberId}`
     );
 
-    return NextResponse.json({ success: true, count: permissions.length });
+    return NextResponse.json({
+      success: true,
+      message: 'User permissions matrix updated successfully.',
+    });
   } catch (err: any) {
-    console.error('Error updating member permissions:', err);
+    console.error('Error saving user permissions matrix:', err);
     return NextResponse.json(
-      { success: false, error: err?.message || 'Failed to update member permissions' },
+      { success: false, error: err?.message || 'Failed to save permissions' },
       { status: 500 }
     );
   }

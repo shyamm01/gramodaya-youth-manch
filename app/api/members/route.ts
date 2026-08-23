@@ -62,7 +62,7 @@ export async function GET() {
           dob: p.dob || "",
           gender: p.gender || "",
           address: fullAddress,
-          pincode: p.pincode || v?.pincode || "241125",
+          pincode: v?.pincode || "241125",
           state: st?.nameHindi || st?.name || "Uttar Pradesh",
           district: dist?.nameHindi || dist?.name || "Hardoi",
           block: v?.blockNameHindi || v?.blockName || "Hardoi",
@@ -75,9 +75,9 @@ export async function GET() {
           designation: p.designation || "",
           politicalBackground: p.politicalBackground || "",
           bloodGroup: p.bloodGroup || "",
-          role: p.role || "MEMBER",
+          role: p.systemRole === "MEMBER" ? "MEMBER" : "ADMIN",
           systemRole: p.systemRole || "MEMBER",
-          isApproved: p.isApproved || p.status === 'active',
+          isApproved: p.status === 'active',
           createdAt: p.createdAt,
         };
       });
@@ -120,9 +120,11 @@ export async function POST(req: Request) {
       designation,
       politicalBackground,
       bloodGroup,
-      status = "pending",
+      status = "active",
       role = "MEMBER",
       systemRole = "MEMBER",
+      adminName,
+      adminMobile,
     } = validation.data as any;
 
     const db = getDb();
@@ -132,19 +134,19 @@ export async function POST(req: Request) {
 
     const cleanMobileDigits = normalizeMobile(mobile || "");
     const formattedMobile = "+91 " + cleanMobileDigits.slice(0, 5) + " " + cleanMobileDigits.slice(5);
+    const cleanEmail = email && email.trim() ? email.trim().toLowerCase() : null;
 
     // Check duplicate in profiles by mobile or email
     let existingProfile: any = null;
     try {
+      const conditions = [like(schema.profiles.mobile, "%" + cleanMobileDigits + "%")];
+      if (cleanEmail) {
+        conditions.push(eq(schema.profiles.email, cleanEmail));
+      }
       const found = await db
         .select()
         .from(schema.profiles)
-        .where(
-          or(
-            like(schema.profiles.mobile, "%" + cleanMobileDigits + "%"),
-            email ? eq(schema.profiles.email, email.trim().toLowerCase()) : undefined
-          )
-        )
+        .where(or(...conditions))
         .limit(1);
       if (found && found.length > 0) existingProfile = found[0];
     } catch (e) {
@@ -173,7 +175,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json(
         {
-          error: "यह खाता (" + formattedMobile + ") पहले से पंजीकृत है [स्थिति: " + (existingProfile.status === "active" ? "सक्रिय" : "लंबित") + "]।",
+          error: `An account is already registered with this mobile (${formattedMobile}) or email (${existingProfile.email || cleanEmail}). Status: ${existingProfile.status}.`,
           alreadyRegistered: true,
           member: existingProfile,
           token,
@@ -187,38 +189,130 @@ export async function POST(req: Request) {
     const { ensureSupabaseUrl } = await import("@/src/lib/supabaseStorage");
     const cdnPhotoUrl = photoUrl ? await ensureSupabaseUrl(photoUrl, "profiles", "member") : null;
 
-    // profiles.id is a foreign key to auth.users(id), so a profile can only be created
-    // through a real Supabase Auth user — mobile-only members get a synthetic <mobile>@gym.org identity.
     const { getServerSupabase } = await import("@/src/lib/supabaseServer");
     const supabase = getServerSupabase();
     if (!supabase) {
-      return NextResponse.json({ success: false, error: "प्रमाणीकरण सेवा अनुपलब्ध है।" }, { status: 500 });
+      return NextResponse.json({ success: false, error: "Authentication service unavailable." }, { status: 500 });
     }
 
-    const syntheticEmail = email ? email.trim().toLowerCase() : `${cleanMobileDigits}@gym.org`;
-    const finalPassword = password && password.length >= 4 ? password : crypto.randomBytes(24).toString("hex");
-
-    const { data: created, error: createErr } = await supabase.auth.admin.createUser({
-      email: syntheticEmail,
-      password: finalPassword,
-      email_confirm: true,
-      user_metadata: {
-        full_name: name.trim(),
-        mobile: cleanMobileDigits,
-        status,
-        system_role: systemRole,
-        role,
-      },
-    });
-
-    if (createErr || !created?.user) {
-      return NextResponse.json(
-        { success: false, error: "यह खाता पहले से पंजीकृत हो सकता है अथवा खाता बनाने में त्रुटि हुई।" },
-        { status: 409 }
-      );
+    // Determine application origin for email redirect link
+    let origin = "http://localhost:3000";
+    try {
+      const originHeader = req.headers.get("origin") || req.headers.get("referer");
+      if (originHeader) {
+        origin = new URL(originHeader).origin;
+      }
+    } catch {
+      origin = "http://localhost:3000";
     }
 
-    const profileId = created.user.id;
+    const redirectTo = `${origin}/auth/callback?next=/auth/update-password`;
+
+    let createdUser: any = null;
+    let inviteLink: string | null = null;
+    let inviteSent = false;
+
+    if (cleanEmail) {
+      // 1. Try inviting user by email (sends Supabase invitation email with password setup link)
+      try {
+        const { data: inviteData, error: inviteErr } = await supabase.auth.admin.inviteUserByEmail(cleanEmail, {
+          data: {
+            full_name: name.trim(),
+            mobile: cleanMobileDigits,
+            status: status || "active",
+            system_role: systemRole || role || "MEMBER",
+            role: role || "MEMBER",
+          },
+          redirectTo,
+        });
+
+        if (!inviteErr && inviteData?.user) {
+          createdUser = inviteData.user;
+          inviteSent = true;
+        } else if (inviteErr) {
+          console.warn("inviteUserByEmail note, falling back to createUser + generateLink:", inviteErr.message);
+        }
+      } catch (invEx) {
+        console.warn("inviteUserByEmail exception:", invEx);
+      }
+
+      // 2. If invitation was not sent directly, create the user and generate a verification/setup link
+      if (!createdUser) {
+        const initialPassword = password && password.length >= 6 ? password : crypto.randomBytes(16).toString("hex");
+        const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+          email: cleanEmail,
+          password: initialPassword,
+          email_confirm: false,
+          user_metadata: {
+            full_name: name.trim(),
+            mobile: cleanMobileDigits,
+            status: status || "active",
+            system_role: systemRole || role || "MEMBER",
+            role: role || "MEMBER",
+          },
+        });
+
+        if (createErr || !created?.user) {
+          return NextResponse.json(
+            { success: false, error: createErr?.message || "Failed to create user authentication record." },
+            { status: 409 }
+          );
+        }
+        createdUser = created.user;
+
+        // Generate invitation / password recovery setup link
+        try {
+          const { data: linkData } = await supabase.auth.admin.generateLink({
+            type: "invite",
+            email: cleanEmail,
+            options: { redirectTo },
+          });
+
+          if (linkData?.properties?.action_link) {
+            inviteLink = linkData.properties.action_link;
+          } else {
+            // Fallback to recovery link
+            const { data: recData } = await supabase.auth.admin.generateLink({
+              type: "recovery",
+              email: cleanEmail,
+              options: { redirectTo },
+            });
+            if (recData?.properties?.action_link) {
+              inviteLink = recData.properties.action_link;
+            }
+          }
+        } catch (linkGenErr) {
+          console.warn("generateLink fallback notice:", linkGenErr);
+        }
+      }
+    } else {
+      // Mobile-only identity
+      const syntheticEmail = `${cleanMobileDigits}@gym.org`;
+      const finalPassword = password && password.length >= 4 ? password : crypto.randomBytes(24).toString("hex");
+
+      const { data: created, error: createErr } = await supabase.auth.admin.createUser({
+        email: syntheticEmail,
+        password: finalPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: name.trim(),
+          mobile: cleanMobileDigits,
+          status,
+          system_role: systemRole,
+          role,
+        },
+      });
+
+      if (createErr || !created?.user) {
+        return NextResponse.json(
+          { success: false, error: createErr?.message || "Failed to create member user record." },
+          { status: 409 }
+        );
+      }
+      createdUser = created.user;
+    }
+
+    const profileId = createdUser.id;
 
     // Trigger inserts a base row from user_metadata; fill in the rest authoritatively.
     let insertedRecord: any = null;
@@ -229,22 +323,19 @@ export async function POST(req: Request) {
           fullName: name.trim(),
           avatarUrl: cdnPhotoUrl || photoUrl || null,
           mobile: formattedMobile,
-          email: email ? email.trim().toLowerCase() : null,
+          email: cleanEmail || null,
           fatherName: fatherName ? fatherName.trim() : null,
           dob: dob || null,
           gender: gender || null,
           villageId: numericVillageId || 8,
-          pincode: pincode || "241125",
           houseNo: houseNo || null,
           street: street || null,
           occupation: occupation || null,
           designation: designation || null,
           politicalBackground: politicalBackground || null,
           bloodGroup: bloodGroup || null,
-          status: status as any,
-          role: role as any,
-          systemRole: systemRole as any,
-          isApproved: status === 'active',
+          status: (status || "active") as any,
+          systemRole: (systemRole || (role === 'ADMIN' ? 'ADMIN' : 'MEMBER')) as any,
         })
         .where(eq(schema.profiles.id, profileId))
         .returning();
@@ -258,7 +349,7 @@ export async function POST(req: Request) {
       villageId: String(numericVillageId || 1),
       name: name.trim(),
       mobile: formattedMobile,
-      email: email ? email.trim() : "",
+      email: cleanEmail || "",
       photoUrl: cdnPhotoUrl || photoUrl || "",
       fatherName: fatherName ? fatherName.trim() : "",
       dob: dob || "",
@@ -277,9 +368,9 @@ export async function POST(req: Request) {
       designation: designation || "",
       politicalBackground: politicalBackground || "",
       bloodGroup: bloodGroup || "",
-      status: status,
-      role: role,
-      systemRole: systemRole,
+      status: status || "active",
+      role: role || "MEMBER",
+      systemRole: systemRole || "MEMBER",
       isApproved: status === 'active',
       organizationName: "ग्रामोदय यूथ मंच",
       createdAt: new Date(),
@@ -296,9 +387,34 @@ export async function POST(req: Request) {
       isAdmin: formatted.systemRole === "ADMIN" || formatted.systemRole === "SUPER_ADMIN",
     });
 
-    logAuditAction("New Member Profile: " + formatted.name, formatted.name, formatted.mobile, formatted.name);
+    logAuditAction("New Member Profile: " + formatted.name, adminName || formatted.name, adminMobile || formatted.mobile, formatted.name);
 
-    return NextResponse.json({ success: true, member: formatted, token });
+    if (db) {
+      try {
+        await db.insert(schema.auditLogs).values({
+          userName: adminName || 'Administrator',
+          action: 'MEMBER_REGISTERED',
+          details: `Registered new member account for ${formatted.name} (Email: ${cleanEmail || 'None'}, Mobile: ${formatted.mobile}) with authority role ${formatted.systemRole}. Email invitation & password setup link generated.`,
+          ipAddress: req.headers.get('x-forwarded-for') || '127.0.0.1',
+          villageId: numericVillageId || 1,
+          userId: profileId,
+          timestamp: new Date(),
+        });
+      } catch (auditErr) {
+        console.warn("Audit log insert note on member create:", auditErr);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      member: formatted,
+      token,
+      inviteLink,
+      inviteSent,
+      message: cleanEmail
+        ? `Member registered! An invitation & password setup link has been sent to ${cleanEmail}. The member can also log in anytime with Google using this email.`
+        : `Member registered successfully!`,
+    });
   } catch (err: any) {
     console.error("Error creating member profile:", err);
     return NextResponse.json({ success: false, error: err?.message || "Failed to register member" }, { status: 500 });

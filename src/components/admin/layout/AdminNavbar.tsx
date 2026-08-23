@@ -17,21 +17,27 @@ export const AdminNavbar: React.FC<AdminNavbarProps> = ({
   activeTab,
   onOpenMobileSidebar,
 }) => {
-  const { isSuperAdmin } = useApp();
+  const { isSuperAdmin, authSession } = useApp();
+
+  const roleLabel = isSuperAdmin
+    ? 'Super Admin'
+    : authSession.systemRole === 'ADMIN' || authSession.role === 'ADMIN'
+    ? 'Village Admin'
+    : 'Admin Portal';
 
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-8 py-3 bg-white/80 dark:bg-[#09090b]/80 backdrop-blur-md border-b border-slate-200 dark:border-[#202024] transition-colors duration-200">
+    <header className="sticky top-0 z-30 flex items-center justify-between px-4 sm:px-8 py-3 bg-white/85 dark:bg-[#070B14]/85 backdrop-blur-md border-b border-[#E4DFD5] dark:border-slate-800/80 transition-colors duration-200">
       <div className="flex items-center gap-3">
         <button
           onClick={onOpenMobileSidebar}
-          className="lg:hidden p-2 text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+          className="lg:hidden p-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl hover:bg-[#F3F0E8] dark:hover:bg-slate-800 transition cursor-pointer"
           aria-label="Open sidebar"
         >
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-zinc-400">
-          <span className="text-slate-400 dark:text-zinc-600">Super Admin</span>
+        <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+          <span className="text-slate-400 dark:text-slate-500">{roleLabel}</span>
           <span>/</span>
           <span className="text-slate-900 dark:text-white font-bold capitalize">
             {activeTab.replace('-', ' ')}
@@ -60,7 +66,7 @@ export const AdminNavbar: React.FC<AdminNavbarProps> = ({
         {/* Back to Public Portal Link */}
         <Link
           href="/"
-          className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-white px-2.5 py-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
+          className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white px-2.5 py-1.5 rounded-xl hover:bg-[#F3F0E8] dark:hover:bg-slate-800 transition"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Public Portal</span>

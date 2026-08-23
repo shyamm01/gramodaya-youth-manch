@@ -1,4 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
+import { setupListeners } from '@reduxjs/toolkit/query';
 import authReducer from './slices/authSlice';
 import villageReducer from './slices/villageSlice';
 import homeReducer from './slices/homeSlice';
@@ -15,6 +16,8 @@ import eldersReducer from './slices/eldersSlice';
 import leadershipReducer from './slices/leadershipSlice';
 import chatReducer from './slices/chatSlice';
 import permissionsReducer from './slices/permissionsSlice';
+import adminUiReducer from './slices/adminUiSlice';
+import { adminApi } from './api/adminApi';
 
 export const store = configureStore({
   reducer: {
@@ -34,13 +37,19 @@ export const store = configureStore({
     leadership: leadershipReducer,
     chat: chatReducer,
     permissions: permissionsReducer,
+    adminUi: adminUiReducer,
+    [adminApi.reducerPath]: adminApi.reducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: false,
-    }),
+    }).concat(adminApi.middleware),
   devTools: process.env.NODE_ENV !== 'production',
 });
+
+// Enables refetchOnReconnect and the cache-lifetime timers RTK Query uses to
+// drop entries no mounted component is subscribed to any more.
+setupListeners(store.dispatch);
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;

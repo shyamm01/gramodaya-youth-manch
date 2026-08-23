@@ -4,7 +4,7 @@ import {
   districts,
   gramPanchayats,
   villages,
-  permissions,
+  modules,
   profiles,
   announcements,
   complaints,
@@ -132,36 +132,45 @@ export async function seedDatabase() {
 
     const villageId = village.id;
 
-    // 5. Seed Core Permissions
-    console.log('Seeding Canonical Permissions...');
-    const CORE_PERMISSIONS = [
-      { code: 'dashboard:view', name: 'डैशबोर्ड दृश्य', module: 'dashboard', description: 'मुख्य डैशबोर्ड आँकड़े देखने की अनुमति' },
-      { code: 'complaints:view', name: 'शिकायतें देखें', module: 'complaints', description: 'ग्राम शिकायतों को देखने की अनुमति' },
-      { code: 'complaints:update_status', name: 'शिकायत स्थिति बदलें', module: 'complaints', description: 'शिकायतों की स्थिति अपडेट करने की अनुमति' },
-      { code: 'members:view', name: 'सदस्य देखें', module: 'members', description: 'ग्राम सदस्यों की सूची देखने की अनुमति' },
-      { code: 'members:approve', name: 'सदस्य स्वीकृति', module: 'members', description: 'लंबित सदस्यों को स्वीकृत करने की अनुमति' },
-      { code: 'social_work:create', name: 'सामाजिक कार्य जोड़ें', module: 'social_work', description: 'नए सामाजिक कार्यों को पोस्ट करने की अनुमति' },
-      { code: 'events:create', name: 'कार्यक्रम बनाएं', module: 'events', description: 'ग्राम कार्यक्रमों को प्रकाशित करने की अनुमति' },
-      { code: 'gallery:upload', name: 'चित्र अपलोड', module: 'gallery', description: 'चित्रशाला में नई तस्वीरें जोड़ने की अनुमति' },
-      { code: 'announcements:create', name: 'सूचना बनाएं', module: 'announcements', description: 'आधिकारिक सूचनाएं और अलर्ट जारी करने की अनुमति' },
-      { code: 'elders:create', name: 'बुजुर्ग सूची प्रबंधन', module: 'elders', description: 'बुजुर्ग सम्मान सूची में नाम जोड़ने की अनुमति' },
+    // 5. Seed Canonical System Modules
+    console.log('Seeding Canonical System Modules...');
+    const CANONICAL_MODULES = [
+      { slug: 'village', name: 'Village Management', nameHindi: 'ग्राम प्रबंधन', icon: 'Building2', description: 'Multi-village governance, chapter configurations, and geographical units', displayOrder: 1 },
+      { slug: 'members', name: 'Members & Approvals', nameHindi: 'सदस्यता एवं अनुमोदन', icon: 'Users', description: 'Member directory, verification workflows, and role assignments', displayOrder: 2 },
+      { slug: 'complaints', name: 'Complaints & Grievances', nameHindi: 'जन समस्या एवं शिकायत निवारण', icon: 'AlertCircle', description: 'Grievance logging, administrative triage, and status resolution', displayOrder: 3 },
+      { slug: 'social_works', name: 'Social Development Works', nameHindi: 'सामाजिक विकास कार्य', icon: 'HeartHandshake', description: 'Community welfare initiatives, development projects, and ground impact', displayOrder: 4 },
+      { slug: 'events', name: 'Village Events', nameHindi: 'ग्राम कार्यक्रम व सभाएं', icon: 'Calendar', description: 'Community meetings, festival gatherings, and program scheduling', displayOrder: 5 },
+      { slug: 'gallery', name: 'Media Gallery', nameHindi: 'चित्रशाला एवं मीडिया', icon: 'Image', description: 'Photo and media archive, event snapshots, and village gallery', displayOrder: 6 },
+      { slug: 'announcements', name: 'Announcements & Alerts', nameHindi: 'सूचना एवं प्रसारण', icon: 'Megaphone', description: 'Official public notices, alerts, and village broadcasts', displayOrder: 7 },
+      { slug: 'public_info', name: 'Public Information Board', nameHindi: 'सार्वजनिक सूचना पट्ट', icon: 'FileText', description: 'Transparency reports, public documents, and civic notices', displayOrder: 8 },
+      { slug: 'elders', name: 'Elder Care & Respect', nameHindi: 'बुजुर्ग सम्मान एवं देखरेख', icon: 'UserCheck', description: 'Senior citizen directory, honors, and elder care assistance', displayOrder: 9 },
+      { slug: 'education', name: 'Education & Career Guidance', nameHindi: 'शिक्षा एवं मार्गदर्शन', icon: 'GraduationCap', description: 'Scholarships, government schemes, and career counseling', displayOrder: 10 },
+      { slug: 'chat', name: 'Community Live Chat', nameHindi: 'सामुदायिक लाइव चैट', icon: 'MessageSquare', description: 'Real-time community discussions and direct communication', displayOrder: 11 },
+      { slug: 'audit', name: 'Audit & Activity Logs', nameHindi: 'ऑडिट एवं गतिविधि लॉग्स', icon: 'Activity', description: 'Security tracking, administrative activity history, and audit logs', displayOrder: 12 },
+      { slug: 'settings', name: 'Settings & Permissions Matrix', nameHindi: 'सिस्टम सेटिंग्स व अनुमतियां', icon: 'Settings', description: 'User permissions matrix and system configuration settings', displayOrder: 13 },
     ];
 
-    for (const perm of CORE_PERMISSIONS) {
+    for (const mod of CANONICAL_MODULES) {
       await db
-        .insert(permissions)
+        .insert(modules)
         .values({
-          code: perm.code,
-          name: perm.name,
-          module: perm.module,
-          description: perm.description,
+          slug: mod.slug,
+          name: mod.name,
+          nameHindi: mod.nameHindi,
+          icon: mod.icon,
+          description: mod.description,
+          displayOrder: mod.displayOrder,
+          isActive: true,
         })
         .onConflictDoUpdate({
-          target: permissions.code,
+          target: modules.slug,
           set: {
-            name: perm.name,
-            module: perm.module,
-            description: perm.description,
+            name: mod.name,
+            nameHindi: mod.nameHindi,
+            icon: mod.icon,
+            description: mod.description,
+            displayOrder: mod.displayOrder,
+            updatedAt: new Date(),
           },
         });
     }

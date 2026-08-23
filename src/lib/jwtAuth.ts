@@ -83,16 +83,39 @@ async function enrichUserFromProfile(user: JwtUserPayload): Promise<JwtUserPaylo
       const sysRole: SystemRole = isSuper ? 'SUPER_ADMIN' : rawSys === 'ADMIN' ? 'ADMIN' : 'MEMBER';
       const isAdm = isSuper || sysRole === 'ADMIN' || p.role === 'ADMIN';
 
-      // Fetch user custom permissions
+      // Fetch user custom module permissions
       let customPerms: PermissionCode[] = [];
       try {
         const permRows = await sql`
-          SELECT permission_code 
-          FROM public.user_permissions
-          WHERE user_id = ${p.id} AND is_granted = true
+          SELECT up.can_read, up.can_write, up.can_update, up.can_delete, m.slug as module_slug
+          FROM public.user_permissions up
+          JOIN public.modules m ON up.module_id = m.id
+          WHERE up.user_id = ${p.id}
         `;
         if (permRows && permRows.length > 0) {
-          customPerms = permRows.map((r: any) => r.permission_code as PermissionCode);
+          for (const r of permRows) {
+            const slug = r.module_slug;
+            if (r.can_read) customPerms.push(`${slug}:view` as PermissionCode);
+            if (r.can_write) {
+              customPerms.push(
+                `${slug}:create` as PermissionCode,
+                `${slug}:upload` as PermissionCode,
+                `${slug}:participate` as PermissionCode
+              );
+            }
+            if (r.can_update) {
+              customPerms.push(
+                `${slug}:update` as PermissionCode,
+                `${slug}:update_status` as PermissionCode,
+                `${slug}:resolve` as PermissionCode,
+                `${slug}:publish` as PermissionCode,
+                `${slug}:moderate` as PermissionCode
+              );
+            }
+            if (r.can_delete) {
+              customPerms.push(`${slug}:delete` as PermissionCode);
+            }
+          }
         }
       } catch (permErr) {
         // Ignore perm fetch error
