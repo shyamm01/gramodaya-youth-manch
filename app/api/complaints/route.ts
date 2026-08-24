@@ -35,21 +35,31 @@ export async function GET(req: Request) {
     const conditions = [];
     if (villageId) conditions.push(eq(schema.complaints.villageId, villageId));
     if (statusFilter) conditions.push(eq(schema.complaints.status, statusFilter as any));
-    if (categoryFilter) conditions.push(eq(schema.complaints.category, categoryFilter as any));
+    // ?category= still accepts the display name ("Water") for backward
+    // compatibility; it now resolves through the complaint_categories lookup
+    // rather than matching a duplicated enum column on the complaint itself.
+    if (categoryFilter) conditions.push(eq(schema.complaintCategories.name, categoryFilter));
     if (cursor) conditions.push(sql`${schema.complaints.id} < ${cursor}`);
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    // Fetch complaints with villages info and attachments
+    // Fetch complaints with village and category info, plus attachments
     const rows = await db
       .select({
         complaint: schema.complaints,
         villageName: schema.villages.name,
         villageNameHindi: schema.villages.nameHindi,
         villageSlug: schema.villages.slug,
+        categoryName: schema.complaintCategories.name,
+        categoryNameHindi: schema.complaintCategories.nameHindi,
+        categorySlug: schema.complaintCategories.slug,
       })
       .from(schema.complaints)
       .leftJoin(schema.villages, eq(schema.complaints.villageId, schema.villages.id))
+      .leftJoin(
+        schema.complaintCategories,
+        eq(schema.complaints.categoryId, schema.complaintCategories.id)
+      )
       .where(whereClause)
       .orderBy(desc(schema.complaints.id))
       .limit(limit);
@@ -74,7 +84,10 @@ export async function GET(req: Request) {
       }
     }
 
-    const formatted = rows.map(({ complaint: c, villageName, villageNameHindi, villageSlug }) => {
+    const formatted = rows.map(({
+      complaint: c, villageName, villageNameHindi, villageSlug,
+      categoryName, categoryNameHindi, categorySlug,
+    }) => {
       const atts = attachmentsMap[c.id] || [];
       const item: Record<string, any> = {
         id: String(c.id),
@@ -85,7 +98,10 @@ export async function GET(req: Request) {
         categoryId: c.categoryId ? String(c.categoryId) : undefined,
         title: c.title,
         titleHindi: c.titleHindi || undefined,
-        category: c.category,
+        // Resolved from complaint_categories, not stored on the complaint.
+        category: categoryName || 'Other',
+        categoryHindi: categoryNameHindi || undefined,
+        categorySlug: categorySlug || undefined,
         description: c.description,
         descriptionHindi: c.descriptionHindi || undefined,
         location: c.location,
@@ -96,7 +112,10 @@ export async function GET(req: Request) {
         reporterMobile: c.reporterMobile,
         status: c.status,
         priority: c.priority || "medium",
-        photoUrl: c.photoUrl || (atts[0]?.url ? atts[0].url : undefined),
+        // The cover image is the first photo attachment; complaints no longer
+        // carries its own photo_url copy.
+        photoUrl: atts.find((a) => a.type === "photo")?.url || atts[0]?.url || undefined,
+        videoUrl: atts.find((a) => a.type === "video")?.url || undefined,
         resolvedAt: c.resolvedAt || undefined,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
@@ -127,17 +146,23 @@ export async function GET(req: Request) {
           .groupBy(schema.complaints.status),
         db
           .select({
-            category: schema.complaints.category,
+            category: schema.complaintCategories.name,
             count: count(),
           })
           .from(schema.complaints)
+          .leftJoin(
+            schema.complaintCategories,
+            eq(schema.complaints.categoryId, schema.complaintCategories.id)
+          )
           .where(villageCondition)
-          .groupBy(schema.complaints.category),
+          .groupBy(schema.complaintCategories.name),
       ]);
 
       counts = {
         byStatus: Object.fromEntries(statusCounts.map((r) => [r.status, Number(r.count)])),
-        byCategory: Object.fromEntries(categoryCounts.map((r) => [r.category, Number(r.count)])),
+        byCategory: Object.fromEntries(
+          categoryCounts.map((r) => [r.category ?? "Other", Number(r.count)])
+        ),
         total: statusCounts.reduce((sum, r) => sum + Number(r.count), 0),
       };
     }
@@ -233,13 +258,26 @@ export async function POST(req: Request) {
     if (!resolvedReporterName) resolvedReporterName = "Village Resident";
     if (!resolvedReporterMobile) resolvedReporterMobile = "Hidden";
 
-    // Resolve categoryId from category name if not provided
+    // Resolve categoryId from the category name if the client sent one.
+    // categoryId is the only place a complaint records its category now, so
+    // this falls back to "Other" rather than leaving the complaint unclassified.
     if (!resolvedCategoryId && category) {
       const catRow = await db.query.complaintCategories.findFirst({
         where: (c, { eq: eqOp }) => eqOp(c.name, category),
       });
       if (catRow) resolvedCategoryId = catRow.id;
     }
+    if (!resolvedCategoryId) {
+      const fallbackCat = await db.query.complaintCategories.findFirst({
+        where: (c, { eq: eqOp }) => eqOp(c.slug, "other"),
+      });
+      resolvedCategoryId = fallbackCat?.id;
+    }
+    const resolvedCategory = resolvedCategoryId
+      ? await db.query.complaintCategories.findFirst({
+          where: (c, { eq: eqOp }) => eqOp(c.id, resolvedCategoryId!),
+        })
+      : undefined;
 
     const { ensureSupabaseUrl } = await import("@/src/lib/supabaseStorage");
     const cdnPhotoUrl = photoUrl ? await ensureSupabaseUrl(photoUrl, "grievances", "complaint") : null;
@@ -252,7 +290,6 @@ export async function POST(req: Request) {
         categoryId: resolvedCategoryId || null,
         title: title.trim(),
         titleHindi: titleHindi?.trim() || null,
-        category: (category as any) || "Other",
         description: description.trim(),
         descriptionHindi: descriptionHindi?.trim() || null,
         location: location.trim(),
@@ -262,14 +299,14 @@ export async function POST(req: Request) {
         reporterName: resolvedReporterName,
         reporterMobile: resolvedReporterMobile,
         priority: (priority as any) || "medium",
-        photoUrl: cdnPhotoUrl || photoUrl || null,
-        videoUrl: videoUrl || null,
         status: "NEW",
         isActive: Boolean(isActive ?? true),
       })
       .returning();
 
-    // Insert attachments (from explicit array + backward-compat photo/video)
+    // Media goes to complaint_attachments only — the complaint row no longer
+    // keeps its own photo_url / video_url copy. A request body that still sends
+    // photoUrl / videoUrl is accepted and turned into attachments here.
     const attachmentRows: { complaintId: number; type: any; url: string; caption?: string }[] = [];
 
     if (cdnPhotoUrl || photoUrl) {
@@ -297,11 +334,17 @@ export async function POST(req: Request) {
       }
     }
 
+    // (complaint_id, url) is unique, so the same file arriving both as
+    // photoUrl and inside the attachments array must not be inserted twice.
+    const uniqueAttachmentRows = attachmentRows.filter(
+      (row, i) => attachmentRows.findIndex((r) => r.url === row.url) === i
+    );
+
     let insertedAttachments: any[] = [];
-    if (attachmentRows.length > 0) {
+    if (uniqueAttachmentRows.length > 0) {
       insertedAttachments = await db
         .insert(schema.complaintAttachments)
-        .values(attachmentRows)
+        .values(uniqueAttachmentRows)
         .returning();
     }
 
@@ -320,7 +363,9 @@ export async function POST(req: Request) {
       categoryId: inserted.categoryId ? String(inserted.categoryId) : undefined,
       title: inserted.title,
       titleHindi: inserted.titleHindi || null,
-      category: inserted.category,
+      category: resolvedCategory?.name || "Other",
+      categoryHindi: resolvedCategory?.nameHindi || undefined,
+      categorySlug: resolvedCategory?.slug || undefined,
       description: inserted.description,
       descriptionHindi: inserted.descriptionHindi || null,
       location: inserted.location,
@@ -331,8 +376,8 @@ export async function POST(req: Request) {
       reporterMobile: inserted.reporterMobile,
       status: inserted.status,
       priority: inserted.priority,
-      photoUrl: inserted.photoUrl || "",
-      videoUrl: inserted.videoUrl || "",
+      photoUrl: insertedAttachments.find((a) => a.type === "photo")?.url || "",
+      videoUrl: insertedAttachments.find((a) => a.type === "video")?.url || "",
       attachments: insertedAttachments.map((a) => ({
         id: String(a.id),
         type: a.type,

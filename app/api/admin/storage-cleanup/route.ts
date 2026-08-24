@@ -31,7 +31,8 @@ export async function POST(req: Request) {
       db.select({ url: schema.profiles.avatarUrl }).from(schema.profiles),
       db.select({ url: schema.gallery.photoUrl }).from(schema.gallery),
       db.select({ url: schema.events.photoUrl }).from(schema.events),
-      db.select({ url: schema.complaints.photoUrl }).from(schema.complaints),
+      // Grievance media lives in complaint_attachments, not on the complaint.
+      db.select({ url: schema.complaintAttachments.url }).from(schema.complaintAttachments),
       db.select({ url: schema.socialWorks.photoUrl }).from(schema.socialWorks),
       db.select({ url: schema.elders.photoUrl }).from(schema.elders),
     ]);

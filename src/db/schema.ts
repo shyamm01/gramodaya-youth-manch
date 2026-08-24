@@ -33,22 +33,16 @@ export const systemRoleEnum = pgEnum('system_role', [
 ]);
 
 export const memberStatusEnum = pgEnum('member_status', ['active', 'pending', 'suspended']);
-export const memberRoleEnum = pgEnum('member_role', ['MEMBER', 'ADMIN']);
 
-export const complaintCategoryEnum = pgEnum('complaint_category', [
-  'Water',
-  'Road',
-  'Electricity',
-  'Cleanliness',
-  'Environment',
-  'Education',
-  'Health',
-  'Sanitation',
-  'Animal-related',
-  'Social Issue',
-  'Government Service',
-  'Other',
-]);
+/**
+ * NOTE: `member_role` and `complaint_category` used to live here.
+ *  - member_role backed profiles.role, a second copy of profiles.system_role.
+ *  - complaint_category backed complaints.category, a second copy of
+ *    complaints.category_id -> complaint_categories.
+ * Both columns and both types are dropped in migration 0028. Categories are now
+ * rows in `complaintCategories` below, so adding one is an INSERT, not a
+ * migration.
+ */
 
 export const complaintStatusEnum = pgEnum('complaint_status', [
   'NEW',
@@ -136,6 +130,19 @@ export const educationEnquiryStatusEnum = pgEnum('education_enquiry_status', [
   'closed',
 ]);
 
+export const chatRoomTypeEnum = pgEnum('chat_room_type', [
+  'group',
+  'direct',
+  'village',
+]);
+
+/** Role within a room — orthogonal to the platform-wide system_role. */
+export const chatMemberRoleEnum = pgEnum('chat_member_role', [
+  'member',
+  'moderator',
+  'admin',
+]);
+
 // ==============================================================================
 // 2. GEOGRAPHY & CHAPTER HIERARCHY TABLES (3NF Normalized)
 // ==============================================================================
@@ -149,7 +156,9 @@ export const states = pgTable(
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     name: text('name').notNull(),
     nameHindi: text('name_hindi').notNull(),
-    code: text('code').notNull().unique(), // e.g. 'UP'
+    // Uniqueness lives in idx_states_code below. Declaring `.unique()` as well
+    // makes Postgres build a second, identical index on the same column.
+    code: text('code').notNull(), // e.g. 'UP'
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
@@ -173,6 +182,9 @@ export const districts = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    // A district name is unique within its state — the natural key that lets
+    // the reference seed be re-run without creating duplicates.
+    uniqueIndex('idx_districts_state_name').on(table.stateId, sql`lower(${table.name})`),
     index('idx_districts_state_id').on(table.stateId),
     index('idx_districts_name').on(table.name),
   ]
@@ -199,6 +211,7 @@ export const gramPanchayats = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    uniqueIndex('idx_gram_panchayats_district_name').on(table.districtId, sql`lower(${table.name})`),
     index('idx_gram_panchayats_district_id').on(table.districtId),
     index('idx_gram_panchayats_name').on(table.name),
     index('idx_gram_panchayats_pincode').on(table.pincode),
@@ -213,7 +226,7 @@ export const villages = pgTable(
   'villages',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    slug: text('slug').notNull().unique(), // e.g. 'rasoolpur'
+    slug: text('slug').notNull(), // e.g. 'rasoolpur' — unique via idx_villages_slug
     name: text('name').notNull(),
     nameHindi: text('name_hindi').notNull(),
     gramPanchayatId: bigint('gram_panchayat_id', { mode: 'number' })
@@ -275,8 +288,14 @@ export const profiles = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    // Mobile is the OTP login key, so it has to be unique — partial, because
+    // "no mobile on file" is legitimate for an email-only account.
+    uniqueIndex('idx_profiles_mobile_unique')
+      .on(table.mobile)
+      .where(sql`mobile IS NOT NULL`),
     index('idx_profiles_created_at').on(table.createdAt),
     index('idx_profiles_mobile').on(table.mobile),
+    index('idx_profiles_email').on(table.email),
     index('idx_profiles_status').on(table.status),
     index('idx_profiles_system_role').on(table.systemRole),
     index('idx_profiles_village_id').on(table.villageId),
@@ -290,7 +309,10 @@ export const modules = pgTable(
   'modules',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    slug: text('slug').notNull().unique(), // Immutable identifier, e.g. 'complaints', 'members', 'events'
+    // Immutable identifier ('complaints', 'members', 'events') — a database
+    // trigger rejects any UPDATE that changes it, because permission rows and
+    // requireAuth() checks both address modules by slug.
+    slug: text('slug').notNull(),
     name: text('name').notNull(),
     nameHindi: text('name_hindi').notNull(),
     icon: text('icon').notNull().default('Layers'),
@@ -303,6 +325,7 @@ export const modules = pgTable(
   (table) => [
     uniqueIndex('idx_modules_slug').on(table.slug),
     index('idx_modules_is_active').on(table.isActive),
+    index('idx_modules_display_order').on(table.displayOrder),
   ]
 );
 
@@ -330,6 +353,15 @@ export const userPermissions = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    // One grant row per (user, module, scope). Without this the same grant
+    // could be inserted twice and the effective permission depended on which
+    // row a query happened to read first.
+    uniqueIndex('idx_user_permissions_unique_grant').on(
+      table.userId,
+      table.moduleId,
+      table.scopeType,
+      sql`COALESCE(${table.scopeId}, -1)`
+    ),
     index('idx_user_permissions_user_id').on(table.userId),
     index('idx_user_permissions_module_id').on(table.moduleId),
     index('idx_user_permissions_scope').on(table.scopeType, table.scopeId),
@@ -344,6 +376,7 @@ export const userVillageRoles = pgTable(
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
     userId: uuid('user_id')
+      .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
     villageId: bigint('village_id', { mode: 'number' })
       .notNull()
@@ -354,8 +387,9 @@ export const userVillageRoles = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index('idx_user_village_roles_user').on(table.userId),
-    index('idx_user_village_roles_village').on(table.villageId),
+    uniqueIndex('idx_user_village_roles_unique').on(table.userId, table.villageId),
+    index('idx_user_village_roles_user_id').on(table.userId),
+    index('idx_user_village_roles_village_id').on(table.villageId),
     index('idx_user_village_roles_role').on(table.role),
   ]
 );
@@ -374,7 +408,7 @@ export const complaintCategories = pgTable(
   'complaint_categories',
   {
     id: bigserial('id', { mode: 'number' }).primaryKey(),
-    slug: text('slug').notNull().unique(),
+    slug: text('slug').notNull(),
     name: text('name').notNull(),
     nameHindi: text('name_hindi').notNull(),
     icon: text('icon').notNull().default('📌'),
@@ -384,6 +418,7 @@ export const complaintCategories = pgTable(
   },
   (table) => [
     uniqueIndex('idx_complaint_categories_slug').on(table.slug),
+    index('idx_complaint_categories_display_order').on(table.displayOrder),
   ]
 );
 
@@ -398,8 +433,6 @@ export const complaints = pgTable(
       .references(() => complaintCategories.id, { onDelete: 'set null' }),
     title: text('title').notNull(),
     titleHindi: text('title_hindi'),
-    /** @deprecated Use categoryId FK instead. Kept for backward compat. */
-    category: complaintCategoryEnum('category').notNull().default('Other'),
     description: text('description').notNull(),
     descriptionHindi: text('description_hindi'),
     location: text('location').notNull(),
@@ -410,10 +443,9 @@ export const complaints = pgTable(
     reporterMobile: text('reporter_mobile').notNull(),
     status: complaintStatusEnum('status').notNull().default('NEW'),
     priority: complaintPriorityEnum('priority').notNull().default('medium'),
-    /** @deprecated Use complaint_attachments table instead. */
-    photoUrl: text('photo_url'),
-    /** @deprecated Use complaint_attachments table instead. */
-    videoUrl: text('video_url'),
+    // Media lives in `complaintAttachments`. The old photo_url / video_url
+    // columns mirrored the first attachment of each kind and capped a
+    // grievance at one photo and one video; migration 0012 moved them.
     isActive: boolean('is_active').notNull().default(true),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -423,7 +455,6 @@ export const complaints = pgTable(
     index('idx_complaints_village_id').on(table.villageId),
     index('idx_complaints_user_id').on(table.userId),
     index('idx_complaints_status').on(table.status),
-    index('idx_complaints_category').on(table.category),
     index('idx_complaints_category_id').on(table.categoryId),
     index('idx_complaints_created_at').on(table.createdAt),
     index('idx_complaints_priority').on(table.priority),
@@ -449,6 +480,8 @@ export const complaintAttachments = pgTable(
   },
   (table) => [
     index('idx_complaint_attachments_complaint_id').on(table.complaintId),
+    // The same file must not be attached to one grievance twice.
+    uniqueIndex('idx_complaint_attachments_unique_url').on(table.complaintId, table.url),
   ]
 );
 
@@ -502,6 +535,7 @@ export const socialWorks = pgTable(
     index('idx_social_works_user_id').on(table.userId),
     index('idx_social_works_status').on(table.status),
     index('idx_social_works_date').on(table.date),
+    index('idx_social_works_created_at').on(table.createdAt),
   ]
 );
 
@@ -516,6 +550,10 @@ export const events = pgTable(
       .references(() => villages.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     description: text('description'),
+    // Known limitation: date/time are text rather than date/time columns.
+    // Correcting them changes the payload the events API and the admin editor
+    // exchange, so it is an application change rather than a schema fix — see
+    // drizzle/README.md.
     date: text('date').notNull(),
     time: text('time').notNull(),
     location: text('location').notNull(),
@@ -528,6 +566,7 @@ export const events = pgTable(
   (table) => [
     index('idx_events_village_id').on(table.villageId),
     index('idx_events_status').on(table.status),
+    index('idx_events_date').on(table.date),
   ]
 );
 
@@ -544,7 +583,7 @@ export const gallery = pgTable(
     photoUrl: text('photo_url').notNull(),
     uploadedBy: text('uploaded_by').notNull(),
     uploadedByMobile: text('uploaded_by_mobile'),
-    date: date('date').notNull(),
+    date: date('date').notNull().default(sql`CURRENT_DATE`),
     status: galleryStatusEnum('status').notNull().default('published'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -552,6 +591,7 @@ export const gallery = pgTable(
   (table) => [
     index('idx_gallery_village_id').on(table.villageId),
     index('idx_gallery_status').on(table.status),
+    index('idx_gallery_date').on(table.date),
   ]
 );
 
@@ -590,8 +630,8 @@ export const announcements = pgTable(
     title: text('title').notNull(),
     content: text('content').notNull(),
     date: date('date').notNull().default(sql`CURRENT_DATE`),
-    publishedBy: text('published_by').notNull().default('Admin'),
-    isUrgent: boolean('is_urgent').default(false),
+    publishedBy: text('published_by').notNull().default('ग्रामोदय यूथ मंच'),
+    isUrgent: boolean('is_urgent').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -623,6 +663,7 @@ export const publicInfos = pgTable(
   (table) => [
     index('idx_public_infos_village_id').on(table.villageId),
     index('idx_public_infos_status').on(table.status),
+    index('idx_public_infos_created_at').on(table.createdAt),
   ]
 );
 
@@ -816,9 +857,11 @@ export const educationEnquiries = pgTable(
 export const chatRooms = pgTable(
   'chat_rooms',
   {
-    id: text('id').primaryKey(), // e.g. 'general', 'direct_userId1_userId2'
+    // Text primary key on purpose: room ids are addressed by name from the
+    // realtime client ('general', 'direct_<a>_<b>'), not allocated by the DB.
+    id: text('id').primaryKey(),
     name: text('name').notNull(),
-    type: text('type').notNull().default('group'), // 'group', 'direct', 'village'
+    type: chatRoomTypeEnum('type').notNull().default('group'),
     villageId: bigint('village_id', { mode: 'number' })
       .references(() => villages.id, { onDelete: 'cascade' }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -836,21 +879,25 @@ export const chatRooms = pgTable(
 export const chatMembers = pgTable(
   'chat_members',
   {
-    id: text('id').primaryKey(),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
     roomId: text('room_id')
       .notNull()
       .references(() => chatRooms.id, { onDelete: 'cascade' }),
-    memberId: text('member_id').notNull(),
-    mobile: text('mobile').notNull(),
-    name: text('name').notNull(),
-    role: text('role').default('Member'),
+    // Replaces the old member_id / mobile / name trio, which stored a copy of
+    // the person's profile on their membership row and went stale as soon as
+    // they changed their name.
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    /** Role *within this room* — a moderator here is a plain member elsewhere. */
+    role: chatMemberRoleEnum('role').notNull().default('member'),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
     lastReadAt: timestamp('last_read_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    uniqueIndex('idx_chat_members_room_user').on(table.roomId, table.userId),
     index('idx_chat_members_room_id').on(table.roomId),
-    index('idx_chat_members_member_id').on(table.memberId),
-    index('idx_chat_members_mobile').on(table.mobile),
+    index('idx_chat_members_user_id').on(table.userId),
   ]
 );
 
@@ -860,27 +907,31 @@ export const chatMembers = pgTable(
 export const chatMessages = pgTable(
   'chat_messages',
   {
-    id: text('id').primaryKey(),
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
     roomId: text('room_id')
       .notNull()
       .references(() => chatRooms.id, { onDelete: 'cascade' }),
+    // Derivable through roomId, but kept: the Supabase realtime subscription
+    // filters on it directly and a replication filter cannot join.
     villageId: bigint('village_id', { mode: 'number' })
       .references(() => villages.id, { onDelete: 'cascade' }),
-    senderMobile: text('sender_mobile').notNull(),
-    senderName: text('sender_name').notNull(),
-    senderPhoto: text('sender_photo'),
-    senderMemberId: text('sender_member_id'),
+    // Replaces sender_name / sender_mobile / sender_photo / sender_member_id —
+    // four copies of the sender's profile stamped onto every message, so an
+    // updated photo left every past message showing the old one.
+    // SET NULL, not cascade: a deleted account leaves its messages in place.
+    senderId: uuid('sender_id').references(() => profiles.id, { onDelete: 'set null' }),
     text: text('text').notNull(),
     photoUrl: text('photo_url'),
-    isRead: boolean('is_read').default(false),
-    isDeleted: boolean('is_deleted').default(false),
+    isRead: boolean('is_read').notNull().default(false),
+    isDeleted: boolean('is_deleted').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
     index('idx_chat_messages_room_id').on(table.roomId),
     index('idx_chat_messages_village_id').on(table.villageId),
+    index('idx_chat_messages_sender_id').on(table.senderId),
     index('idx_chat_messages_created_at').on(table.createdAt),
-    index('idx_chat_messages_sender_mobile').on(table.senderMobile),
+    index('idx_chat_messages_room_created').on(table.roomId, table.createdAt),
   ]
 );
 
@@ -959,6 +1010,8 @@ export const profilesRelations = relations(profiles, ({ one, many }) => ({
   userPermissions: many(userPermissions),
   villageRoles: many(userVillageRoles),
   auditLogs: many(auditLogs),
+  chatMemberships: many(chatMembers),
+  chatMessages: many(chatMessages),
 }));
 
 export const modulesRelations = relations(modules, ({ many }) => ({
@@ -1146,6 +1199,10 @@ export const chatMembersRelations = relations(chatMembers, ({ one }) => ({
     fields: [chatMembers.roomId],
     references: [chatRooms.id],
   }),
+  user: one(profiles, {
+    fields: [chatMembers.userId],
+    references: [profiles.id],
+  }),
 }));
 
 export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
@@ -1156,6 +1213,10 @@ export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
   village: one(villages, {
     fields: [chatMessages.villageId],
     references: [villages.id],
+  }),
+  sender: one(profiles, {
+    fields: [chatMessages.senderId],
+    references: [profiles.id],
   }),
 }));
 

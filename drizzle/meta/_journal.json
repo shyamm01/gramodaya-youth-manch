@@ -5,190 +5,232 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1786731940000,
-      "tag": "0000_create_enums",
+      "when": 1787500000000,
+      "tag": "0000_create_extensions_and_helpers",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1786731941000,
-      "tag": "0001_create_states_table",
+      "when": 1787500001000,
+      "tag": "0001_create_enums",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1786731942000,
-      "tag": "0002_create_districts_table",
+      "when": 1787500002000,
+      "tag": "0002_create_states_table",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
-      "when": 1786731943000,
-      "tag": "0003_create_gram_panchayats_table",
+      "when": 1787500003000,
+      "tag": "0003_create_districts_table",
       "breakpoints": true
     },
     {
       "idx": 4,
       "version": "7",
-      "when": 1786731944000,
-      "tag": "0004_create_villages_table",
+      "when": 1787500004000,
+      "tag": "0004_create_gram_panchayats_table",
       "breakpoints": true
     },
     {
       "idx": 5,
       "version": "7",
-      "when": 1786731945000,
-      "tag": "0005_create_permissions_table",
+      "when": 1787500005000,
+      "tag": "0005_create_villages_table",
       "breakpoints": true
     },
     {
       "idx": 6,
       "version": "7",
-      "when": 1786731946000,
-      "tag": "0006_create_user_permissions_table",
+      "when": 1787500006000,
+      "tag": "0006_create_profiles_table",
       "breakpoints": true
     },
     {
       "idx": 7,
       "version": "7",
-      "when": 1786731947000,
-      "tag": "0007_create_user_village_roles_table",
+      "when": 1787500007000,
+      "tag": "0007_create_modules_table",
       "breakpoints": true
     },
     {
       "idx": 8,
       "version": "7",
-      "when": 1786731948000,
-      "tag": "0008_create_members_table",
+      "when": 1787500008000,
+      "tag": "0008_create_user_permissions_table",
       "breakpoints": true
     },
     {
       "idx": 9,
       "version": "7",
-      "when": 1786731949000,
-      "tag": "0009_create_complaints_table",
+      "when": 1787500009000,
+      "tag": "0009_create_user_village_roles_table",
       "breakpoints": true
     },
     {
       "idx": 10,
       "version": "7",
-      "when": 1786731950000,
-      "tag": "0010_create_social_works_table",
+      "when": 1787500010000,
+      "tag": "0010_create_complaint_categories_table",
       "breakpoints": true
     },
     {
       "idx": 11,
       "version": "7",
-      "when": 1786731951000,
-      "tag": "0011_create_events_table",
+      "when": 1787500011000,
+      "tag": "0011_create_complaints_table",
       "breakpoints": true
     },
     {
       "idx": 12,
       "version": "7",
-      "when": 1786731952000,
-      "tag": "0012_create_gallery_table",
+      "when": 1787500012000,
+      "tag": "0012_create_complaint_attachments_table",
       "breakpoints": true
     },
     {
       "idx": 13,
       "version": "7",
-      "when": 1786731953000,
-      "tag": "0013_create_elders_table",
+      "when": 1787500013000,
+      "tag": "0013_create_complaint_status_history_table",
       "breakpoints": true
     },
     {
       "idx": 14,
       "version": "7",
-      "when": 1786731954000,
-      "tag": "0014_create_announcements_table",
+      "when": 1787500014000,
+      "tag": "0014_create_social_works_table",
       "breakpoints": true
     },
     {
       "idx": 15,
       "version": "7",
-      "when": 1786731955000,
-      "tag": "0015_create_public_infos_table",
+      "when": 1787500015000,
+      "tag": "0015_create_events_table",
       "breakpoints": true
     },
     {
       "idx": 16,
       "version": "7",
-      "when": 1786731956000,
-      "tag": "0016_create_group_messages_table",
+      "when": 1787500016000,
+      "tag": "0016_create_gallery_table",
       "breakpoints": true
     },
     {
       "idx": 17,
       "version": "7",
-      "when": 1786731957000,
-      "tag": "0017_create_messages_table",
+      "when": 1787500017000,
+      "tag": "0017_create_elders_table",
       "breakpoints": true
     },
     {
       "idx": 18,
       "version": "7",
-      "when": 1786731958000,
-      "tag": "0018_create_audit_logs_table",
+      "when": 1787500018000,
+      "tag": "0018_create_announcements_table",
       "breakpoints": true
     },
     {
       "idx": 19,
       "version": "7",
-      "when": 1786731959000,
-      "tag": "0019_create_chat_messages_table",
+      "when": 1787500019000,
+      "tag": "0019_create_public_infos_table",
       "breakpoints": true
     },
     {
       "idx": 20,
       "version": "7",
-      "when": 1786731960000,
-      "tag": "0020_create_profiles_table",
+      "when": 1787500020000,
+      "tag": "0020_create_education_categories_table",
       "breakpoints": true
     },
     {
       "idx": 21,
       "version": "7",
-      "when": 1786731961000,
-      "tag": "0021_create_chat_tables",
+      "when": 1787500021000,
+      "tag": "0021_create_education_resources_table",
       "breakpoints": true
     },
     {
       "idx": 22,
       "version": "7",
-      "when": 1786731962000,
-      "tag": "0022_extend_profiles_table",
+      "when": 1787500022000,
+      "tag": "0022_create_education_resource_links_table",
       "breakpoints": true
     },
     {
       "idx": 23,
       "version": "7",
-      "when": 1786731963000,
-      "tag": "0023_normalize_and_relate_enums",
+      "when": 1787500023000,
+      "tag": "0023_create_education_enquiries_table",
       "breakpoints": true
     },
     {
       "idx": 24,
       "version": "7",
-      "when": 1787308056641,
-      "tag": "0024_create_education_tables",
+      "when": 1787500024000,
+      "tag": "0024_create_chat_rooms_table",
       "breakpoints": true
     },
     {
       "idx": 25,
       "version": "7",
-      "when": 1787401321985,
-      "tag": "0025_add_education_resource_cta_label",
+      "when": 1787500025000,
+      "tag": "0025_create_chat_members_table",
       "breakpoints": true
     },
     {
       "idx": 26,
       "version": "7",
-      "when": 1787402318401,
-      "tag": "0026_add_education_resource_hindi_detail_fields",
+      "when": 1787500026000,
+      "tag": "0026_create_chat_messages_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1787500027000,
+      "tag": "0027_create_audit_logs_table",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1787500028000,
+      "tag": "0028_drop_legacy_objects",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1787500029000,
+      "tag": "0029_enable_row_level_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1787500030000,
+      "tag": "0030_enable_realtime_and_storage",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1787500031000,
+      "tag": "0031_create_auth_user_triggers",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1787500032000,
+      "tag": "0032_seed_reference_data",
       "breakpoints": true
     }
   ]

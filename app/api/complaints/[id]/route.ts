@@ -29,9 +29,16 @@ export async function GET(
         villageName: schema.villages.name,
         villageNameHindi: schema.villages.nameHindi,
         villageSlug: schema.villages.slug,
+        categoryName: schema.complaintCategories.name,
+        categoryNameHindi: schema.complaintCategories.nameHindi,
+        categorySlug: schema.complaintCategories.slug,
       })
       .from(schema.complaints)
       .leftJoin(schema.villages, eq(schema.complaints.villageId, schema.villages.id))
+      .leftJoin(
+        schema.complaintCategories,
+        eq(schema.complaints.categoryId, schema.complaintCategories.id)
+      )
       .where(eq(schema.complaints.id, numId))
       .limit(1);
 
@@ -52,7 +59,10 @@ export async function GET(
         .orderBy(schema.complaintStatusHistory.id),
     ]);
 
-    const { complaint: c, villageName, villageNameHindi, villageSlug } = row;
+    const {
+      complaint: c, villageName, villageNameHindi, villageSlug,
+      categoryName, categoryNameHindi, categorySlug,
+    } = row;
 
     const formatted: Record<string, any> = {
       id: String(c.id),
@@ -64,7 +74,10 @@ export async function GET(
       categoryId: c.categoryId ? String(c.categoryId) : undefined,
       title: c.title,
       titleHindi: c.titleHindi || undefined,
-      category: c.category,
+      // Resolved from complaint_categories, not stored on the complaint.
+      category: categoryName || 'Other',
+      categoryHindi: categoryNameHindi || undefined,
+      categorySlug: categorySlug || undefined,
       description: c.description,
       descriptionHindi: c.descriptionHindi || undefined,
       location: c.location,
@@ -75,7 +88,8 @@ export async function GET(
       reporterMobile: c.reporterMobile,
       status: c.status,
       priority: c.priority || "medium",
-      photoUrl: c.photoUrl || (attachments[0]?.url ? attachments[0].url : undefined),
+      photoUrl: attachments.find((a) => a.type === 'photo')?.url || attachments[0]?.url || undefined,
+      videoUrl: attachments.find((a) => a.type === 'video')?.url || undefined,
       resolvedAt: c.resolvedAt || undefined,
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
@@ -159,8 +173,16 @@ export async function PUT(
     const updateData: any = {};
     if (body.title !== undefined) updateData.title = body.title.trim();
     if (body.titleHindi !== undefined) updateData.titleHindi = body.titleHindi ? body.titleHindi.trim() : null;
-    if (body.category !== undefined) updateData.category = body.category;
-    if (body.categoryId !== undefined) updateData.categoryId = Number(body.categoryId) || null;
+    // A complaint's category is categoryId and nothing else. A body that still
+    // sends the display name is resolved through the lookup table.
+    if (body.categoryId !== undefined) {
+      updateData.categoryId = Number(body.categoryId) || null;
+    } else if (body.category !== undefined) {
+      const catRow = await db.query.complaintCategories.findFirst({
+        where: (c, { eq: eqOp }) => eqOp(c.name, body.category),
+      });
+      if (catRow) updateData.categoryId = catRow.id;
+    }
     if (body.description !== undefined) updateData.description = body.description.trim();
     if (body.descriptionHindi !== undefined) updateData.descriptionHindi = body.descriptionHindi ? body.descriptionHindi.trim() : null;
     if (body.location !== undefined) updateData.location = body.location;
@@ -177,9 +199,6 @@ export async function PUT(
         updateData.resolvedAt = new Date().toISOString();
       }
     }
-    if (body.photoUrl !== undefined) updateData.photoUrl = body.photoUrl;
-    if (body.videoUrl !== undefined) updateData.videoUrl = body.videoUrl;
-
     const [updated] = await db
       .update(schema.complaints)
       .set(updateData)
@@ -197,15 +216,30 @@ export async function PUT(
       });
     }
 
-    // Handle new attachments if provided
-    if (body.attachments?.length) {
-      const attachmentRows = body.attachments.map((att: any) => ({
-        complaintId: numId,
-        type: att.type || 'photo',
-        url: att.url,
-        caption: att.caption || null,
-      }));
-      await db.insert(schema.complaintAttachments).values(attachmentRows);
+    // Media edits go to complaint_attachments — the complaint row no longer
+    // has photo_url / video_url of its own. A body that still sends those two
+    // is folded into the attachment list here.
+    const incomingMedia: { type: string; url: string; caption: string | null }[] = [];
+    if (body.photoUrl) incomingMedia.push({ type: 'photo', url: body.photoUrl, caption: null });
+    if (body.videoUrl) incomingMedia.push({ type: 'video', url: body.videoUrl, caption: null });
+    for (const att of body.attachments || []) {
+      incomingMedia.push({ type: att.type || 'photo', url: att.url, caption: att.caption || null });
+    }
+
+    if (incomingMedia.length) {
+      const attachmentRows = incomingMedia
+        .filter((row, i) => incomingMedia.findIndex((r) => r.url === row.url) === i)
+        .map((att) => ({
+          complaintId: numId,
+          type: att.type as any,
+          url: att.url,
+          caption: att.caption,
+        }));
+      // (complaint_id, url) is unique — re-submitting the same image is a no-op.
+      await db
+        .insert(schema.complaintAttachments)
+        .values(attachmentRows)
+        .onConflictDoNothing();
     }
 
     logAuditAction(
@@ -253,7 +287,6 @@ export async function DELETE(
       .select({
         id: schema.complaints.id,
         title: schema.complaints.title,
-        photoUrl: schema.complaints.photoUrl,
         userId: schema.complaints.userId,
         reporterMobile: schema.complaints.reporterMobile,
       })
@@ -286,11 +319,9 @@ export async function DELETE(
     // Cascade delete handles complaint_attachments and complaint_status_history
     await db.delete(schema.complaints).where(eq(schema.complaints.id, numId));
 
-    // Clean up storage objects
+    // Clean up storage objects. complaint_attachments is the only place a
+    // grievance's media is recorded, so this list is complete.
     const urlsToDelete = attachments.map((a) => a.url);
-    if (existing.photoUrl && !urlsToDelete.includes(existing.photoUrl)) {
-      urlsToDelete.push(existing.photoUrl);
-    }
     for (const url of urlsToDelete) {
       deleteSupabaseObjectByUrl(url).catch(() => {});
     }

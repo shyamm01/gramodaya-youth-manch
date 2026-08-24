@@ -114,21 +114,34 @@ export function formatMember(m: any) {
 /**
  * Transformer: Complaint Model -> Standardized DTO
  */
-export function formatComplaint(c: any) {
+/**
+ * `category` and the media URLs are no longer columns on `complaints` — the
+ * category comes from complaint_categories via categoryId and the media from
+ * complaint_attachments. Callers should pass the joined category name as
+ * `categoryName` and the attachment rows as `attachments`; the DTO shape the
+ * clients consume is unchanged.
+ */
+export function formatComplaint(
+  c: any,
+  opts: { categoryName?: string | null; attachments?: { type: string; url: string }[] } = {}
+) {
   if (!c) return null;
+  const attachments = opts.attachments || c.attachments || [];
   return {
     id: String(c.id),
     villageId: c.villageId ? String(c.villageId) : '1',
-    memberId: c.memberId ? String(c.memberId) : undefined,
+    memberId: c.userId ? String(c.userId) : c.memberId ? String(c.memberId) : undefined,
+    categoryId: c.categoryId ? String(c.categoryId) : undefined,
     title: c.title,
-    category: c.category,
+    category: opts.categoryName ?? c.categoryName ?? 'Other',
     description: c.description,
     location: c.location,
     reporterName: c.reporterName,
     reporterMobile: c.reporterMobile,
     status: c.status,
-    photoUrl: c.photoUrl || '',
-    videoUrl: c.videoUrl || '',
+    priority: c.priority || 'medium',
+    photoUrl: attachments.find((a: any) => a.type === 'photo')?.url || '',
+    videoUrl: attachments.find((a: any) => a.type === 'video')?.url || '',
     isActive: c.isActive !== undefined ? Boolean(c.isActive) : true,
     resolvedAt: c.resolvedAt ? new Date(c.resolvedAt).toISOString() : undefined,
     createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : undefined,

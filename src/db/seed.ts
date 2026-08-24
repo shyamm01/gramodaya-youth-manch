@@ -8,6 +8,8 @@ import {
   profiles,
   announcements,
   complaints,
+  complaintCategories,
+  complaintAttachments,
   socialWorks,
   events,
   gallery,
@@ -205,22 +207,45 @@ export async function seedDatabase() {
     }
 
     // 9. Seed Complaints
+    // The category is a complaint_categories row (seeded by migration 0010) and
+    // the photo is a complaint_attachments row — neither is a column on the
+    // complaint any more.
     console.log(`Inserting ${store.complaints.length} complaints...`);
+    const categoryRows = await db.select().from(complaintCategories);
+    const categoryIdByName = new Map(
+      categoryRows.map((c) => [c.name.toLowerCase(), c.id])
+    );
+    const otherCategoryId = categoryIdByName.get('other');
+
     for (const comp of store.complaints) {
-      await db
+      const [insertedComplaint] = await db
         .insert(complaints)
         .values({
           villageId,
           title: comp.title,
-          category: (comp.category as any) || 'Other',
+          categoryId:
+            categoryIdByName.get(String(comp.category || '').toLowerCase()) ??
+            otherCategoryId ??
+            null,
           description: comp.description,
           location: comp.location || 'Rasoolpur',
           reporterName: comp.reporterName || 'Resident',
           reporterMobile: comp.reporterMobile || '+91 99999 99999',
           status: comp.status || 'NEW',
-          photoUrl: comp.photoUrl || null,
         })
-        .onConflictDoNothing();
+        .onConflictDoNothing()
+        .returning();
+
+      if (insertedComplaint && comp.photoUrl) {
+        await db
+          .insert(complaintAttachments)
+          .values({
+            complaintId: insertedComplaint.id,
+            type: 'photo',
+            url: comp.photoUrl,
+          })
+          .onConflictDoNothing();
+      }
     }
 
     // 10. Seed Social Works
