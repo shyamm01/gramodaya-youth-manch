@@ -674,13 +674,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const [authData, villagesList] = await Promise.all([
         fetchAuthMeOnce(),
         fetchVillagesOnce(),
-        // Content collections. Until now refreshData fetched only the session
-        // and the village list, so events, gallery, elders, complaints, social
-        // works and public infos stayed at their initial [] for the lifetime of
-        // the app — every admin section rendered its empty state no matter what
-        // the database held. The public pages never showed it because they each
-        // fetch their own data directly.
-        loadCollections(),
       ]);
 
       if (authData?.user) {
@@ -730,6 +723,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     refreshData();
+    // Safety fallback: ensure initial loading state resolves even under slow networks
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1500);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {

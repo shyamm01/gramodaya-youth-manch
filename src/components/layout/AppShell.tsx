@@ -56,20 +56,6 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     },
   ];
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#F8F9FA] dark:bg-[#0B0F17] transition-colors">
-        <div className="w-16 h-16 rounded-full border-4 border-[#2D6A4F] border-t-transparent animate-spin mb-4" />
-        <h2 className="text-xl font-bold text-[#1B4332] dark:text-[#E0DCCF]">
-          {villageSettings.orgName || 'Gramodaya Youth Manch'}
-        </h2>
-        <p className="text-sm text-[#40916C] dark:text-[#A3B18A] mt-1">
-          {villageSettings.tagline || 'Loading...'}
-        </p>
-      </div>
-    );
-  }
-
   // If this is a Super Admin or Admin dashboard route, completely bypass public Header, BackButtonHeader, BottomNav, and Footer
   if (isAdminRoute) {
     return (
@@ -93,6 +79,20 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
             onClose={() => setSelectedIdCardMember(null)}
           />
         )}
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#F8F9FA] dark:bg-[#0B0F17] transition-colors">
+        <div className="w-16 h-16 rounded-full border-4 border-[#2D6A4F] border-t-transparent animate-spin mb-4" />
+        <h2 className="text-xl font-bold text-[#1B4332] dark:text-[#E0DCCF]">
+          {villageSettings.orgName || 'Gramodaya Youth Manch'}
+        </h2>
+        <p className="text-sm text-[#40916C] dark:text-[#A3B18A] mt-1">
+          {villageSettings.tagline || 'Loading...'}
+        </p>
       </div>
     );
   }
