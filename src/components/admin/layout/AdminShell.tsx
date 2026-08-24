@@ -10,6 +10,11 @@ import { AdminLayout } from './AdminLayout';
 import { AdminUnauthorizedSection } from './AdminUnauthorizedSection';
 import { deriveAdminTab, adminTabToPath, TAB_TO_SECTION } from './adminTabs';
 import { resolveAdminAccess } from '../access/adminAccessPolicy';
+import {
+  SkeletonSectionHeader,
+  SkeletonFilterBar,
+  SkeletonTable,
+} from '@/src/components/admin/section-ui';
 
 /**
  * The chrome and the gate around every admin screen.
@@ -28,7 +33,7 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({ children }
   const pathname = usePathname();
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { authSession } = useApp();
+  const { authSession, isAuthHydrated } = useApp();
 
   const tab = useMemo(() => deriveAdminTab(pathname), [pathname]);
 
@@ -57,6 +62,22 @@ export const AdminShell: React.FC<{ children: React.ReactNode }> = ({ children }
   };
 
   const access = useMemo(() => resolveAdminAccess(tab, authSession), [tab, authSession]);
+
+  if (!isAuthHydrated) {
+    return (
+      <AdminLayout
+        activeTab={tab}
+        setActiveTab={handleTabChange}
+        onTriggerQuickCreateAction={handleQuickCreate}
+      >
+        <div className="space-y-6 animate-pulse">
+          <SkeletonSectionHeader />
+          <SkeletonFilterBar selects={2} />
+          <SkeletonTable columns={6} rows={7} />
+        </div>
+      </AdminLayout>
+    );
+  }
 
   if (!authSession || !authSession.isAdminLoggedIn) {
     return (

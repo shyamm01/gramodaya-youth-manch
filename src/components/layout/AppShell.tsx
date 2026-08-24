@@ -27,6 +27,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     selectedIdCardMember,
     setSelectedIdCardMember,
     authSession,
+    isAuthHydrated,
   } = useApp();
 
   const isAdminRoute = pathname?.startsWith('/super-admin') || pathname?.startsWith('/admin');
@@ -83,7 +84,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     );
   }
 
-  if (isLoading) {
+  if (isLoading || !isAuthHydrated) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#F8F9FA] dark:bg-[#0B0F17] transition-colors">
         <div className="w-16 h-16 rounded-full border-4 border-[#2D6A4F] border-t-transparent animate-spin mb-4" />

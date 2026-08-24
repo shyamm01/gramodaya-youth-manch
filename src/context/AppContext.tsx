@@ -78,6 +78,7 @@ interface AppContextType {
   stats: AppStats;
   authSession: AuthSession;
   setAuthSession: React.Dispatch<React.SetStateAction<AuthSession>>;
+  isAuthHydrated: boolean;
   isJoinModalOpen: boolean;
   setIsJoinModalOpen: (open: boolean) => void;
   isMyProfileModalOpen: boolean;
@@ -283,6 +284,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [integrations, setIntegrations] = useState<ApiIntegration[]>([]);
 
   const [authSession, setAuthSession] = useState<AuthSession>({ isAdminLoggedIn: false, isMemberLoggedIn: false });
+  const [isAuthHydrated, setIsAuthHydrated] = useState<boolean>(false);
   const [isJoinModalOpen, setIsJoinModalOpen] = useState<boolean>(false);
   const [isMyProfileModalOpen, setIsMyProfileModalOpen] = useState<boolean>(false);
   const [selectedChatPartner, setSelectedChatPartner] = useState<Member | null>(null);
@@ -469,6 +471,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         })
         .catch(() => {
           /* ignore network errors during initial check */
+        })
+        .finally(() => {
+          setIsAuthHydrated(true);
         });
     }
   }, []);
@@ -671,10 +676,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isFetchingDataRef.current = true;
 
     try {
-      const [authData, villagesList] = await Promise.all([
-        fetchAuthMeOnce(),
-        fetchVillagesOnce(),
-      ]);
+      // 1. Fetch /api/auth/me FIRST to verify authentication and RBAC session
+      const authData = await fetchAuthMeOnce();
 
       if (authData?.user) {
         const user = authData.user;
@@ -698,9 +701,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           currentMember: user,
           email: user.email,
           permissions: user.permissions || [],
+          token: authData.token || prev.token,
         }));
         if (user.permissions) setUserPermissions(user.permissions);
       }
+
+      // 2. Only after /api/auth/me completes, fetch village configuration
+      const villagesList = await fetchVillagesOnce();
 
       if (villagesList && Array.isArray(villagesList) && villagesList.length > 0) {
         setVillages(villagesList);
@@ -1953,6 +1960,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         stats,
         authSession,
         setAuthSession,
+        isAuthHydrated,
         isJoinModalOpen,
         setIsJoinModalOpen,
         isMyProfileModalOpen,

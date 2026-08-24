@@ -21,7 +21,7 @@ import {
 } from '../features/home';
 
 export const HomeSection: React.FC = () => {
-  const { members, complaints, socialWorks, events, gallery, admins, announcements, authSession } = useApp();
+  const { members, complaints, socialWorks, events, gallery, admins, announcements, authSession, isAuthHydrated } = useApp();
 
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
@@ -37,19 +37,16 @@ export const HomeSection: React.FC = () => {
     authSession.isMemberLoggedIn || authSession.isAdminLoggedIn || authSession.supabaseUserId
   );
 
-  // Every card on this page fetches from a generic, village-scoped API (also
-  // used elsewhere in the app) and owns its own loading/error state — a slow
-  // gallery query no longer blocks the notices card from showing, and one
-  // card failing doesn't fail the page. Dedup against StrictMode's dev-mode
-  // double-invoke happens inside each thunk's `condition`, not here.
+  // Triggered only AFTER /api/auth/me has completed so authorization context is fully established
   useEffect(() => {
+    if (!isAuthHydrated) return;
     dispatch(fetchHomeStats());
     dispatch(fetchHomeAnnouncements());
     dispatch(fetchHomeEvents());
     dispatch(fetchHomeSocialWork());
     dispatch(fetchHomeGallery());
     dispatch(fetchHomeComplaints());
-  }, [dispatch]);
+  }, [dispatch, isAuthHydrated]);
 
   const activeMembersCount =
     stats.data?.stats?.activeMembers ?? members.filter((m) => m.status === 'active').length;

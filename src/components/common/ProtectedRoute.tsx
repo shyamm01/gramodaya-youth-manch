@@ -49,6 +49,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     currentMemberMobile,
     setIsJoinModalOpen,
     lang,
+    isAuthHydrated,
   } = useApp();
   const router = useRouter();
   const pathname = usePathname();
@@ -76,6 +77,17 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     authSession.currentMember ||
     currentMemberMobile
   );
+
+  if (!isAuthHydrated) {
+    if (pathname?.startsWith('/admin') || pathname?.startsWith('/super-admin')) {
+      return <>{children}</>;
+    }
+    return (
+      <div className="min-h-[300px] flex items-center justify-center p-8">
+        <div className="w-8 h-8 rounded-full border-2 border-emerald-600 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   // Helper to determine context-relevant icon and policy details
   const getSectionMetadata = () => {

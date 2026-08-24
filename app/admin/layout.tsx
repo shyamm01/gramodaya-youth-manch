@@ -16,9 +16,5 @@ import { AdminShell } from '@/src/components/admin/layout/AdminShell';
  * is the inner one (is this person an admin, and may they open this screen).
  */
 export default function AdminRootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <ProtectedRoute>
-      <AdminShell>{children}</AdminShell>
-    </ProtectedRoute>
-  );
+  return <AdminShell>{children}</AdminShell>;
 }
