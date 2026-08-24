@@ -30,6 +30,8 @@ ALTER TABLE "states" DROP CONSTRAINT IF EXISTS "states_code_key";
 --> statement-breakpoint
 ALTER TABLE "states" DROP CONSTRAINT IF EXISTS "states_code_unique";
 --> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_states_code" ON "states" USING btree ("code");
+DROP INDEX IF EXISTS "idx_states_code";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_states_code" ON "states" USING btree ("code");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_states_name" ON "states" USING btree ("name");

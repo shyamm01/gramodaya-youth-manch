@@ -39,7 +39,9 @@ ALTER TABLE "districts"
 DELETE FROM "districts" a USING "districts" b
  WHERE a."id" > b."id" AND a."state_id" = b."state_id" AND lower(a."name") = lower(b."name");
 --> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_districts_state_name"
+DROP INDEX IF EXISTS "idx_districts_state_name";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_districts_state_name"
   ON "districts" USING btree ("state_id", lower("name"));
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_districts_state_id" ON "districts" USING btree ("state_id");

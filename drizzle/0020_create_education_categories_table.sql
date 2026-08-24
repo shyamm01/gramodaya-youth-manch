@@ -52,12 +52,16 @@ ALTER TABLE "education_categories"
 --> statement-breakpoint
 
 -- Indexes --------------------------------------------------------------------
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_education_categories_village_slug"
+DROP INDEX IF EXISTS "idx_education_categories_village_slug";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_education_categories_village_slug"
   ON "education_categories" USING btree ("village_id", "slug");
 --> statement-breakpoint
 -- PostgreSQL treats NULLs as distinct in a unique index, so platform-wide rows
 -- (village_id IS NULL) need their own partial index to stay unique by slug.
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_education_categories_global_slug"
+DROP INDEX IF EXISTS "idx_education_categories_global_slug";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_education_categories_global_slug"
   ON "education_categories" USING btree ("slug") WHERE "village_id" IS NULL;
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_education_categories_village_id"

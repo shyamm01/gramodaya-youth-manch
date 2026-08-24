@@ -24,7 +24,9 @@ ALTER TABLE "complaint_categories" DROP CONSTRAINT IF EXISTS "complaint_categori
 --> statement-breakpoint
 ALTER TABLE "complaint_categories" DROP CONSTRAINT IF EXISTS "complaint_categories_slug_unique";
 --> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_complaint_categories_slug"
+DROP INDEX IF EXISTS "idx_complaint_categories_slug";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_complaint_categories_slug"
   ON "complaint_categories" USING btree ("slug");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_complaint_categories_display_order"

@@ -79,7 +79,9 @@ DROP INDEX IF EXISTS "idx_user_village_roles_user";
 --> statement-breakpoint
 DROP INDEX IF EXISTS "idx_user_village_roles_village";
 --> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_user_village_roles_unique"
+DROP INDEX IF EXISTS "idx_user_village_roles_unique";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_user_village_roles_unique"
   ON "user_village_roles" USING btree ("user_id", "village_id");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_user_village_roles_user_id" ON "user_village_roles" USING btree ("user_id");

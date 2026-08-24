@@ -36,7 +36,12 @@ CREATE INDEX IF NOT EXISTS "idx_complaint_attachments_complaint_id"
   ON "complaint_attachments" USING btree ("complaint_id");
 --> statement-breakpoint
 -- The same file must not be attached to the same grievance twice.
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_complaint_attachments_unique_url"
+DELETE FROM "complaint_attachments" a USING "complaint_attachments" b
+ WHERE a."id" > b."id" AND a."complaint_id" = b."complaint_id" AND a."url" = b."url";
+--> statement-breakpoint
+DROP INDEX IF EXISTS "idx_complaint_attachments_unique_url";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_complaint_attachments_unique_url"
   ON "complaint_attachments" USING btree ("complaint_id", "url");
 --> statement-breakpoint
 

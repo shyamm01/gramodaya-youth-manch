@@ -91,7 +91,9 @@ DROP INDEX IF EXISTS "idx_chat_members_member_id";
 --> statement-breakpoint
 DROP INDEX IF EXISTS "idx_chat_members_mobile";
 --> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_chat_members_room_user"
+DROP INDEX IF EXISTS "idx_chat_members_room_user";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_chat_members_room_user"
   ON "chat_members" USING btree ("room_id", "user_id");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_chat_members_room_id" ON "chat_members" USING btree ("room_id");

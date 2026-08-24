@@ -44,7 +44,9 @@ ALTER TABLE "modules" DROP CONSTRAINT IF EXISTS "modules_slug_key";
 --> statement-breakpoint
 ALTER TABLE "modules" DROP CONSTRAINT IF EXISTS "modules_slug_unique";
 --> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_modules_slug" ON "modules" USING btree ("slug");
+DROP INDEX IF EXISTS "idx_modules_slug";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_modules_slug" ON "modules" USING btree ("slug");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_modules_is_active" ON "modules" USING btree ("is_active");
 --> statement-breakpoint

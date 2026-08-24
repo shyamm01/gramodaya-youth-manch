@@ -129,7 +129,9 @@ ALTER TABLE "profiles"
 -- Indexes --------------------------------------------------------------------
 -- Mobile is the login key for the OTP flow, so it has to be unique. Partial,
 -- because "no mobile on file" is a legitimate state for an email-only account.
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_profiles_mobile_unique"
+DROP INDEX IF EXISTS "idx_profiles_mobile_unique";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_profiles_mobile_unique"
   ON "profiles" USING btree ("mobile") WHERE "mobile" IS NOT NULL;
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_profiles_mobile" ON "profiles" USING btree ("mobile");

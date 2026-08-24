@@ -77,7 +77,9 @@ ALTER TABLE "villages" DROP CONSTRAINT IF EXISTS "villages_slug_key";
 --> statement-breakpoint
 ALTER TABLE "villages" DROP CONSTRAINT IF EXISTS "villages_slug_unique";
 --> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_villages_slug" ON "villages" USING btree ("slug");
+DROP INDEX IF EXISTS "idx_villages_slug";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_villages_slug" ON "villages" USING btree ("slug");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_villages_name" ON "villages" USING btree ("name");
 --> statement-breakpoint

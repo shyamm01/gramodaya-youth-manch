@@ -100,7 +100,9 @@ ALTER TABLE "education_resources"
 --> statement-breakpoint
 
 -- Indexes --------------------------------------------------------------------
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_education_resources_category_slug"
+DROP INDEX IF EXISTS "idx_education_resources_category_slug";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_education_resources_category_slug"
   ON "education_resources" USING btree ("category_id", "slug");
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_education_resources_category_id"   ON "education_resources" USING btree ("category_id");

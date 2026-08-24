@@ -73,7 +73,9 @@ ALTER TABLE "gram_panchayats"
 DELETE FROM "gram_panchayats" a USING "gram_panchayats" b
  WHERE a."id" > b."id" AND a."district_id" = b."district_id" AND lower(a."name") = lower(b."name");
 --> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_gram_panchayats_district_name"
+DROP INDEX IF EXISTS "idx_gram_panchayats_district_name";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_gram_panchayats_district_name"
   ON "gram_panchayats" USING btree ("district_id", lower("name"));
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_gram_panchayats_district_id" ON "gram_panchayats" USING btree ("district_id");

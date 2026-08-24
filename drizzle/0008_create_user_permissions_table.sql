@@ -123,7 +123,9 @@ DROP INDEX IF EXISTS "idx_user_permissions_user";
 --> statement-breakpoint
 DROP INDEX IF EXISTS "idx_user_permissions_code";
 --> statement-breakpoint
-CREATE UNIQUE INDEX IF NOT EXISTS "idx_user_permissions_unique_grant"
+DROP INDEX IF EXISTS "idx_user_permissions_unique_grant";
+--> statement-breakpoint
+CREATE UNIQUE INDEX "idx_user_permissions_unique_grant"
   ON "user_permissions" USING btree ("user_id", "module_id", "scope_type", (COALESCE("scope_id", -1)));
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "idx_user_permissions_user_id" ON "user_permissions" USING btree ("user_id");
