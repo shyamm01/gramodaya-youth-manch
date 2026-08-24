@@ -15,16 +15,17 @@ async function truncateAllUsers() {
   }
 
   try {
-    // Truncate all user-related tables with CASCADE
+    // `profiles` is the user table — `members` was dropped by migration 0028.
+    // CASCADE reaches the domain rows that reference a profile.
     await db.execute(sql`
-      TRUNCATE TABLE 
+      TRUNCATE TABLE
         public.user_permissions,
         public.user_village_roles,
-        public.members
+        public.profiles
       RESTART IDENTITY CASCADE;
     `);
 
-    console.log('✅ All users removed. Tables public.members, public.user_village_roles, public.user_permissions are now empty.');
+    console.log('✅ All users removed. Tables public.profiles, public.user_village_roles, public.user_permissions are now empty.');
     process.exit(0);
   } catch (error) {
     console.error('❌ Error truncating user tables:', error);

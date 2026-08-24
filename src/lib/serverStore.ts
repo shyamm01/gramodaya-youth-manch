@@ -220,44 +220,54 @@ export async function syncAllDatastoreToSupabase(): Promise<{ success: boolean; 
   let count = 0;
 
   try {
-    // 1. Sync Members
-    if (store.members.length > 0) {
-      const memberPayload = store.members.map((m) => ({
-        id: m.id,
-        name: m.name,
-        mobile: m.mobile,
-        status: m.status,
-        photo_url: m.photoUrl || null,
-        organization_name: m.organizationName || 'ग्रामोदय यूथ मंच',
-        father_name: m.fatherName || null,
-        dob: m.dob || null,
-        address: m.address || null,
-        role: 'MEMBER',
-        created_at: m.createdAt,
-      }));
-      const { error } = await supabase.from('members').upsert(memberPayload, { onConflict: 'id' });
-      if (!error) count += memberPayload.length;
-    }
+    // 1. Members
+    // Members are no longer syncable from the local JSON datastore. A person is
+    // a `profiles` row keyed by their Supabase auth.users UUID (the old
+    // `members` table was dropped in migration 0028), and this store has no
+    // auth identity to key on — inventing one would create profiles that no
+    // account can ever sign in to. Members are created through the auth flow
+    // and /api/members instead.
 
     // 2. Sync Complaints
     if (store.complaints.length > 0) {
+      const categorySlug = (c: { category?: string }) =>
+        String(c.category || 'Other').toLowerCase().replace(/\s+/g, '-');
+
+      // Resolve the category to its complaint_categories id — complaints no
+      // longer carries a category name of its own.
+      const { data: categoryRows } = await supabase
+        .from('complaint_categories')
+        .select('id, slug');
+      const categoryIdBySlug = new Map(
+        (categoryRows || []).map((r: any) => [r.slug as string, r.id as number])
+      );
+
       const complaintPayload = store.complaints.map((c) => ({
         id: c.id,
         title: c.title,
-        category: c.category,
+        category_id: categoryIdBySlug.get(categorySlug(c)) ?? categoryIdBySlug.get('other') ?? null,
         description: c.description,
         location: c.location,
         reporter_name: c.reporterName,
         reporter_mobile: c.reporterMobile,
         status: c.status,
-        photo_url: c.photoUrl || null,
-        video_url: c.videoUrl || null,
         is_active: c.isActive !== undefined ? c.isActive : true,
         resolved_at: c.resolvedAt || null,
         created_at: c.createdAt,
       }));
       const { error } = await supabase.from('complaints').upsert(complaintPayload, { onConflict: 'id' });
       if (!error) count += complaintPayload.length;
+
+      // Media belongs to complaint_attachments, not to the complaint row.
+      const attachmentPayload = store.complaints.flatMap((c) => [
+        ...(c.photoUrl ? [{ complaint_id: c.id, type: 'photo', url: c.photoUrl }] : []),
+        ...(c.videoUrl ? [{ complaint_id: c.id, type: 'video', url: c.videoUrl }] : []),
+      ]);
+      if (attachmentPayload.length > 0) {
+        await supabase
+          .from('complaint_attachments')
+          .upsert(attachmentPayload, { onConflict: 'complaint_id,url', ignoreDuplicates: true });
+      }
     }
 
     // 3. Sync Announcements

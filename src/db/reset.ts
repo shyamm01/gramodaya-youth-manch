@@ -29,28 +29,36 @@ export async function resetDatabase() {
   try {
     console.log('🗑️  Truncating all existing database tables (CASCADE)...');
 
+    // Child tables first, then parents. `members`, `permissions`,
+    // `group_messages` and `messages` are intentionally absent — they were
+    // dropped by migration 0028 and superseded by profiles / modules /
+    // chat_messages.
     const tableNames = [
       'chat_messages',
       'chat_members',
       'chat_rooms',
-      'messages',
-      'group_messages',
       'audit_logs',
+      'education_enquiries',
+      'education_resource_links',
+      'education_resources',
+      'education_categories',
       'public_infos',
       'elders',
       'gallery',
       'events',
       'social_works',
+      'complaint_status_history',
+      'complaint_attachments',
       'complaints',
+      'complaint_categories',
       'user_permissions',
       'user_village_roles',
-      'members',
+      'modules',
       'profiles',
       'villages',
       'gram_panchayats',
       'districts',
       'states',
-      'permissions',
     ];
 
     for (const table of tableNames) {
