@@ -6,13 +6,17 @@ import { ROLE_DEFAULT_PERMISSIONS } from '@/src/lib/permissions';
 
 export async function GET(req: Request) {
   try {
-    let token = extractTokenFromRequest(req);
+    const token = extractTokenFromRequest(req);
     let payload: any = null;
     let supabaseUser: any = null;
+    // Only a token that actually verified is echoed back to the client; a
+    // stale or malformed cookie must not be handed out as a live session.
+    let verifiedToken: string | null = null;
 
     // 1. Try custom JWT token if present
     if (token) {
       payload = await verifyJwtToken(token);
+      if (payload) verifiedToken = token;
     }
 
     // 2. If no JWT payload, check Supabase Server Client (SSR cookies)
@@ -156,8 +160,8 @@ export async function GET(req: Request) {
       user,
     };
 
-    if (token) {
-      response.token = token;
+    if (verifiedToken) {
+      response.token = verifiedToken;
     }
 
     return NextResponse.json(response);

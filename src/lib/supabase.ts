@@ -1,8 +1,12 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient as createSsrBrowserClient } from '@/lib/supabase/client';
 
-// Retrieve credentials directly from Vite environment variables (VITE_SUPABASE_URL & VITE_SUPABASE_ANON_KEY)
-const DEFAULT_SUPABASE_URL = 'https://yynnbfuinskyhdwjpnja.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_BHODlbLcF6uGs893x_r5dA_8c8bmxRr';
+// Retrieve credentials from Next.js environment variables defined in .env.local
+const DEFAULT_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://yynnbfuinskyhdwjpnja.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  'sb_publishable_BHODlbLcF6uGs893x_r5dA_8c8bmxRr';
 
 export const normalizeUrl = (rawUrl?: string | null): string | null => {
   if (!rawUrl || typeof rawUrl !== 'string') return null;
@@ -26,20 +30,22 @@ export const normalizeUrl = (rawUrl?: string | null): string | null => {
 
 export const getValidSupabaseUrl = (): string => {
   try {
-    const metaEnv = (import.meta as any).env || {};
-    const procEnv: Record<string, any> = typeof process !== 'undefined' && process.env ? process.env : {};
+    const metaEnv = typeof import.meta !== 'undefined' ? (import.meta as any).env || {} : {};
 
     const envUrl = normalizeUrl(
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.SUPABASE_URL ||
       metaEnv.VITE_SUPABASE_URL ||
       metaEnv.SUPABASE_URL ||
-      procEnv.VITE_SUPABASE_URL ||
-      procEnv.SUPABASE_URL ||
-      procEnv.NEXT_PUBLIC_SUPABASE_URL
+      (typeof process !== 'undefined' && process.env ? process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL : undefined)
     );
     if (envUrl) return envUrl;
 
     if (typeof window !== 'undefined' && window.localStorage) {
-      const storedUrl = normalizeUrl(window.localStorage.getItem('VITE_SUPABASE_URL'));
+      const storedUrl = normalizeUrl(
+        window.localStorage.getItem('NEXT_PUBLIC_SUPABASE_URL') ||
+        window.localStorage.getItem('VITE_SUPABASE_URL')
+      );
       if (storedUrl) return storedUrl;
     }
   } catch (e) {
@@ -50,26 +56,28 @@ export const getValidSupabaseUrl = (): string => {
 
 export const getValidSupabaseAnonKey = (): string => {
   try {
-    const metaEnv = (import.meta as any).env || {};
-    const procEnv: Record<string, any> = typeof process !== 'undefined' && process.env ? process.env : {};
+    const metaEnv = typeof import.meta !== 'undefined' ? (import.meta as any).env || {} : {};
 
     const rawKey =
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      process.env.SUPABASE_ANON_KEY ||
+      process.env.SUPABASE_PUBLISHABLE_KEY ||
       metaEnv.VITE_SUPABASE_ANON_KEY ||
       metaEnv.VITE_SUPABASE_PUBLISHABLE_KEY ||
       metaEnv.SUPABASE_PUBLISHABLE_KEY ||
       metaEnv.SUPABASE_ANON_KEY ||
-      procEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-      procEnv.VITE_SUPABASE_ANON_KEY ||
-      procEnv.VITE_SUPABASE_PUBLISHABLE_KEY ||
-      procEnv.SUPABASE_PUBLISHABLE_KEY ||
-      procEnv.SUPABASE_ANON_KEY;
+      (typeof process !== 'undefined' && process.env ? process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY : undefined);
 
     if (typeof rawKey === 'string' && rawKey.trim().length > 0) {
       return rawKey.trim();
     }
 
     if (typeof window !== 'undefined' && window.localStorage) {
-      const storedKey = window.localStorage.getItem('VITE_SUPABASE_ANON_KEY');
+      const storedKey =
+        window.localStorage.getItem('NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY') ||
+        window.localStorage.getItem('NEXT_PUBLIC_SUPABASE_ANON_KEY') ||
+        window.localStorage.getItem('VITE_SUPABASE_ANON_KEY');
       if (storedKey && storedKey.trim().length > 0) {
         return storedKey.trim();
       }
@@ -83,12 +91,49 @@ export const getValidSupabaseAnonKey = (): string => {
 export let supabaseUrl: string = getValidSupabaseUrl();
 export let supabaseAnonKey: string = getValidSupabaseAnonKey();
 
-let activeClient: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
+/**
+ * True when the admin "point this app at another Supabase project" feature has
+ * stored an override. Only then does this module build its own client.
+ */
+function hasCredentialOverride(): boolean {
+  if (typeof window === 'undefined' || !window.localStorage) return false;
+  return Boolean(
+    window.localStorage.getItem('VITE_SUPABASE_URL') ||
+      window.localStorage.getItem('VITE_SUPABASE_ANON_KEY')
+  );
+}
+
+/**
+ * Builds the default client.
+ *
+ * In the browser this delegates to the cookie-backed @supabase/ssr singleton in
+ * `lib/supabase/client.ts` so the app has exactly ONE GoTrueClient.
+ *
+ * It previously created a second `@supabase/supabase-js` client here with
+ * persistSession + autoRefreshToken enabled. That client stored the session in
+ * localStorage while the SSR client stored it in cookies, and both ran on the
+ * same pages (live chat, admin helpdesk). Two GoTrueClients over one project
+ * fight: whichever refreshed first rotated the refresh token and invalidated
+ * the other's copy. The cookie copy is the one the server reads, so once it
+ * went stale every server-side getUser() failed and /api/auth/me returned
+ * {"authenticated": false} even though the browser still looked signed in.
+ *
+ * On the server this module is only used for anonymous reads, so it must never
+ * persist or refresh a session.
+ */
+function createDefaultClient(): SupabaseClient {
+  if (typeof window !== 'undefined' && !hasCredentialOverride()) {
+    return createSsrBrowserClient() as unknown as SupabaseClient;
+  }
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: typeof window !== 'undefined',
+      autoRefreshToken: typeof window !== 'undefined',
+    },
+  });
+}
+
+let activeClient: SupabaseClient = createDefaultClient();
 
 /**
  * Proxy export for `supabase` so all imports dynamically route to the single active client.

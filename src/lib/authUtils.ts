@@ -47,7 +47,16 @@ export function hashPassword(password: string): string {
  * into the camelCase Member DTO shape consumed by the frontend.
  */
 export function profileToMemberDTO(profile: Record<string, any>) {
-  const systemRole = profile.system_role || profile.role || 'MEMBER';
+  // `system_role` is the only role column now — the old `role` column was a
+  // duplicate of it and was dropped.
+  const systemRole = profile.system_role || 'MEMBER';
+  // `address` was dropped too: it repeated what house_no / street plus the
+  // village relation already say, so it is composed here instead.
+  const address =
+    profile.address ||
+    [profile.house_no, profile.street, profile.village_name_hindi || profile.village_name]
+      .filter((part: unknown) => typeof part === 'string' && part.trim())
+      .join(', ');
   return {
     id: String(profile.id),
     name: profile.full_name || 'Member',
@@ -58,13 +67,16 @@ export function profileToMemberDTO(profile: Record<string, any>) {
     fatherName: profile.father_name || '',
     dob: profile.dob || '',
     gender: profile.gender || '',
-    address: profile.address || '',
+    address,
+    houseNo: profile.house_no || '',
+    street: profile.street || '',
     villageId: profile.village_id ? String(profile.village_id) : '8',
     occupation: profile.occupation || '',
     designation: profile.designation || '',
     politicalBackground: profile.political_background || '',
     bloodGroup: profile.blood_group || '',
-    role: profile.role || 'MEMBER',
+    // Kept in the DTO for the frontend's existing shape, derived from systemRole.
+    role: systemRole === 'MEMBER' ? 'MEMBER' : 'ADMIN',
     systemRole,
     isAdmin: systemRole === 'SUPER_ADMIN' || systemRole === 'ADMIN',
     organizationName: profile.org_name_hindi || profile.org_name || 'ग्रामोदय यूथ मंच',

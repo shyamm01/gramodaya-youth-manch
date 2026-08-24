@@ -68,8 +68,10 @@ async function enrichUserFromProfile(user: JwtUserPayload): Promise<JwtUserPaylo
   const sql = getSqlClient();
   if (!sql) return user;
   try {
+    // `role` and `is_approved` are gone: `role` duplicated `system_role` and
+    // `is_approved` duplicated `status = 'active'`. Both are derived below.
     const rows = await sql`
-      SELECT id, full_name, mobile, email, status, role, system_role, village_id, is_approved
+      SELECT id, full_name, mobile, email, status, system_role, village_id
       FROM public.profiles
       WHERE id = ${user.id}::uuid
          OR (email IS NOT NULL AND email ILIKE ${user.email || ''})
@@ -81,7 +83,7 @@ async function enrichUserFromProfile(user: JwtUserPayload): Promise<JwtUserPaylo
       const rawSys = (p.system_role || user.systemRole || 'MEMBER') as SystemRole;
       const isSuper = rawSys === 'SUPER_ADMIN';
       const sysRole: SystemRole = isSuper ? 'SUPER_ADMIN' : rawSys === 'ADMIN' ? 'ADMIN' : 'MEMBER';
-      const isAdm = isSuper || sysRole === 'ADMIN' || p.role === 'ADMIN';
+      const isAdm = isSuper || sysRole === 'ADMIN';
 
       // Fetch user custom module permissions
       let customPerms: PermissionCode[] = [];
@@ -251,6 +253,40 @@ export function clearAuthCookie(response: Response) {
   return response;
 }
 
+/** Parse a Cookie header into an exact name -> value map. */
+function parseCookieHeader(header: string | null): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!header) return out;
+  for (const part of header.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq < 0) continue;
+    const name = part.slice(0, eq).trim();
+    if (!name) continue;
+    try {
+      out[name] = decodeURIComponent(part.slice(eq + 1).trim());
+    } catch {
+      out[name] = part.slice(eq + 1).trim();
+    }
+  }
+  return out;
+}
+
+/**
+ * Cookie names that hold a bare JWT this module can verify, in priority order.
+ *
+ * Matching MUST be by exact name. The previous implementation used the regex
+ * /(?:gym_auth_token|auth-token|sb-access-token)=([^;]+)/, which is unanchored:
+ * `auth-token=` also matches the tail of Supabase SSR's `sb-<ref>-auth-token=`.
+ * In a browser that cookie is usually sent first, so the regex returned the SSR
+ * session blob ("base64-<encoded JSON>") instead of the app's own token. That is
+ * not a JWT, verification returned null, and /api/auth/me answered
+ * {"authenticated": false} for users who were in fact signed in.
+ *
+ * Supabase's own SSR cookies are deliberately NOT listed here — they are
+ * chunked and base64-wrapped, and are read by createServerClient() instead.
+ */
+const JWT_COOKIE_NAMES = ['gym_auth_token', 'sb-access-token', 'auth-token'] as const;
+
 /**
  * Extract token from Request (Authorization header or cookies)
  */
@@ -258,16 +294,15 @@ export function extractTokenFromRequest(req: Request): string | null {
   // 1. Authorization header
   const authHeader = req.headers.get('Authorization') || req.headers.get('authorization');
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.substring(7).trim();
+    const bearer = authHeader.substring(7).trim();
+    if (bearer) return bearer;
   }
 
-  // 2. Cookie header
-  const cookieHeader = req.headers.get('cookie') || req.headers.get('Cookie');
-  if (cookieHeader) {
-    const match = cookieHeader.match(/(?:gym_auth_token|auth-token|sb-access-token)=([^;]+)/);
-    if (match && match[1]) {
-      return decodeURIComponent(match[1]);
-    }
+  // 2. Cookies, by exact name, most specific first
+  const cookies = parseCookieHeader(req.headers.get('cookie') || req.headers.get('Cookie'));
+  for (const name of JWT_COOKIE_NAMES) {
+    const value = cookies[name];
+    if (value && value.trim()) return value.trim();
   }
 
   return null;

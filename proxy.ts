@@ -2,7 +2,29 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { verifyJwtToken } from './src/lib/jwtAuth';
 import { updateSession } from './lib/supabase/proxy';
 
+/**
+ * Routes that must own their own auth cookies, with no session-refresh running
+ * underneath them.
+ *
+ * `/auth/callback` is the important one. It calls exchangeCodeForSession(),
+ * which mints the session cookies for a brand-new login. If updateSession()
+ * also runs on that request it calls getUser() against a request that has no
+ * session yet (only the ?code= parameter), and @supabase/ssr responds by
+ * emitting cookie *removals*. Those removals were then copied onto the
+ * response in step 5 below and shipped as Set-Cookie headers alongside the
+ * callback's freshly minted ones — so the browser could be told to set and
+ * clear the same auth cookie in a single response. The OAuth round-trip
+ * appeared to succeed, /dashboard loaded, and the session was already gone:
+ * every later request, /api/auth/me included, saw no cookie and answered
+ * {"authenticated": false}.
+ */
+const AUTH_COOKIE_OWNING_PATHS = ['/auth/callback'];
+
 export async function proxy(request: NextRequest) {
+  if (AUTH_COOKIE_OWNING_PATHS.some((p) => request.nextUrl.pathname.startsWith(p))) {
+    return NextResponse.next();
+  }
+
   // 1. Update Supabase Auth Session & Cookies (PRD Section 11 & 28)
   const { supabaseResponse, user: supabaseUser } = await updateSession(request);
 

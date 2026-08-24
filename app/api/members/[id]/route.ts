@@ -101,7 +101,8 @@ export async function PUT(
     const sql = getSqlClient();
     if (sql) {
       const rows = await sql`
-        SELECT p.*, v.org_name, v.org_name_hindi
+        SELECT p.*, v.org_name, v.org_name_hindi,
+               v.name AS village_name, v.name_hindi AS village_name_hindi
         FROM public.profiles p
         LEFT JOIN public.villages v ON p.village_id = v.id
         WHERE p.id = ${id}
